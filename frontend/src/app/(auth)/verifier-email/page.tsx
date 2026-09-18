@@ -50,7 +50,7 @@ function VerifyEmail() {
           <Alert tone="danger">{error}</Alert>
         </div>
         <p className="mt-4 text-sm text-slatey-400">
-          Un lien de confirmation ne sert qu'une fois et expire au bout de 24 heures. Depuis la
+          Un lien de confirmation ne sert qu&apos;une fois et expire au bout de 24 heures. Depuis
           page de connexion, vous pouvez en demander un nouveau.
         </p>
         <Link href="/connexion" className="btn-primary mt-6 inline-flex">

@@ -1,8 +1,8 @@
 # État du projet — rapport de livraison
 
 Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation), Phase 2
-(AI Writer) et Phase 3 (Funding Intelligence)**, plus l'export qui figure parmi les
-fonctionnalités indispensables du MVP.
+(AI Writer), Phase 3 (Funding Intelligence) et Phase 4 (Budget)**, plus l'export qui figure
+parmi les fonctionnalités indispensables du MVP.
 
 Ce document dit ce qui fonctionne réellement, ce qui est partiel et ce qui n'est pas commencé.
 Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
@@ -160,6 +160,27 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   avec lien vers l'AI Writer), et **espace d'administration** réservé au rôle `ADMIN`.
 - Notification automatique lorsqu'un projet dépasse 70 % de compatibilité avec un dispositif.
 
+### Budget et plan de financement
+
+- **Trame de budget par type de projet** (documentaire, long métrage, court métrage, série TV,
+  série web, animation) : 22 à 27 postes répartis sur les cinq phases de production, dans
+  l'ordre où un comité de lecture les attend. La trame propose **la structure, jamais les
+  montants** : un tarif plausible inventé serait un chiffre faux dans un dossier de
+  financement. Régénérer complète sans écraser les lignes déjà chiffrées.
+- **Tous les totaux sont calculés, jamais saisis** : le montant d'une ligne vaut quantité ×
+  prix unitaire, le total du budget la somme des lignes, et le plan de financement suit le
+  budget. Sous-totaux et part relative par phase.
+- **Plan de financement où « acquis » veut dire acquis** : une source seulement espérée compte
+  dans l'identifié et dans le recherché, pas dans le financé. Quatre chiffres distincts — budget
+  total, acquis, identifié, non couvert même par l'espéré — plutôt qu'un pourcentage unique qui
+  flatterait le dossier.
+- **Calendrier de production** : une ligne par phase, dates de début et de fin.
+- **Export XLSX** à trois feuilles (budget, plan de financement, calendrier), réservé aux offres
+  qui incluent l'export. Les montants y sont des **formules** et non des valeurs figées : un
+  financeur qui corrige un prix voit le total suivre.
+- Le critère « Budget » du score de maturité lit ces tables : chiffrer le dossier fait monter le
+  score immédiatement (mesuré sur un parcours réel : 4/100 → 19/100).
+
 ### Tableau de bord et administration
 
 - Statistiques (projets, documents générés, opportunités compatibles, échéances), cartes projet
@@ -171,7 +192,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Interface
 
-- Next.js 14 (App Router), TypeScript strict, Tailwind. 17 routes, build de production
+- Next.js 14 (App Router), TypeScript strict, Tailwind. 19 routes, build de production
   vérifié, `tsc --noEmit` sans erreur.
 - Landing page complète en dix sections (problème, solution, AI Writer, Funding Intelligence,
   matching, budget, pour qui, tarifs, FAQ, CTA final).
@@ -181,7 +202,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **152 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **181 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -206,7 +227,6 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 | Fonctionnalité | Ce qui existe | Ce qui manque |
 | --- | --- | --- |
 | **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration | La base est vide au démarrage : elle s'alimente par saisie administrateur. Le pipeline de veille automatisée (collecte, classification, validation) reste en Phase 6 |
-| **Budget et plan de financement** | Tables `budgets`, `budget_items`, `funding_plans`, `funding_plan_lines`, `production_schedules` ; catégories de postes ; calculs de financement acquis/recherché/pourcentage sur le modèle ; le critère « Budget » du score les lit déjà | Générateur de budget, API, interface |
 | **Notifications** | Table, API de lecture et de marquage, affichage au tableau de bord, tâches de détection d'échéances et de dossiers incomplets | Envoi effectif des e-mails (le service SMTP existe et journalise à défaut), déclenchement planifié |
 | **Abonnements** | Trois offres en base avec prix et quotas configurables depuis l'administration, quotas appliqués | Aucun paiement : changer d'offre se fait aujourd'hui par l'administration |
 | **Internationalisation** | Champ `preferred_locale`, paramètre de langue accepté par les prompts (français / anglais) | Traduction de l'interface : elle est en français |
@@ -228,11 +248,16 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
    désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
    seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc
    obligatoire dès qu'on quitte le poste de développement, où le jeton reste renvoyé par l'API.
-5. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
+5. **Budget : aucun repère de prix** — la trame donne les postes, l'auteur cherche les tarifs
+   ailleurs. Une base de coûts indicative par pays rendrait le chiffrage plus rapide, mais
+   suppose des données vérifiées que le produit n'a pas : proposer des montants inventés serait
+   pire que ne rien proposer. Le drapeau d'offre `allows_advanced_budget` reste inutilisé — le
+   module est ouvert à tous, seul l'export XLSX suit la règle d'offre commune aux exports.
+6. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
    désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
    registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
    de dix heures demandera toujours une relecture d'ensemble.
-6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+7. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 
@@ -272,14 +297,12 @@ Installation manuelle : sections 6 et 7 du README.
 1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
-2. **Phase 4 — Budget** : générateur de budget par type de projet, plan de financement,
-   calendrier de production, export XLSX.
-3. **Tests frontend** : Playwright sur inscription → projet → génération → export.
-4. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
+2. **Tests frontend** : Playwright sur inscription → projet → génération → export.
+3. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
    (mobile money notamment), gestion du cycle d'abonnement.
-5. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
+4. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
    classification → validation humaine → base), notifications par e-mail. Il alimentera la base
    de financements que l'administration remplit aujourd'hui à la main.
-6. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
+5. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
-7. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.
+6. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

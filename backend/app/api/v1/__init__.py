@@ -6,6 +6,7 @@ from app.api.v1 import (
     admin,
     admin_funding,
     auth,
+    budget,
     dashboard,
     documents,
     exports,
@@ -19,6 +20,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(projects.router)
+api_router.include_router(budget.router)
 api_router.include_router(documents.catalog_router)
 api_router.include_router(documents.router)
 api_router.include_router(exports.router)

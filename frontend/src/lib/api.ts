@@ -8,12 +8,18 @@
 
 import type {
   AuthResponse,
+  Budget,
+  BudgetCategory,
+  BudgetItem,
   Character,
   DashboardResponse,
   DocumentSummary,
   DocumentType,
   DocumentTypeInfo,
   DocumentVersion,
+  FundingPlan,
+  FundingPlanLine,
+  FundingSourceType,
   GenerationJob,
   GenerationResult,
   MatchExplanation,
@@ -26,6 +32,7 @@ import type {
   ProjectSummary,
   ReadinessScore,
   RefineAction,
+  SchedulePhase,
   ScreenplayCapacity,
   User,
 } from "./types";
@@ -421,6 +428,113 @@ export const dashboardApi = {
   notifications: () => request<NotificationItem[]>("/api/v1/notifications"),
   markRead: (id: string) =>
     request<{ detail: string }>(`/api/v1/notifications/${id}/read`, { method: "POST" }),
+};
+
+export const budgetApi = {
+  get: (projectId: string) => request<Budget>(`/api/v1/projects/${projectId}/budget`),
+
+  /** Installe les postes attendus pour ce type de projet, sans montants. */
+  generate: (projectId: string, replace = false) =>
+    request<Budget>(`/api/v1/projects/${projectId}/budget/generate`, {
+      method: "POST",
+      body: { replace },
+    }),
+
+  updateBudget: (projectId: string, payload: { currency?: string; notes?: string }) =>
+    request<Budget>(`/api/v1/projects/${projectId}/budget`, { method: "PUT", body: payload }),
+
+  addItem: (
+    projectId: string,
+    payload: {
+      category: BudgetCategory;
+      label: string;
+      quantity?: number;
+      unit?: string | null;
+      unit_price?: number;
+    },
+  ) =>
+    request<BudgetItem>(`/api/v1/projects/${projectId}/budget/items`, {
+      method: "POST",
+      body: payload,
+    }),
+
+  updateItem: (
+    projectId: string,
+    itemId: string,
+    payload: Partial<{
+      category: BudgetCategory;
+      label: string;
+      quantity: number;
+      unit: string | null;
+      unit_price: number;
+    }>,
+  ) =>
+    request<BudgetItem>(`/api/v1/projects/${projectId}/budget/items/${itemId}`, {
+      method: "PUT",
+      body: payload,
+    }),
+
+  deleteItem: (projectId: string, itemId: string) =>
+    request<{ detail: string }>(`/api/v1/projects/${projectId}/budget/items/${itemId}`, {
+      method: "DELETE",
+    }),
+
+  plan: (projectId: string) =>
+    request<FundingPlan>(`/api/v1/projects/${projectId}/funding-plan`),
+
+  addPlanLine: (
+    projectId: string,
+    payload: {
+      source_type: FundingSourceType;
+      source_name?: string | null;
+      amount?: number;
+      is_secured?: boolean;
+      expected_date?: string | null;
+    },
+  ) =>
+    request<FundingPlanLine>(`/api/v1/projects/${projectId}/funding-plan/lines`, {
+      method: "POST",
+      body: payload,
+    }),
+
+  updatePlanLine: (
+    projectId: string,
+    lineId: string,
+    payload: Partial<{
+      source_type: FundingSourceType;
+      source_name: string | null;
+      amount: number;
+      is_secured: boolean;
+      expected_date: string | null;
+    }>,
+  ) =>
+    request<FundingPlanLine>(`/api/v1/projects/${projectId}/funding-plan/lines/${lineId}`, {
+      method: "PUT",
+      body: payload,
+    }),
+
+  deletePlanLine: (projectId: string, lineId: string) =>
+    request<{ detail: string }>(
+      `/api/v1/projects/${projectId}/funding-plan/lines/${lineId}`,
+      { method: "DELETE" },
+    ),
+
+  schedule: (projectId: string) =>
+    request<SchedulePhase[]>(`/api/v1/projects/${projectId}/schedule`),
+
+  setPhase: (
+    projectId: string,
+    payload: {
+      phase: BudgetCategory;
+      start_date?: string | null;
+      end_date?: string | null;
+      notes?: string | null;
+    },
+  ) =>
+    request<SchedulePhase>(`/api/v1/projects/${projectId}/schedule`, {
+      method: "PUT",
+      body: payload,
+    }),
 };
 
 export const jobApi = {

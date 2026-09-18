@@ -153,6 +153,80 @@ export interface GenerationResult {
   missing_information: string[];
 }
 
+export type BudgetCategory =
+  | "DEVELOPMENT"
+  | "PRE_PRODUCTION"
+  | "PRODUCTION"
+  | "POST_PRODUCTION"
+  | "DISTRIBUTION";
+
+export type FundingSourceType =
+  | "PRODUCER"
+  | "PUBLIC_FUND"
+  | "TELEVISION"
+  | "COPRODUCER"
+  | "INVESTOR"
+  | "SPONSOR"
+  | "OTHER";
+
+export interface BudgetItem {
+  id: string;
+  category: BudgetCategory;
+  label: string;
+  quantity: number;
+  unit: string | null;
+  unit_price: number;
+  /** Toujours calculé côté serveur : quantité × prix unitaire. */
+  amount: number;
+  sort_order: number;
+}
+
+export interface CategoryTotal {
+  category: BudgetCategory;
+  amount: number;
+  item_count: number;
+  share: number;
+}
+
+export interface Budget {
+  id: string;
+  project_id: string;
+  currency: string;
+  total_amount: number;
+  notes: string | null;
+  items: BudgetItem[];
+  totals_by_category: CategoryTotal[];
+  updated_at: string;
+}
+
+export interface FundingPlanLine {
+  id: string;
+  source_type: FundingSourceType;
+  source_name: string | null;
+  amount: number;
+  is_secured: boolean;
+  expected_date: string | null;
+}
+
+export interface FundingPlan {
+  currency: string;
+  total_budget: number;
+  secured_amount: number;
+  identified_amount: number;
+  sought_amount: number;
+  funded_percentage: number;
+  uncovered_amount: number;
+  lines: FundingPlanLine[];
+}
+
+export interface SchedulePhase {
+  id: string;
+  phase: BudgetCategory;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+}
+
 export type JobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
 
 /**
