@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 
 from app.core.config import settings
+from app.core.observability import tag_request
 
 request_id_header = "X-Request-ID"
 
@@ -59,6 +60,7 @@ async def request_logging_middleware(
 ) -> Response:
     request_id = request.headers.get(request_id_header) or uuid.uuid4().hex[:16]
     request.state.request_id = request_id
+    tag_request(request_id)
     started = time.perf_counter()
     response = await call_next(request)
     duration_ms = int((time.perf_counter() - started) * 1000)

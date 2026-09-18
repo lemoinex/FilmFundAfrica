@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { AuthProvider } from "@/lib/auth-context";
+import { LocaleProvider } from "@/lib/i18n";
+import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n/locale";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,10 +21,16 @@ export const metadata: Metadata = {
  * `next/font`, qui les télécharge au moment du build : cela permet de
  * construire l'image Docker dans un environnement sans accès à Google Fonts.
  * Les piles de repli système sont définies dans `tailwind.config.ts`.
+ *
+ * La langue est lue ici, côté serveur, dans le cookie déposé par le sélecteur
+ * de langue : `<html lang>` est donc juste dès le premier octet envoyé, et
+ * l'interface ne s'affiche jamais brièvement dans la mauvaise langue.
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = resolveLocale(cookies().get(LOCALE_COOKIE)?.value);
+
   return (
-    <html lang="fr">
+    <html lang={locale}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -31,7 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <LocaleProvider initialLocale={locale}>
+          <AuthProvider>{children}</AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

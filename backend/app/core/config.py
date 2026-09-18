@@ -70,6 +70,17 @@ class Settings(BaseSettings):
     #: balayage, meme si le signal Redis s'est perdu.
     job_stale_seconds: int = 60
 
+    # --- Observabilite ---
+    #: Vide : aucun suivi d'erreurs, aucune requete vers un tiers.
+    sentry_dsn: str = ""
+    #: Environnement affiche dans Sentry ; reprend `ENVIRONMENT` si vide.
+    sentry_environment: str = ""
+    #: Version deployee, pour rattacher une erreur a un lot de code.
+    sentry_release: str = ""
+    #: Part des requetes tracees pour la performance. 0 = aucune : le suivi
+    #: d'erreurs n'a pas besoin de traces, et elles coutent cher.
+    sentry_traces_sample_rate: float = 0.0
+
     # --- Paiements et abonnements ---
     #: `manual` : encaissement hors ligne, valide depuis l'administration.
     #: `mock` : prestataire simule, pour le developpement et les tests.

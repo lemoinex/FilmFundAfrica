@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.deps import DbSession
+from app.core.observability import sentry_status
 from app.core.rate_limit import backend_status
 from app.services.job_queue import job_queue
 
@@ -41,6 +42,9 @@ def health(db: DbSession) -> dict:
         "rate_limit": rate_limit,
         "generation": generation,
         "jobs_pending": job_queue.pending(),
+        # `unavailable` : un DSN est configure mais le paquet manque. Le
+        # deploiement croit alors etre suivi sans l'etre — d'ou la sonde.
+        "error_tracking": sentry_status(),
         "ai_provider": settings.ai_provider,
         "ai_configured": settings.ai_provider == "mock" or bool(settings.ai_api_key),
     }

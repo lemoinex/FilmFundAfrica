@@ -6,8 +6,10 @@ import { Suspense, useState, type FormEvent } from "react";
 
 import { Alert, Spinner } from "@/components/ui";
 import { ApiError, authApi } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 function ResetPasswordForm() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const [token, setToken] = useState(searchParams.get("token") ?? "");
   const [password, setPassword] = useState("");
@@ -23,7 +25,7 @@ function ResetPasswordForm() {
       await authApi.resetPassword(token, password);
       setDone(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Réinitialisation impossible.");
+      setError(err instanceof ApiError ? err.message : t("reset.failed"));
     } finally {
       setSubmitting(false);
     }
@@ -33,9 +35,11 @@ function ResetPasswordForm() {
     return (
       <div className="space-y-4">
         <Alert tone="success">
-          Mot de passe mis à jour. Vous pouvez vous connecter avec le nouveau.
+          {t("reset.done")}
         </Alert>
-        <Link href="/connexion" className="btn-primary w-full">Se connecter</Link>
+        <Link href="/connexion" className="btn-primary w-full">
+          {t("login.submit")}
+        </Link>
       </div>
     );
   }
@@ -46,7 +50,7 @@ function ResetPasswordForm() {
 
       {!searchParams.get("token") ? (
         <div>
-          <label className="label" htmlFor="token">Jeton reçu par e-mail</label>
+          <label className="label" htmlFor="token">{t("reset.token")}</label>
           <input
             id="token"
             className="field"
@@ -58,7 +62,7 @@ function ResetPasswordForm() {
       ) : null}
 
       <div>
-        <label className="label" htmlFor="password">Nouveau mot de passe</label>
+        <label className="label" htmlFor="password">{t("reset.newPassword")}</label>
         <input
           id="password"
           type="password"
@@ -69,21 +73,22 @@ function ResetPasswordForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <p className="hint">Au moins 8 caractères, mêlant lettres et chiffres.</p>
+        <p className="hint">{t("reset.passwordHint")}</p>
       </div>
 
       <button type="submit" className="btn-primary w-full" disabled={submitting}>
         {submitting ? <Spinner /> : null}
-        Définir le mot de passe
+        {t("reset.submit")}
       </button>
     </form>
   );
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useI18n();
   return (
     <div className="card p-8">
-      <h1 className="font-display text-2xl text-slatey-100">Nouveau mot de passe</h1>
+      <h1 className="font-display text-2xl text-slatey-100">{t("reset.title")}</h1>
       <Suspense fallback={<div className="skeleton mt-7 h-32 rounded" />}>
         <ResetPasswordForm />
       </Suspense>

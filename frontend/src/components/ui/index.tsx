@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { classNames } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 
 /* ------------------------------------------------------------------ */
 /* Retours d'état                                                      */
@@ -32,6 +33,7 @@ export function Alert({
   children: ReactNode;
   onDismiss?: () => void;
 }) {
+  const { t } = useI18n();
   const tones = {
     info: "border-signal-info/40 bg-signal-info/10 text-slatey-100",
     success: "border-signal-success/40 bg-signal-success/10 text-slatey-100",
@@ -51,7 +53,7 @@ export function Alert({
             type="button"
             onClick={onDismiss}
             className="text-slatey-400 hover:text-slatey-100"
-            aria-label="Fermer"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
@@ -117,6 +119,7 @@ export function Badge({
 
 /** Jauge du Project Readiness Score. */
 export function ScoreRing({ value, size = 56 }: { value: number | null | undefined; size?: number }) {
+  const { t } = useI18n();
   const score = value ?? 0;
   const radius = (size - 6) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -142,7 +145,7 @@ export function ScoreRing({ value, size = 56 }: { value: number | null | undefin
       </svg>
       <span
         className="absolute inset-0 flex items-center justify-center text-xs font-semibold tabular-nums text-slatey-100"
-        title={`Score de maturité : ${value ?? "non calculé"}/100`}
+        title={t("ui.scoreTitle", { value: value ?? t("ui.scoreNotComputed") })}
       >
         {value ?? "—"}
       </span>

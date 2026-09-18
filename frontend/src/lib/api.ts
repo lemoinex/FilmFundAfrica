@@ -6,6 +6,7 @@
  * redirection vers la page de connexion si elle échoue.
  */
 
+import { tr } from "./i18n/translate";
 import type {
   AuthResponse,
   Budget,
@@ -157,7 +158,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/connexion")) {
       window.location.href = "/connexion";
     }
-    throw new ApiError("Session expirée. Reconnectez-vous.", 401, "session_expired");
+    throw new ApiError(tr("api.sessionExpired"), 401, "session_expired");
   }
 
   if (!response.ok) throw await toApiError(response);
@@ -619,7 +620,7 @@ export async function waitForJob(
     await new Promise((resolve) => setTimeout(resolve, delay));
     delay = Math.min(Math.round(delay * 1.4), JOB_POLL_MAX_MS);
     if (options.signal?.aborted) {
-      throw new ApiError("Suivi de la génération interrompu.", 0, "job_tracking_aborted");
+      throw new ApiError(tr("api.jobTrackingAborted"), 0, "job_tracking_aborted");
     }
     current = await jobApi.get(current.id);
     options.onProgress?.(current);
@@ -627,7 +628,7 @@ export async function waitForJob(
 
   if (current.status === "FAILED" || current.result === null) {
     throw new ApiError(
-      current.error_message ?? "La génération a échoué.",
+      current.error_message ?? tr("api.generationFailed"),
       500,
       current.error_code ?? "job_failed",
     );

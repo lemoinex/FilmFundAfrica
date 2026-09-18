@@ -5,19 +5,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { DeadlineBadge, StatusBadge } from "@/components/funding";
 import { Alert, Badge, EmptyState, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, adminFundingApi } from "@/lib/api";
-import { formatDate } from "@/lib/format";
-import {
-  DOCUMENT_TYPE_LABELS,
-  FUNDING_CATEGORY_LABELS,
-  PROJECT_TYPE_LABELS,
-} from "@/lib/labels";
-import type {
-  DocumentType,
-  FundingCategory,
-  Opportunity,
-  OpportunityPage,
-  ProjectType,
-} from "@/lib/types";
+import { useI18n, type Translate } from "@/lib/i18n";
+import { DOCUMENT_TYPES, FUNDING_CATEGORIES, PROJECT_TYPES } from "@/lib/labels";
+import type { FundingCategory, Opportunity, OpportunityPage, ProjectType } from "@/lib/types";
 
 interface RequirementDraft {
   label: string;
@@ -56,6 +46,7 @@ function splitList(value: string): string[] {
 }
 
 export default function AdminFundingPage() {
+  const { t, formatDate } = useI18n();
   const [data, setData] = useState<OpportunityPage | null>(null);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Opportunity | null>(null);
@@ -67,9 +58,9 @@ export default function AdminFundingPage() {
     try {
       setData(await adminFundingApi.list(query || undefined));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(search), search ? 300 : 0);
@@ -79,21 +70,21 @@ export default function AdminFundingPage() {
   async function handleVerify(id: string) {
     try {
       await adminFundingApi.verify(id, "OPEN");
-      setNotice("Dispositif vérifié et publié.");
+      setNotice(t("adminFunding.verified"));
       await load(search);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Vérification impossible.");
+      setError(err instanceof ApiError ? err.message : t("adminFunding.verifyFailed"));
     }
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`Supprimer définitivement « ${name} » ?`)) return;
+    if (!window.confirm(t("adminFunding.deleteConfirm", { name }))) return;
     try {
       await adminFundingApi.remove(id);
-      setNotice("Dispositif supprimé.");
+      setNotice(t("adminFunding.deleted"));
       await load(search);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Suppression impossible.");
+      setError(err instanceof ApiError ? err.message : t("adminFunding.deleteFailed"));
     }
   }
 
@@ -102,15 +93,15 @@ export default function AdminFundingPage() {
       setEditing(await adminFundingApi.get(id));
       setShowForm(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
   }
 
   return (
     <div className="space-y-5">
       <SectionHeading
-        title="Base des financements"
-        description="Chaque dispositif exige une source consultable : sans elle, il ne peut pas être publié comme ouvert."
+        title={t("adminFunding.title")}
+        description={t("adminFunding.subtitle")}
         action={
           <button
             type="button"
@@ -120,7 +111,7 @@ export default function AdminFundingPage() {
               setShowForm(true);
             }}
           >
-            Ajouter un dispositif
+            {t("adminFunding.add")}
           </button>
         }
       />
@@ -130,6 +121,7 @@ export default function AdminFundingPage() {
 
       {showForm ? (
         <OpportunityForm
+          t={t}
           opportunity={editing}
           onCancel={() => {
             setShowForm(false);
@@ -147,7 +139,7 @@ export default function AdminFundingPage() {
       <input
         type="search"
         className="field"
-        placeholder="Rechercher un dispositif…"
+        placeholder={t("adminFunding.searchPlaceholder")}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
@@ -156,8 +148,8 @@ export default function AdminFundingPage() {
         <SkeletonCard lines={4} />
       ) : data.total === 0 ? (
         <EmptyState
-          title="Aucun dispositif"
-          description="La base est vide. Ajoutez un premier dispositif : il apparaîtra ensuite dans la recherche et dans les analyses de compatibilité des projets."
+          title={t("adminFunding.empty")}
+          description={t("adminFunding.emptyHint")}
         />
       ) : (
         <div className="space-y-2.5">
@@ -169,7 +161,7 @@ export default function AdminFundingPage() {
                   <p className="mt-0.5 text-xs text-slatey-400">{opportunity.organization}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="brass">{FUNDING_CATEGORY_LABELS[opportunity.category]}</Badge>
+                  <Badge tone="brass">{t(`fundingCategory.${opportunity.category}`)}</Badge>
                   <DeadlineBadge opportunity={opportunity} />
                   <StatusBadge opportunity={opportunity} />
                 </div>
@@ -181,7 +173,7 @@ export default function AdminFundingPage() {
                   className="btn-secondary px-3 py-1.5 text-xs"
                   onClick={() => openEditor(opportunity.id)}
                 >
-                  Modifier
+                  {t("adminFunding.editEntry")}
                 </button>
                 {opportunity.status !== "OPEN" ? (
                   <button
@@ -189,7 +181,7 @@ export default function AdminFundingPage() {
                     className="btn-secondary px-3 py-1.5 text-xs"
                     onClick={() => handleVerify(opportunity.id)}
                   >
-                    Vérifier et publier
+                    {t("adminFunding.verifyAndPublish")}
                   </button>
                 ) : null}
                 <button
@@ -197,12 +189,14 @@ export default function AdminFundingPage() {
                   className="btn-danger px-3 py-1.5 text-xs"
                   onClick={() => handleDelete(opportunity.id, opportunity.name)}
                 >
-                  Supprimer
+                  {t("common.delete")}
                 </button>
                 <span className="ml-auto text-xs text-slatey-500">
                   {opportunity.last_verified_at
-                    ? `Vérifié le ${formatDate(opportunity.last_verified_at)}`
-                    : "Jamais vérifié"}
+                    ? t("funding.verifiedOn", {
+                        date: formatDate(opportunity.last_verified_at),
+                      })
+                    : t("adminFunding.neverVerified")}
                 </span>
               </div>
             </div>
@@ -217,10 +211,12 @@ export default function AdminFundingPage() {
 /* Formulaire                                                          */
 /* ------------------------------------------------------------------ */
 function OpportunityForm({
+  t,
   opportunity,
   onCancel,
   onSaved,
 }: {
+  t: Translate;
   opportunity: Opportunity | null;
   onCancel: () => void;
   onSaved: (message: string) => void | Promise<void>;
@@ -307,7 +303,7 @@ function OpportunityForm({
     try {
       if (opportunity) {
         await adminFundingApi.update(opportunity.id, payload);
-        await onSaved("Dispositif mis à jour.");
+        await onSaved(t("adminFunding.saved"));
       } else {
         payload.requirement_items = requirements
           .filter((item) => item.label.trim())
@@ -317,10 +313,10 @@ function OpportunityForm({
             required_document_type: item.required_document_type || null,
           }));
         await adminFundingApi.create(payload);
-        await onSaved("Dispositif ajouté.");
+        await onSaved(t("adminFunding.created"));
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Enregistrement impossible.");
+      setError(err instanceof ApiError ? err.message : t("adminFunding.saveFailed"));
       setSaving(false);
     }
   }
@@ -328,7 +324,7 @@ function OpportunityForm({
   return (
     <form onSubmit={handleSubmit} className="card space-y-5 p-6">
       <h3 className="font-display text-lg text-slatey-100">
-        {opportunity ? "Modifier le dispositif" : "Nouveau dispositif"}
+        {t(opportunity ? "adminFunding.formEdit" : "adminFunding.formNew")}
       </h3>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -336,7 +332,7 @@ function OpportunityForm({
       {/* Identité */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="name">Nom du dispositif *</label>
+          <label className="label" htmlFor="name">{t("adminFunding.name")}</label>
           <input
             id="name"
             className="field"
@@ -346,7 +342,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="organization">Organisme *</label>
+          <label className="label" htmlFor="organization">{t("adminFunding.organization")}</label>
           <input
             id="organization"
             className="field"
@@ -358,7 +354,7 @@ function OpportunityForm({
       </div>
 
       <div>
-        <label className="label" htmlFor="description">Description</label>
+        <label className="label" htmlFor="description">{t("adminFunding.description")}</label>
         <textarea
           id="description"
           className="field"
@@ -371,22 +367,22 @@ function OpportunityForm({
       {/* Traçabilité — en évidence, car c'est la condition de publication */}
       <fieldset className="rounded-lg border border-brass-500/30 bg-brass-500/[0.04] p-4">
         <legend className="px-2 text-xs uppercase tracking-wide text-brass-300">
-          Traçabilité (obligatoire)
+          {t("adminFunding.traceability")}
         </legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="source_name">Nom de la source *</label>
+            <label className="label" htmlFor="source_name">{t("adminFunding.sourceName")}</label>
             <input
               id="source_name"
               className="field"
               required
-              placeholder="Site officiel de l'organisme, appel à projets…"
+              placeholder={t("adminFunding.sourceNamePlaceholder")}
               value={form.source_name}
               onChange={(event) => update("source_name", event.target.value)}
             />
           </div>
           <div>
-            <label className="label" htmlFor="source_url">URL de la source *</label>
+            <label className="label" htmlFor="source_url">{t("adminFunding.sourceUrl")}</label>
             <input
               id="source_url"
               type="url"
@@ -398,31 +394,28 @@ function OpportunityForm({
             />
           </div>
         </div>
-        <p className="hint">
-          Un dispositif ne peut pas être publié comme ouvert sans son URL source. Elle est
-          affichée aux utilisateurs avec la date de dernière vérification.
-        </p>
+        <p className="hint">{t("adminFunding.traceabilityHint")}</p>
       </fieldset>
 
       {/* Éligibilité */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="category">Type de financement</label>
+          <label className="label" htmlFor="category">{t("search.category")}</label>
           <select
             id="category"
             className="field"
             value={form.category}
             onChange={(event) => update("category", event.target.value)}
           >
-            {(Object.keys(FUNDING_CATEGORY_LABELS) as FundingCategory[]).map((category) => (
+            {FUNDING_CATEGORIES.map((category) => (
               <option key={category} value={category}>
-                {FUNDING_CATEGORY_LABELS[category]}
+                {t(`fundingCategory.${category}`)}
               </option>
             ))}
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="country">Pays de l&apos;organisme</label>
+          <label className="label" htmlFor="country">{t("adminFunding.organizationCountry")}</label>
           <input
             id="country"
             className="field"
@@ -434,25 +427,22 @@ function OpportunityForm({
 
       <div>
         <label className="label" htmlFor="eligible_countries">
-          Pays éligibles (séparés par des virgules)
+          {t("adminFunding.eligibleCountries")}
         </label>
         <input
           id="eligible_countries"
           className="field"
-          placeholder="Sénégal, Cameroun, Côte d'Ivoire — laisser vide si ouvert à tous"
+          placeholder={t("adminFunding.eligibleCountriesPlaceholder")}
           value={form.eligible_countries}
           onChange={(event) => update("eligible_countries", event.target.value)}
         />
-        <p className="hint">
-          Vide = ouvert à tous les pays. Un projet dont le pays n&apos;y figure pas est marqué
-          inéligible, avec la raison.
-        </p>
+        <p className="hint">{t("adminFunding.eligibleCountriesHint")}</p>
       </div>
 
       <div>
-        <span className="label">Types de projet acceptés</span>
+        <span className="label">{t("adminFunding.acceptedTypes")}</span>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(PROJECT_TYPE_LABELS) as ProjectType[]).map((type) => (
+          {PROJECT_TYPES.map((type) => (
             <button
               key={type}
               type="button"
@@ -463,16 +453,16 @@ function OpportunityForm({
                   : "btn-secondary px-3 py-1.5 text-xs"
               }
             >
-              {PROJECT_TYPE_LABELS[type]}
+              {t(`projectType.${type}`)}
             </button>
           ))}
         </div>
-        <p className="hint">Aucune sélection = ouvert à tous les types.</p>
+        <p className="hint">{t("adminFunding.acceptedTypesHint")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="genres">Genres (virgules)</label>
+          <label className="label" htmlFor="genres">{t("adminFunding.genres")}</label>
           <input
             id="genres"
             className="field"
@@ -481,7 +471,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="languages">Langues (virgules)</label>
+          <label className="label" htmlFor="languages">{t("adminFunding.languages")}</label>
           <input
             id="languages"
             className="field"
@@ -494,7 +484,7 @@ function OpportunityForm({
       {/* Montants et dates */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label className="label" htmlFor="minimum_budget">Montant minimum</label>
+          <label className="label" htmlFor="minimum_budget">{t("adminFunding.minAmount")}</label>
           <input
             id="minimum_budget"
             type="number"
@@ -505,7 +495,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="maximum_budget">Montant maximum</label>
+          <label className="label" htmlFor="maximum_budget">{t("adminFunding.maxAmount")}</label>
           <input
             id="maximum_budget"
             type="number"
@@ -516,7 +506,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="currency">Devise</label>
+          <label className="label" htmlFor="currency">{t("adminFunding.currency")}</label>
           <input
             id="currency"
             className="field"
@@ -529,7 +519,7 @@ function OpportunityForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="opening_date">Ouverture des candidatures</label>
+          <label className="label" htmlFor="opening_date">{t("opportunity.opening")}</label>
           <input
             id="opening_date"
             type="date"
@@ -539,7 +529,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="deadline">Date limite</label>
+          <label className="label" htmlFor="deadline">{t("opportunity.deadline")}</label>
           <input
             id="deadline"
             type="date"
@@ -552,7 +542,7 @@ function OpportunityForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="application_url">Lien de candidature</label>
+          <label className="label" htmlFor="application_url">{t("adminFunding.applicationUrl")}</label>
           <input
             id="application_url"
             type="url"
@@ -562,7 +552,7 @@ function OpportunityForm({
           />
         </div>
         <div>
-          <label className="label" htmlFor="website">Site de l&apos;organisme</label>
+          <label className="label" htmlFor="website">{t("adminFunding.website")}</label>
           <input
             id="website"
             type="url"
@@ -574,7 +564,7 @@ function OpportunityForm({
       </div>
 
       <div>
-        <label className="label" htmlFor="requirements">Pièces à fournir (texte libre)</label>
+        <label className="label" htmlFor="requirements">{t("adminFunding.requirementsText")}</label>
         <textarea
           id="requirements"
           className="field"
@@ -587,17 +577,14 @@ function OpportunityForm({
       {/* Pièces exigées, à la création */}
       {!opportunity ? (
         <div>
-          <span className="label">Documents exigés</span>
-          <p className="hint mb-2">
-            Un document rattaché à un type permet au matching de dire à l&apos;auteur ce qui
-            manque à son dossier.
-          </p>
+          <span className="label">{t("adminFunding.requiredDocuments")}</span>
+          <p className="hint mb-2">{t("adminFunding.requiredDocumentsHint")}</p>
           <div className="space-y-2">
             {requirements.map((requirement, index) => (
               <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                 <input
                   className="field py-1.5 text-sm"
-                  placeholder="Intitulé (Synopsis, Budget…)"
+                  placeholder={t("adminFunding.requirementLabel")}
                   value={requirement.label}
                   onChange={(event) =>
                     setRequirements((current) =>
@@ -620,9 +607,11 @@ function OpportunityForm({
                     )
                   }
                 >
-                  <option value="">Aucun type rattaché</option>
-                  {(Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[]).map((type) => (
-                    <option key={type} value={type}>{DOCUMENT_TYPE_LABELS[type]}</option>
+                  <option value="">{t("adminFunding.noDocumentType")}</option>
+                  {DOCUMENT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {t(`documentType.${type}`)}
+                    </option>
                   ))}
                 </select>
                 <button
@@ -632,7 +621,7 @@ function OpportunityForm({
                     setRequirements((current) => current.filter((_, i) => i !== index))
                   }
                 >
-                  Retirer
+                  {t("adminFunding.removeRequirement")}
                 </button>
               </div>
             ))}
@@ -647,33 +636,33 @@ function OpportunityForm({
               ])
             }
           >
-            Ajouter une pièce
+            {t("adminFunding.addRequirement")}
           </button>
         </div>
       ) : null}
 
       <div>
-        <label className="label" htmlFor="status">Statut</label>
+        <label className="label" htmlFor="status">{t("adminFunding.status")}</label>
         <select
           id="status"
           className="field"
           value={form.status}
           onChange={(event) => update("status", event.target.value)}
         >
-          <option value="UNVERIFIED">Non vérifié — non présenté comme actif</option>
-          <option value="OPEN">Ouvert — vérifié et publié</option>
-          <option value="UPCOMING">À venir</option>
-          <option value="CLOSED">Clos</option>
+          <option value="UNVERIFIED">{t("adminFunding.statusUnverified")}</option>
+          <option value="OPEN">{t("adminFunding.statusOpen")}</option>
+          <option value="UPCOMING">{t("adminFunding.statusUpcoming")}</option>
+          <option value="CLOSED">{t("adminFunding.statusClosed")}</option>
         </select>
       </div>
 
       <div className="flex gap-2 border-t border-ink-700 pt-5">
         <button type="submit" className="btn-primary" disabled={saving}>
           {saving ? <Spinner /> : null}
-          {opportunity ? "Enregistrer" : "Ajouter le dispositif"}
+          {t(opportunity ? "common.save" : "adminFunding.submitNew")}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Annuler
+          {t("common.cancel")}
         </button>
       </div>
     </form>

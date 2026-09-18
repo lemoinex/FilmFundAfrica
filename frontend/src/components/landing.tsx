@@ -1,29 +1,45 @@
+"use client";
+
 import Link from "next/link";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Badge } from "@/components/ui";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { DOCUMENT_TYPES } from "@/lib/labels";
 
 /* ------------------------------------------------------------------ */
 /* Navigation                                                          */
 /* ------------------------------------------------------------------ */
+const NAV_LINKS: { href: string; label: MessageKey }[] = [
+  { href: "#solution", label: "landing.nav.platform" },
+  { href: "#financements", label: "landing.nav.funding" },
+  { href: "#tarifs", label: "landing.nav.pricing" },
+  { href: "#faq", label: "landing.nav.faq" },
+];
+
 export function LandingNav() {
+  const { t } = useI18n();
+
   return (
     <header className="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/85 backdrop-blur">
       <nav className="container-page flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <Logo />
-          <span className="font-display text-lg text-slatey-100">FilmFund Africa</span>
+          <span className="font-display text-lg text-slatey-100">{t("common.appName")}</span>
         </Link>
 
         <div className="hidden items-center gap-7 text-sm text-slatey-300 md:flex">
-          <a href="#solution" className="hover:text-slatey-100">Plateforme</a>
-          <a href="#financements" className="hover:text-slatey-100">Financements</a>
-          <a href="#tarifs" className="hover:text-slatey-100">Tarifs</a>
-          <a href="#faq" className="hover:text-slatey-100">FAQ</a>
+          {NAV_LINKS.map((link) => (
+            <a key={link.href} href={link.href} className="hover:text-slatey-100">
+              {t(link.label)}
+            </a>
+          ))}
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/connexion" className="btn-ghost">Connexion</Link>
-          <Link href="/inscription" className="btn-primary">Créer mon projet</Link>
+          <LanguageSwitcher />
+          <Link href="/connexion" className="btn-ghost">{t("landing.nav.login")}</Link>
+          <Link href="/inscription" className="btn-primary">{t("landing.cta")}</Link>
         </div>
       </nav>
     </header>
@@ -44,32 +60,30 @@ export function Logo({ className = "h-7 w-7" }: { className?: string }) {
 /* 0 — Hero                                                            */
 /* ------------------------------------------------------------------ */
 export function Hero() {
+  const { t } = useI18n();
+
   return (
     <section className="relative overflow-hidden bg-grain-fade">
       <div className="container-page py-20 sm:py-28">
         <div className="max-w-3xl animate-fade-up">
-          <p className="eyebrow mb-5">De l&apos;idée au financement de votre projet audiovisuel</p>
+          <p className="eyebrow mb-5">{t("landing.hero.eyebrow")}</p>
           <h1 className="font-display text-4xl leading-[1.12] text-slatey-100 sm:text-5xl lg:text-6xl">
-            Transformez votre idée en projet audiovisuel finançable.
+            {t("landing.hero.title")}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slatey-300">
-            Développez votre projet, créez votre dossier et découvrez les financements adaptés
-            à votre film — avec un assistant conçu pour les réalités du cinéma africain
-            francophone.
+            {t("landing.hero.body")}
           </p>
 
           <div className="mt-9 flex flex-wrap gap-3">
             <Link href="/inscription" className="btn-primary px-6 py-3 text-base">
-              Créer mon projet
+              {t("landing.cta")}
             </Link>
             <a href="#solution" className="btn-secondary px-6 py-3 text-base">
-              Découvrir la plateforme
+              {t("landing.hero.discover")}
             </a>
           </div>
 
-          <p className="mt-6 text-sm text-slatey-400">
-            Offre gratuite · Aucune carte bancaire requise
-          </p>
+          <p className="mt-6 text-sm text-slatey-400">{t("landing.hero.noCard")}</p>
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brass-500/30 to-transparent" />
@@ -80,37 +94,34 @@ export function Hero() {
 /* ------------------------------------------------------------------ */
 /* 1 — Problème                                                        */
 /* ------------------------------------------------------------------ */
-const PROBLEMS = [
-  "Structurer un projet encore flou",
-  "Rédiger un dossier au niveau attendu",
-  "Comprendre ce que veulent vraiment les financeurs",
-  "Trouver les fonds adaptés à son film",
-  "Suivre les appels à projets et leurs échéances",
-  "Construire un budget crédible",
-  "Préparer un pitch qui tient en trois minutes",
-  "Travailler sans outil pensé pour l'Afrique",
+const PROBLEMS: MessageKey[] = [
+  "landing.problem.1",
+  "landing.problem.2",
+  "landing.problem.3",
+  "landing.problem.4",
+  "landing.problem.5",
+  "landing.problem.6",
+  "landing.problem.7",
+  "landing.problem.8",
 ];
 
 export function Problem() {
+  const { t } = useI18n();
+
   return (
     <section className="border-t border-ink-800 py-20">
       <div className="container-page">
         <div className="mb-10 max-w-2xl">
-          <p className="eyebrow mb-3">Le problème</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Le film existe. Le dossier, rarement.
-          </h2>
-          <p className="mt-4 text-slatey-300">
-            Chaque année, des projets solides sont écartés non pas pour leur qualité
-            artistique, mais parce que le dossier ne répond pas aux attentes des comités.
-          </p>
+          <p className="eyebrow mb-3">{t("landing.problem.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.problem.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.problem.body")}</p>
         </div>
 
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PROBLEMS.map((problem) => (
             <li key={problem} className="card p-4 text-sm text-slatey-300">
               <span className="mr-2 text-signal-danger">✕</span>
-              {problem}
+              {t(problem)}
             </li>
           ))}
         </ul>
@@ -122,49 +133,33 @@ export function Problem() {
 /* ------------------------------------------------------------------ */
 /* 2 — Solution                                                        */
 /* ------------------------------------------------------------------ */
-const PILLARS = [
-  {
-    title: "Project Development",
-    description:
-      "Structurez votre projet étape par étape : concept, personnages, enjeux, vision, public.",
-  },
-  {
-    title: "Funding Intelligence",
-    description:
-      "Une base d'opportunités qui conserve sa source et sa date de dernière vérification.",
-  },
-  {
-    title: "AI Assistant",
-    description:
-      "Un assistant spécialisé dans les documents du cinéma, pas un générateur de texte générique.",
-  },
-  {
-    title: "Project Management",
-    description: "Vos documents, leurs versions et vos échéances au même endroit.",
-  },
+const PILLARS: { title: MessageKey; description: MessageKey }[] = [
+  { title: "landing.pillar.development", description: "landing.pillar.developmentBody" },
+  { title: "landing.pillar.funding", description: "landing.pillar.fundingBody" },
+  { title: "landing.pillar.ai", description: "landing.pillar.aiBody" },
+  { title: "landing.pillar.management", description: "landing.pillar.managementBody" },
 ];
 
 export function Solution() {
+  const { t } = useI18n();
+
   return (
     <section id="solution" className="border-t border-ink-800 py-20">
       <div className="container-page">
         <div className="mb-10 max-w-2xl">
-          <p className="eyebrow mb-3">La solution</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Une chaîne continue : idée → projet → dossier → financement.
-          </h2>
-          <p className="mt-4 text-slatey-300">
-            FilmFund Africa n&apos;est pas un ERP audiovisuel. Chaque fonctionnalité renforce
-            cette seule chaîne.
-          </p>
+          <p className="eyebrow mb-3">{t("landing.solution.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.solution.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.solution.body")}</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PILLARS.map((pillar, index) => (
             <div key={pillar.title} className="card p-6">
               <span className="font-display text-sm text-brass-400">0{index + 1}</span>
-              <h3 className="mt-3 font-display text-lg text-slatey-100">{pillar.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slatey-400">{pillar.description}</p>
+              <h3 className="mt-3 font-display text-lg text-slatey-100">{t(pillar.title)}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slatey-400">
+                {t(pillar.description)}
+              </p>
             </div>
           ))}
         </div>
@@ -176,73 +171,64 @@ export function Solution() {
 /* ------------------------------------------------------------------ */
 /* 3 — AI Writer                                                       */
 /* ------------------------------------------------------------------ */
-const DOCUMENTS = [
-  "Logline",
-  "Synopsis court",
-  "Synopsis long",
-  "Note d'intention",
-  "Note de réalisation",
-  "Traitement",
-  "Présentation des personnages",
-  "Pitch oral",
-  "Pitch écrit",
-  "Bible du projet",
-  "Scénario dialogué",
+const WRITER_POINTS: MessageKey[] = [
+  "landing.writer.point1",
+  "landing.writer.point2",
+  "landing.writer.point3",
+  "landing.writer.point4",
+];
+
+/** Les mêmes actions que dans l'éditeur, plus la régénération complète. */
+const REWORK_ACTIONS: MessageKey[] = [
+  "landing.writer.regenerate",
+  "editor.refine.IMPROVE",
+  "editor.refine.SHORTEN",
+  "editor.refine.EXPAND",
+  "editor.refine.CORRECT",
 ];
 
 export function AiWriter() {
+  const { t } = useI18n();
+
   return (
     <section className="border-t border-ink-800 py-20">
       <div className="container-page grid items-center gap-12 lg:grid-cols-2">
         <div>
-          <p className="eyebrow mb-3">AI Writer</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Des documents cohérents entre eux, pas onze textes indépendants.
-          </h2>
-          <p className="mt-4 text-slatey-300">
-            Chaque document est écrit à partir du contexte complet du projet et des documents
-            déjà validés : la note de réalisation prolonge la note d&apos;intention, le
-            traitement suit le synopsis, le scénario respecte le traitement.
-          </p>
+          <p className="eyebrow mb-3">{t("writer.title")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.writer.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.writer.body")}</p>
 
           <ul className="mt-6 space-y-3 text-sm text-slatey-300">
-            <li className="flex gap-3">
-              <span className="text-brass-400">→</span>
-              Structure professionnelle imposée et longueur cible — jamais de remplissage.
-            </li>
-            <li className="flex gap-3">
-              <span className="text-brass-400">→</span>
-              Durée de scénario au choix (10, 26, 52, 90, 120 min) : 1 page ≈ 1 minute.
-            </li>
-            <li className="flex gap-3">
-              <span className="text-brass-400">→</span>
-              Versions sauvegardées, comparables et restaurables à tout moment.
-            </li>
-            <li className="flex gap-3">
-              <span className="text-brass-400">→</span>
-              Information absente ? Le document écrit « Information non fournie. » plutôt que
-              d&apos;inventer.
-            </li>
+            {WRITER_POINTS.map((point) => (
+              <li key={point} className="flex gap-3">
+                <span className="text-brass-400">→</span>
+                {t(point)}
+              </li>
+            ))}
           </ul>
         </div>
 
         <div className="card p-6">
           <p className="mb-4 text-xs uppercase tracking-wide text-slatey-400">
-            Documents générables
+            {t("landing.writer.documents")}
           </p>
+          {/* La liste vient du catalogue de documents : la page d'accueil ne
+              peut pas annoncer un document que l'AI Writer ne produit pas. */}
           <div className="flex flex-wrap gap-2">
-            {DOCUMENTS.map((document) => (
-              <Badge key={document} tone="brass">{document}</Badge>
+            {DOCUMENT_TYPES.map((type) => (
+              <Badge key={type} tone="brass">
+                {t(`documentType.${type}`)}
+              </Badge>
             ))}
           </div>
           <div className="mt-6 border-t border-ink-700 pt-5">
             <p className="mb-3 text-xs uppercase tracking-wide text-slatey-400">
-              Retravailler en un clic
+              {t("landing.writer.rework")}
             </p>
             <div className="flex flex-wrap gap-2">
-              {["Régénérer", "Améliorer", "Raccourcir", "Développer", "Corriger"].map((action) => (
+              {REWORK_ACTIONS.map((action) => (
                 <span key={action} className="btn-secondary pointer-events-none px-3 py-1.5 text-xs">
-                  {action}
+                  {t(action)}
                 </span>
               ))}
             </div>
@@ -256,34 +242,35 @@ export function AiWriter() {
 /* ------------------------------------------------------------------ */
 /* 4 — Funding Intelligence · 5 — Matching                             */
 /* ------------------------------------------------------------------ */
+const EXAMPLE_FUNDS = [
+  { letter: "A", score: 92 },
+  { letter: "B", score: 87 },
+  { letter: "C", score: 81 },
+];
+
 export function Funding() {
+  const { t } = useI18n();
+
   return (
     <section id="financements" className="border-t border-ink-800 py-20">
       <div className="container-page">
         <div className="mb-10 max-w-2xl">
-          <p className="eyebrow mb-3">Funding Intelligence &amp; Matching</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Les financements qui correspondent vraiment à votre projet.
-          </h2>
-          <p className="mt-4 text-slatey-300">
-            Fonds, bourses, résidences, laboratoires, festivals et forums de coproduction,
-            filtrés par pays, genre, type de projet, budget et langue.
-          </p>
+          <p className="eyebrow mb-3">{t("landing.funding.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.funding.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.funding.body")}</p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="card p-6 lg:col-span-2">
             <p className="mb-4 text-xs uppercase tracking-wide text-slatey-400">
-              Exemple d&apos;analyse de compatibilité
+              {t("landing.funding.example")}
             </p>
             <div className="space-y-3">
-              {[
-                { name: "Fonds A", score: 92 },
-                { name: "Fonds B", score: 87 },
-                { name: "Fonds C", score: 81 },
-              ].map((fund) => (
-                <div key={fund.name} className="flex items-center gap-4">
-                  <span className="w-20 text-sm text-slatey-200">{fund.name}</span>
+              {EXAMPLE_FUNDS.map((fund) => (
+                <div key={fund.letter} className="flex items-center gap-4">
+                  <span className="w-20 text-sm text-slatey-200">
+                    {t("landing.funding.exampleFund", { letter: fund.letter })}
+                  </span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-700">
                     <div
                       className="h-full rounded-full bg-brass-400"
@@ -297,22 +284,19 @@ export function Funding() {
               ))}
             </div>
             <p className="mt-5 border-t border-ink-700 pt-4 text-xs leading-relaxed text-slatey-400">
-              Pour chaque résultat : pourquoi ce fonds correspond, conditions remplies,
-              conditions manquantes, documents requis, date limite, montant potentiel et lien
-              de candidature.
+              {t("landing.funding.exampleNote")}
             </p>
           </div>
 
           <div className="card border-brass-500/25 bg-brass-500/[0.04] p-6">
-            <h3 className="font-display text-base text-brass-100">Ce que le score n&apos;est pas</h3>
+            <h3 className="font-display text-base text-brass-100">
+              {t("landing.funding.notTitle")}
+            </h3>
             <p className="mt-3 text-sm leading-relaxed text-slatey-300">
-              Le score de compatibilité est un indicateur d&apos;aide à la décision. Il ne
-              constitue en aucun cas une garantie de financement : les conditions officielles
-              de chaque organisme font foi.
+              {t("landing.funding.notBody")}
             </p>
             <p className="mt-4 text-sm leading-relaxed text-slatey-400">
-              Aucune opportunité n&apos;est affichée sans sa source et sa date de dernière
-              vérification.
+              {t("landing.funding.sourceNote")}
             </p>
           </div>
         </div>
@@ -324,41 +308,41 @@ export function Funding() {
 /* ------------------------------------------------------------------ */
 /* 6 — Budget                                                          */
 /* ------------------------------------------------------------------ */
+const BUDGET_ROWS: { phase: MessageKey; detail: MessageKey }[] = [
+  { phase: "budgetCategory.DEVELOPMENT", detail: "landing.budget.development" },
+  { phase: "budgetCategory.PRE_PRODUCTION", detail: "landing.budget.preProduction" },
+  { phase: "budgetCategory.PRODUCTION", detail: "landing.budget.production" },
+  { phase: "budgetCategory.POST_PRODUCTION", detail: "landing.budget.postProduction" },
+  { phase: "budgetCategory.DISTRIBUTION", detail: "landing.budget.distribution" },
+];
+
 export function BudgetSection() {
+  const { t } = useI18n();
+
   return (
     <section className="border-t border-ink-800 py-20">
       <div className="container-page grid items-center gap-12 lg:grid-cols-2">
         <div className="card p-6">
           <p className="mb-4 text-xs uppercase tracking-wide text-slatey-400">
-            Postes budgétaires
+            {t("landing.budget.lines")}
           </p>
           <div className="space-y-2.5">
-            {[
-              ["Développement", "recherche, écriture, repérages"],
-              ["Préproduction", "casting, préparation, autorisations"],
-              ["Production", "équipe, matériel, transport, décors"],
-              ["Postproduction", "montage, étalonnage, mixage, sous-titrage"],
-              ["Distribution", "festivals, communication, marketing"],
-            ].map(([phase, detail]) => (
-              <div key={phase} className="flex items-baseline justify-between gap-4 border-b border-ink-800 pb-2.5 last:border-0">
-                <span className="text-sm font-medium text-slatey-200">{phase}</span>
-                <span className="text-right text-xs text-slatey-400">{detail}</span>
+            {BUDGET_ROWS.map((row) => (
+              <div
+                key={row.phase}
+                className="flex items-baseline justify-between gap-4 border-b border-ink-800 pb-2.5 last:border-0"
+              >
+                <span className="text-sm font-medium text-slatey-200">{t(row.phase)}</span>
+                <span className="text-right text-xs text-slatey-400">{t(row.detail)}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div>
-          <p className="eyebrow mb-3">Budget &amp; plan de financement</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Un budget que le comité peut lire sans vous.
-          </h2>
-          <p className="mt-4 text-slatey-300">
-            Budget par phase, plan de financement par source, calcul automatique du financement
-            acquis, du financement recherché et du pourcentage couvert. Calendrier de production
-            du développement à la distribution.
-          </p>
-          <Badge tone="neutral">Module à venir — Phase 4</Badge>
+          <p className="eyebrow mb-3">{t("landing.budget.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.budget.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.budget.body")}</p>
         </div>
       </div>
     </section>
@@ -368,41 +352,56 @@ export function BudgetSection() {
 /* ------------------------------------------------------------------ */
 /* 7 — Pour qui ?                                                      */
 /* ------------------------------------------------------------------ */
-const AUDIENCES = [
+const AUDIENCES: { title: MessageKey; items: MessageKey[] }[] = [
   {
-    title: "Auteur · Réalisateur",
-    items: ["Créer ses projets", "Générer ses documents", "Chercher des financements", "Suivre ses échéances"],
+    title: "landing.audience.author",
+    items: [
+      "landing.audience.author1",
+      "landing.audience.author2",
+      "landing.audience.author3",
+      "landing.audience.author4",
+    ],
   },
   {
-    title: "Producteur",
-    items: ["Plusieurs projets", "Budgets", "Équipes et collaborateurs", "Suivi des candidatures"],
+    title: "landing.audience.producer",
+    items: [
+      "landing.audience.producer1",
+      "landing.audience.producer2",
+      "landing.audience.producer3",
+      "landing.audience.producer4",
+    ],
   },
   {
-    title: "Institution",
-    items: ["École de cinéma", "Incubateur, fonds culturel", "ONG, organisme de formation", "Gestion de cohortes"],
+    title: "landing.audience.institution",
+    items: [
+      "landing.audience.institution1",
+      "landing.audience.institution2",
+      "landing.audience.institution3",
+      "landing.audience.institution4",
+    ],
   },
 ];
 
 export function Audiences() {
+  const { t } = useI18n();
+
   return (
     <section className="border-t border-ink-800 py-20">
       <div className="container-page">
         <div className="mb-10 max-w-2xl">
-          <p className="eyebrow mb-3">Pour qui ?</p>
-          <h2 className="font-display text-3xl text-slatey-100">
-            Des auteurs isolés aux structures qui accompagnent.
-          </h2>
+          <p className="eyebrow mb-3">{t("landing.audiences.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.audiences.title")}</h2>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           {AUDIENCES.map((audience) => (
             <div key={audience.title} className="card p-6">
-              <h3 className="font-display text-lg text-slatey-100">{audience.title}</h3>
+              <h3 className="font-display text-lg text-slatey-100">{t(audience.title)}</h3>
               <ul className="mt-4 space-y-2 text-sm text-slatey-400">
                 {audience.items.map((item) => (
                   <li key={item} className="flex gap-2.5">
                     <span className="text-brass-400">·</span>
-                    {item}
+                    {t(item)}
                   </li>
                 ))}
               </ul>
@@ -417,59 +416,66 @@ export function Audiences() {
 /* ------------------------------------------------------------------ */
 /* 8 — Tarifs                                                          */
 /* ------------------------------------------------------------------ */
-const PLANS = [
+const PLANS: {
+  name: MessageKey;
+  price: string;
+  period: MessageKey | null;
+  description: MessageKey;
+  features: MessageKey[];
+  cta: MessageKey;
+  highlighted: boolean;
+}[] = [
   {
-    name: "Gratuit",
+    name: "plan.FREE",
     price: "0",
-    period: "",
-    description: "Pour tester la plateforme sur un projet.",
-    features: ["1 projet", "1 génération IA", "Veille limitée"],
-    cta: "Commencer",
+    period: null,
+    description: "landing.pricing.freeBody",
+    features: ["landing.pricing.free1", "landing.pricing.free2", "landing.pricing.free3"],
+    cta: "landing.pricing.freeCta",
     highlighted: false,
   },
   {
-    name: "Pro Auteur",
+    name: "plan.PRO_AUTHOR",
     price: "20 000",
-    period: "FCFA / mois",
-    description: "Pour un auteur qui porte ses projets jusqu'au dépôt.",
+    period: "landing.pricing.perMonth",
+    description: "landing.pricing.proBody",
     features: [
-      "Projets illimités",
-      "Génération IA complète",
-      "Veille personnalisée",
-      "Matching des financements",
-      "Export PDF et Word",
+      "landing.pricing.pro1",
+      "landing.pricing.pro2",
+      "landing.pricing.pro3",
+      "landing.pricing.pro4",
+      "landing.pricing.pro5",
     ],
-    cta: "Choisir Pro Auteur",
+    cta: "landing.pricing.proCta",
     highlighted: true,
   },
   {
-    name: "Producteur",
+    name: "plan.PRODUCER",
     price: "100 000",
-    period: "FCFA / mois",
-    description: "Pour une structure qui gère un portefeuille de projets.",
+    period: "landing.pricing.perMonth",
+    description: "landing.pricing.producerBody",
     features: [
-      "Gestion multi-projets",
-      "Budget avancé",
-      "Collaboration d'équipe",
-      "Export complet du dossier",
-      "Suivi des candidatures",
+      "landing.pricing.producer1",
+      "landing.pricing.producer2",
+      "landing.pricing.producer3",
+      "landing.pricing.producer4",
+      "landing.pricing.producer5",
     ],
-    cta: "Choisir Producteur",
+    cta: "landing.pricing.producerCta",
     highlighted: false,
   },
 ];
 
 export function Pricing() {
+  const { t } = useI18n();
+
   return (
     <section id="tarifs" className="border-t border-ink-800 py-20">
       <div className="container-page">
         <div className="mb-10 max-w-2xl">
-          <p className="eyebrow mb-3">Tarifs</p>
-          <h2 className="font-display text-3xl text-slatey-100">Trois offres, une seule promesse.</h2>
-          <p className="mt-4 text-slatey-300">
-            L&apos;usage de l&apos;IA fonctionne au crédit : chaque génération en consomme,
-            afin que le service reste soutenable et prévisible.
-          </p>
+          <p className="eyebrow mb-3">{t("landing.pricing.eyebrow")}</p>
+          <h2 className="font-display text-3xl text-slatey-100">{t("landing.pricing.title")}</h2>
+          <p className="mt-4 text-slatey-300">{t("landing.pricing.body")}</p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
@@ -484,23 +490,23 @@ export function Pricing() {
             >
               {plan.highlighted ? (
                 <span className="absolute -top-2.5 left-6 rounded-full bg-brass-400 px-2.5 py-0.5 text-[11px] font-semibold text-ink-950">
-                  Le plus choisi
+                  {t("landing.pricing.mostChosen")}
                 </span>
               ) : null}
 
-              <h3 className="font-display text-lg text-slatey-100">{plan.name}</h3>
-              <p className="mt-1 text-sm text-slatey-400">{plan.description}</p>
+              <h3 className="font-display text-lg text-slatey-100">{t(plan.name)}</h3>
+              <p className="mt-1 text-sm text-slatey-400">{t(plan.description)}</p>
 
               <p className="mt-5 flex items-baseline gap-2">
                 <span className="font-display text-3xl text-slatey-100">{plan.price}</span>
-                <span className="text-sm text-slatey-400">{plan.period}</span>
+                <span className="text-sm text-slatey-400">{plan.period ? t(plan.period) : ""}</span>
               </p>
 
               <ul className="mt-5 space-y-2.5 text-sm text-slatey-300">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-2.5">
                     <span className="text-brass-400">✓</span>
-                    {feature}
+                    {t(feature)}
                   </li>
                 ))}
               </ul>
@@ -509,7 +515,7 @@ export function Pricing() {
                 href="/inscription"
                 className={plan.highlighted ? "btn-primary mt-6 w-full" : "btn-secondary mt-6 w-full"}
               >
-                {plan.cta}
+                {t(plan.cta)}
               </Link>
             </div>
           ))}
@@ -522,54 +528,35 @@ export function Pricing() {
 /* ------------------------------------------------------------------ */
 /* 9 — FAQ                                                             */
 /* ------------------------------------------------------------------ */
-const FAQ_ITEMS = [
-  {
-    question: "L'IA écrit-elle mon film à ma place ?",
-    answer:
-      "Non. Elle met en forme ce que vous lui donnez, selon la structure attendue par les comités de lecture. Si une information manque, elle l'indique au lieu de l'inventer — jamais de personnage, d'événement ou de financement fabriqué.",
-  },
-  {
-    question: "À qui appartiennent les documents générés ?",
-    answer:
-      "À vous. Vous les modifiez, les exportez en PDF ou en Word, et vous les emportez quand vous le souhaitez.",
-  },
-  {
-    question: "Le score de compatibilité garantit-il un financement ?",
-    answer:
-      "Non, en aucun cas. C'est un indicateur d'aide à la décision qui compare votre projet aux critères publiés d'un dispositif. Les conditions officielles de l'organisme font foi.",
-  },
-  {
-    question: "Les opportunités affichées sont-elles à jour ?",
-    answer:
-      "Chaque opportunité conserve sa source et sa date de dernière vérification, affichées avec elle. Les données de démonstration sont explicitement marquées comme fictives.",
-  },
-  {
-    question: "Puis-je générer un scénario de long métrage complet ?",
-    answer:
-      "Oui. Vous choisissez la durée cible (10 à 120 minutes) ; un scénario long est écrit en plusieurs passes successives, chacune reprenant la continuité de la précédente. La longueur vient du nombre de séquences, jamais d'un étirement artificiel.",
-  },
-  {
-    question: "Mes projets sont-ils visibles par d'autres utilisateurs ?",
-    answer:
-      "Non. Chaque projet est strictement cloisonné à son compte. Un utilisateur ne peut jamais accéder aux projets d'un autre.",
-  },
+const FAQ_ITEMS: { question: MessageKey; answer: MessageKey }[] = [
+  { question: "landing.faq.q1", answer: "landing.faq.a1" },
+  { question: "landing.faq.q2", answer: "landing.faq.a2" },
+  { question: "landing.faq.q3", answer: "landing.faq.a3" },
+  { question: "landing.faq.q4", answer: "landing.faq.a4" },
+  { question: "landing.faq.q5", answer: "landing.faq.a5" },
+  { question: "landing.faq.q6", answer: "landing.faq.a6" },
 ];
 
 export function Faq() {
+  const { t } = useI18n();
+
   return (
     <section id="faq" className="border-t border-ink-800 py-20">
       <div className="container-page max-w-3xl">
-        <p className="eyebrow mb-3">FAQ</p>
-        <h2 className="mb-9 font-display text-3xl text-slatey-100">Questions fréquentes</h2>
+        <p className="eyebrow mb-3">{t("landing.nav.faq")}</p>
+        <h2 className="mb-9 font-display text-3xl text-slatey-100">{t("landing.faq.title")}</h2>
 
         <div className="space-y-2.5">
           {FAQ_ITEMS.map((item) => (
-            <details key={item.question} className="card group p-5 [&_summary::-webkit-details-marker]:hidden">
+            <details
+              key={item.question}
+              className="card group p-5 [&_summary::-webkit-details-marker]:hidden"
+            >
               <summary className="flex cursor-pointer items-center justify-between gap-4 text-sm font-medium text-slatey-100">
-                {item.question}
+                {t(item.question)}
                 <span className="text-brass-400 transition-transform group-open:rotate-45">+</span>
               </summary>
-              <p className="mt-3 text-sm leading-relaxed text-slatey-400">{item.answer}</p>
+              <p className="mt-3 text-sm leading-relaxed text-slatey-400">{t(item.answer)}</p>
             </details>
           ))}
         </div>
@@ -582,22 +569,21 @@ export function Faq() {
 /* 10 — CTA final + pied de page                                       */
 /* ------------------------------------------------------------------ */
 export function FinalCta() {
+  const { t } = useI18n();
+
   return (
     <section className="border-t border-ink-800 bg-grain-fade py-20">
       <div className="container-page text-center">
         <h2 className="mx-auto max-w-2xl font-display text-3xl text-slatey-100 sm:text-4xl">
-          Votre prochain dossier peut être prêt cette semaine.
+          {t("landing.final.title")}
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-slatey-300">
-          Créez votre compte, renseignez votre concept, et repartez avec un dossier structuré
-          et une liste de financements à viser.
-        </p>
+        <p className="mx-auto mt-4 max-w-xl text-slatey-300">{t("landing.final.body")}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/inscription" className="btn-primary px-6 py-3 text-base">
-            Créer mon projet
+            {t("landing.cta")}
           </Link>
           <Link href="/connexion" className="btn-secondary px-6 py-3 text-base">
-            J&apos;ai déjà un compte
+            {t("landing.final.haveAccount")}
           </Link>
         </div>
       </div>
@@ -606,14 +592,16 @@ export function FinalCta() {
 }
 
 export function LandingFooter() {
+  const { t } = useI18n();
+
   return (
     <footer className="border-t border-ink-800 py-10">
       <div className="container-page flex flex-col items-center justify-between gap-4 text-sm text-slatey-400 sm:flex-row">
         <div className="flex items-center gap-2.5">
           <Logo className="h-5 w-5" />
-          <span>FilmFund Africa</span>
+          <span>{t("common.appName")}</span>
         </div>
-        <p>De l&apos;idée au financement de votre projet audiovisuel.</p>
+        <p>{t("common.tagline")}</p>
         <p>© {new Date().getFullYear()}</p>
       </div>
     </footer>

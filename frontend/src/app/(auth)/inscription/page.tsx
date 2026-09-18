@@ -6,13 +6,14 @@ import { useState, type FormEvent } from "react";
 import { Alert, Spinner } from "@/components/ui";
 import { ApiError, authApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { USER_TYPE_LABELS } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
 import type { UserType } from "@/lib/types";
 
 const SELECTABLE_TYPES: UserType[] = ["AUTHOR", "DIRECTOR", "PRODUCER", "INSTITUTION"];
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const { t } = useI18n();
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -55,7 +56,7 @@ export default function RegisterPage() {
           setFieldErrors(Object.fromEntries(err.fields.map((f) => [f.field, f.message])));
         }
       } else {
-        setError("Inscription impossible pour le moment.");
+        setError(t("register.failed"));
       }
       setSubmitting(false);
     }
@@ -76,25 +77,24 @@ export default function RegisterPage() {
   if (sent) {
     return (
       <div className="card p-8">
-        <h1 className="font-display text-2xl text-slatey-100">Vérifiez votre boîte mail</h1>
+        <h1 className="font-display text-2xl text-slatey-100">{t("register.checkInbox")}</h1>
         <p className="mt-3 text-sm text-slatey-300">{sent}</p>
         <p className="mt-4 text-sm text-slatey-400">
-          Le lien a été envoyé à <span className="text-slatey-200">{form.email}</span>. Il expire
-          dans 24 heures. Pensez à regarder dans les indésirables.
+          {t("register.linkSentTo", { email: form.email })}
         </p>
 
         {resent ? (
           <div className="mt-5">
-            <Alert tone="info">Si un lien était en attente, un nouveau vient de partir.</Alert>
+            <Alert tone="info">{t("register.resent")}</Alert>
           </div>
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
           <button type="button" className="btn-secondary" onClick={handleResend}>
-            Renvoyer le lien
+            {t("register.resend")}
           </button>
           <Link href="/connexion" className="btn-primary">
-            Aller à la connexion
+            {t("verify.goToLogin")}
           </Link>
         </div>
       </div>
@@ -103,9 +103,9 @@ export default function RegisterPage() {
 
   return (
     <div className="card p-8">
-      <h1 className="font-display text-2xl text-slatey-100">Créer un compte</h1>
+      <h1 className="font-display text-2xl text-slatey-100">{t("register.title")}</h1>
       <p className="mt-1.5 text-sm text-slatey-400">
-        Gratuit — 1 projet et 1 génération IA pour commencer.
+        {t("register.subtitle")}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-4">
@@ -113,7 +113,7 @@ export default function RegisterPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="first_name">Prénom</label>
+            <label className="label" htmlFor="first_name">{t("register.firstName")}</label>
             <input
               id="first_name"
               className="field"
@@ -123,7 +123,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="label" htmlFor="last_name">Nom</label>
+            <label className="label" htmlFor="last_name">{t("register.lastName")}</label>
             <input
               id="last_name"
               className="field"
@@ -135,7 +135,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="label" htmlFor="email">Adresse e-mail</label>
+          <label className="label" htmlFor="email">{t("login.email")}</label>
           <input
             id="email"
             type="email"
@@ -149,7 +149,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="label" htmlFor="password">Mot de passe</label>
+          <label className="label" htmlFor="password">{t("login.password")}</label>
           <input
             id="password"
             type="password"
@@ -160,14 +160,14 @@ export default function RegisterPage() {
             value={form.password}
             onChange={(event) => update("password", event.target.value)}
           />
-          <p className="hint">Au moins 8 caractères, mêlant lettres et chiffres.</p>
+          <p className="hint">{t("reset.passwordHint")}</p>
           {fieldErrors.password ? (
             <p className="hint text-signal-danger">{fieldErrors.password}</p>
           ) : null}
         </div>
 
         <div>
-          <label className="label" htmlFor="user_type">Je suis</label>
+          <label className="label" htmlFor="user_type">{t("register.iAm")}</label>
           <select
             id="user_type"
             className="field"
@@ -175,14 +175,16 @@ export default function RegisterPage() {
             onChange={(event) => update("user_type", event.target.value)}
           >
             {SELECTABLE_TYPES.map((type) => (
-              <option key={type} value={type}>{USER_TYPE_LABELS[type]}</option>
+              <option key={type} value={type}>
+                {t(`userType.${type}`)}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="country">Pays</label>
+            <label className="label" htmlFor="country">{t("register.country")}</label>
             <input
               id="country"
               className="field"
@@ -191,7 +193,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="label" htmlFor="city">Ville</label>
+            <label className="label" htmlFor="city">{t("register.city")}</label>
             <input
               id="city"
               className="field"
@@ -203,13 +205,15 @@ export default function RegisterPage() {
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
           {submitting ? <Spinner /> : null}
-          Créer mon compte
+          {t("register.submit")}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-slatey-400">
-        Déjà inscrit ?{" "}
-        <Link href="/connexion" className="text-brass-300 hover:text-brass-200">Se connecter</Link>
+        {t("register.alreadyRegistered")}{" "}
+        <Link href="/connexion" className="text-brass-300 hover:text-brass-200">
+          {t("login.submit")}
+        </Link>
       </p>
     </div>
   );

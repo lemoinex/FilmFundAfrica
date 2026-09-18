@@ -5,24 +5,22 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, billingApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { formatDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import type { Payment, Plan, SubscriptionState } from "@/lib/types";
-
-function money(amount: number, currency: string): string {
-  if (amount <= 0) return "Gratuit";
-  return `${new Intl.NumberFormat("fr-FR").format(Math.round(amount))} ${currency} / mois`;
-}
-
-const PAYMENT_LABELS: Record<Payment["status"], string> = {
-  PENDING: "En attente",
-  SUCCEEDED: "Réglé",
-  FAILED: "Échoué",
-  CANCELLED: "Annulé",
-  REFUNDED: "Remboursé",
-};
 
 export default function SubscriptionPage() {
   const { refreshUser } = useAuth();
+  const { t, tn, formatDate, formatNumber } = useI18n();
+
+  /** Un prix nul n'est pas « 0 XOF / mois » mais l'offre gratuite. */
+  const money = (amount: number, currency: string) =>
+    amount <= 0
+      ? t("billing.free")
+      : t("billing.pricePerMonth", {
+          amount: formatNumber(Math.round(amount)),
+          currency,
+        });
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -42,9 +40,9 @@ export default function SubscriptionPage() {
       setSubscription(subscriptionData);
       setPayments(paymentsData);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -66,19 +64,18 @@ export default function SubscriptionPage() {
       }
       setNotice(
         instructions ??
-          `Paiement ouvert sous la référence ${payment.provider_reference}. ` +
-            "Votre offre sera activée dès sa validation.",
+          t("billing.checkoutOpened", { reference: payment.provider_reference }),
       );
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Souscription impossible.");
+      setError(err instanceof ApiError ? err.message : t("billing.subscribeFailed"));
     } finally {
       setBusy(null);
     }
   }
 
   async function cancel() {
-    if (!window.confirm("Résilier l'abonnement ? Il reste actif jusqu'à la fin de la période payée.")) {
+    if (!window.confirm(t("billing.cancelConfirm"))) {
       return;
     }
     setError(null);
@@ -89,7 +86,7 @@ export default function SubscriptionPage() {
       await load();
       await refreshUser();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Résiliation impossible.");
+      setError(err instanceof ApiError ? err.message : t("billing.cancelFailed"));
     } finally {
       setBusy(null);
     }
@@ -110,11 +107,8 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-7">
       <div>
-        <h1 className="font-display text-3xl text-slatey-100">Abonnement</h1>
-        <p className="mt-1.5 text-sm text-slatey-400">
-          Les prix et les quotas viennent du serveur : ils sont modifiables sans nouvelle
-          version de l&apos;application.
-        </p>
+        <h1 className="font-display text-3xl text-slatey-100">{t("billing.title")}</h1>
+        <p className="mt-1.5 text-sm text-slatey-400">{t("billing.subtitle")}</p>
       </div>
 
       {error ? <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert> : null}
@@ -122,13 +116,13 @@ export default function SubscriptionPage() {
 
       <div className="card p-6">
         <SectionHeading
-          title={`Offre en cours : ${current.name}`}
+          title={t("billing.currentPlan", { plan: current.name })}
           description={
             subscription.current_period_end
-              ? subscription.is_renewing
-                ? `Reconduction le ${formatDate(subscription.current_period_end)}.`
-                : `Résilié : actif jusqu'au ${formatDate(subscription.current_period_end)}, sans reconduction.`
-              : "Offre gratuite, sans échéance."
+              ? t(subscription.is_renewing ? "billing.renewsOn" : "billing.cancelledUntil", {
+                  date: formatDate(subscription.current_period_end),
+                })
+              : t("billing.noDeadline")
           }
           action={
             subscription.is_renewing && current.price_amount > 0 ? (
@@ -139,14 +133,16 @@ export default function SubscriptionPage() {
                 disabled={busy === "cancel"}
               >
                 {busy === "cancel" ? <Spinner /> : null}
-                Résilier
+                {t("billing.cancel")}
               </button>
             ) : null
           }
         />
         <p className="text-sm text-slatey-300">
-          {subscription.ai_credits_remaining} crédit(s) IA restant(s) ·{" "}
-          {current.max_projects === 0 ? "projets illimités" : `${current.max_projects} projet(s)`}
+          {tn("billing.creditsLeft", subscription.ai_credits_remaining)} ·{" "}
+          {current.max_projects === 0
+            ? t("billing.unlimitedProjects")
+            : tn("billing.projectQuota", current.max_projects)}
         </p>
       </div>
 
@@ -164,7 +160,7 @@ export default function SubscriptionPage() {
             >
               <div className="flex items-baseline justify-between">
                 <h2 className="font-display text-xl text-slatey-100">{plan.name}</h2>
-                {isCurrent ? <Badge tone="neutral">en cours</Badge> : null}
+                {isCurrent ? <Badge tone="neutral">{t("billing.inUse")}</Badge> : null}
               </div>
               <p className="mt-1 text-sm text-brass-200">
                 {money(plan.price_amount, plan.price_currency)}
@@ -173,11 +169,15 @@ export default function SubscriptionPage() {
 
               <ul className="mt-4 space-y-1.5 text-sm text-slatey-300">
                 <li>
-                  {plan.max_projects === 0 ? "Projets illimités" : `${plan.max_projects} projet(s)`}
+                  {plan.max_projects === 0
+                    ? t("billing.unlimitedProjects")
+                    : tn("billing.projectQuota", plan.max_projects)}
                 </li>
-                <li>{plan.monthly_ai_credits} crédits IA par mois</li>
-                <li>{plan.allows_export ? "Export du dossier" : "Sans export"}</li>
-                <li>{plan.allows_matching ? "Matching financements" : "Matching limité"}</li>
+                <li>{tn("billing.monthlyCredits", plan.monthly_ai_credits)}</li>
+                <li>{t(plan.allows_export ? "billing.exportAllowed" : "billing.exportDenied")}</li>
+                <li>
+                  {t(plan.allows_matching ? "billing.matchingAllowed" : "billing.matchingDenied")}
+                </li>
               </ul>
 
               {plan.price_amount > 0 && !isCurrent ? (
@@ -188,7 +188,7 @@ export default function SubscriptionPage() {
                   disabled={busy !== null}
                 >
                   {busy === plan.code ? <Spinner /> : null}
-                  Souscrire
+                  {t("billing.subscribe")}
                 </button>
               ) : null}
             </div>
@@ -198,10 +198,10 @@ export default function SubscriptionPage() {
 
       <div className="card p-6">
         <SectionHeading
-          title="Paiement mobile money"
-          description="Renseignez le numéro à débiter avant de souscrire, si votre prestataire le demande."
+          title={t("billing.mobileMoney")}
+          description={t("billing.mobileMoneyHint")}
         />
-        <label className="label" htmlFor="phone">Numéro de téléphone</label>
+        <label className="label" htmlFor="phone">{t("billing.phone")}</label>
         <input
           id="phone"
           className="field max-w-xs"
@@ -213,7 +213,7 @@ export default function SubscriptionPage() {
 
       {payments.length > 0 ? (
         <div className="card p-6">
-          <SectionHeading title="Mes paiements" />
+          <SectionHeading title={t("billing.payments")} />
           <div className="space-y-1.5">
             {payments.map((payment) => (
               <div
@@ -221,10 +221,10 @@ export default function SubscriptionPage() {
                 className="flex flex-wrap items-center gap-3 rounded px-1.5 py-2 text-sm hover:bg-ink-800"
               >
                 <span className="text-slatey-200">
-                  {new Intl.NumberFormat("fr-FR").format(payment.amount)} {payment.currency}
+                  {formatNumber(payment.amount)} {payment.currency}
                 </span>
                 <Badge tone={payment.status === "SUCCEEDED" ? "success" : "neutral"}>
-                  {PAYMENT_LABELS[payment.status]}
+                  {t(`paymentStatus.${payment.status}`)}
                 </Badge>
                 <span className="text-xs text-slatey-500">{formatDate(payment.created_at)}</span>
                 <span className="text-xs text-slatey-600">{payment.provider_reference}</span>

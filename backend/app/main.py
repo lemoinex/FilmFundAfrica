@@ -14,6 +14,7 @@ from app.api.v1.health import router as health_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import request_logging_middleware, setup_logging
+from app.core.observability import setup_sentry
 from app.core.rate_limit import auth_limiter
 
 logger = logging.getLogger("filmfund")
@@ -37,6 +38,7 @@ décision : ils ne garantissent en aucun cas l'obtention d'un financement.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    setup_sentry()
     logger.info(
         "démarrage de l'API",
         extra={"event": "startup"},

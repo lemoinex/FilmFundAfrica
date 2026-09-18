@@ -22,6 +22,7 @@ import sys
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import setup_logging
+from app.core.observability import setup_sentry
 from app.core.redis import build_client
 from app.services.job_queue import HEARTBEAT_TTL_SECONDS, JobQueue
 from app.services.job_service import JobService, run_job
@@ -91,6 +92,9 @@ class Worker:
 
 def main() -> int:
     setup_logging()
+    # Une generation echoue loin de toute requete HTTP : sans suivi cote
+    # worker, la moitie des erreurs du produit ne serait jamais remontee.
+    setup_sentry()
     worker = Worker()
     signal.signal(signal.SIGTERM, worker.stop)
     signal.signal(signal.SIGINT, worker.stop)

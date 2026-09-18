@@ -1,98 +1,52 @@
-import type {
-  BudgetCategory,
-  DocumentStatus,
-  DocumentType,
-  FundingCategory,
-  FundingSourceType,
-  FundingStatus,
-  ProjectStatus,
-  ProjectType,
-  UserType,
-} from "./types";
+/**
+ * Listes d'ordre et de choix, indépendantes de la langue.
+ *
+ * Les libellés des énumérations vivent désormais dans les catalogues
+ * (`src/lib/i18n/fr.ts`, `en.ts`), sous les clés `projectType.*`,
+ * `fundingCategory.*`, etc. : `t(\`projectType.${type}\`)`. Ce qui reste ici
+ * est l'ordre d'affichage et les valeurs proposées — ni l'un ni l'autre ne
+ * change d'une langue à l'autre.
+ */
 
-export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
-  DOCUMENTARY: "Documentaire",
-  FEATURE_FILM: "Long métrage",
-  SHORT_FILM: "Court métrage",
-  TV_SERIES: "Série TV",
-  WEB_SERIES: "Web-série",
-  ANIMATION: "Animation",
-};
+import type { BudgetCategory, DocumentType, FundingCategory, ProjectType } from "./types";
 
-export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
-  IDEA: "Idée",
-  DEVELOPMENT: "Développement",
-  WRITING: "Écriture",
-  PRE_PRODUCTION: "Préproduction",
-  PRODUCTION: "Production",
-  POST_PRODUCTION: "Postproduction",
-  COMPLETED: "Terminé",
-};
+/** Types de projet proposés dans les formulaires et les filtres. */
+export const PROJECT_TYPES: ProjectType[] = [
+  "DOCUMENTARY",
+  "FEATURE_FILM",
+  "SHORT_FILM",
+  "TV_SERIES",
+  "WEB_SERIES",
+  "ANIMATION",
+];
 
-export const USER_TYPE_LABELS: Record<UserType, string> = {
-  AUTHOR: "Auteur",
-  DIRECTOR: "Réalisateur",
-  PRODUCER: "Producteur",
-  INSTITUTION: "Institution",
-  ADMIN: "Administrateur",
-};
+/** Dispositifs de financement, dans l'ordre d'affichage des filtres. */
+export const FUNDING_CATEGORIES: FundingCategory[] = [
+  "FUND",
+  "GRANT",
+  "RESIDENCY",
+  "FESTIVAL",
+  "LAB",
+  "WORKSHOP",
+  "COPRODUCTION",
+  "BURSARY",
+  "PITCHING_FORUM",
+];
 
-export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
-  LOGLINE: "Logline",
-  SHORT_SYNOPSIS: "Synopsis court",
-  LONG_SYNOPSIS: "Synopsis long",
-  INTENT_NOTE: "Note d'intention",
-  DIRECTING_NOTE: "Note de réalisation",
-  TREATMENT: "Traitement",
-  CHARACTER_SHEET: "Présentation des personnages",
-  ORAL_PITCH: "Pitch oral",
-  WRITTEN_PITCH: "Pitch écrit",
-  SERIES_BIBLE: "Bible du projet",
-  SCREENPLAY: "Scénario",
-};
-
-export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
-  DRAFT: "Brouillon",
-  IN_REVIEW: "En relecture",
-  FINAL: "Finalisé",
-};
-
-export const ORIGIN_LABELS: Record<string, string> = {
-  MANUAL: "Édition manuelle",
-  AI_GENERATE: "Génération IA",
-  AI_IMPROVE: "IA — amélioration",
-  AI_SHORTEN: "IA — raccourcissement",
-  AI_EXPAND: "IA — développement",
-  AI_CORRECT: "IA — correction",
-  RESTORE: "Restauration",
-};
-
-export const FUNDING_CATEGORY_LABELS: Record<FundingCategory, string> = {
-  FUND: "Fonds",
-  GRANT: "Subvention",
-  RESIDENCY: "Résidence",
-  FESTIVAL: "Festival",
-  LAB: "Laboratoire",
-  WORKSHOP: "Atelier",
-  COPRODUCTION: "Coproduction",
-  BURSARY: "Bourse",
-  PITCHING_FORUM: "Forum de pitch",
-};
-
-export const FUNDING_STATUS_LABELS: Record<FundingStatus, string> = {
-  OPEN: "Ouvert",
-  CLOSED: "Clos",
-  UPCOMING: "À venir",
-  UNVERIFIED: "Non vérifié",
-};
-
-export const BUDGET_CATEGORY_LABELS: Record<BudgetCategory, string> = {
-  DEVELOPMENT: "Développement",
-  PRE_PRODUCTION: "Préparation",
-  PRODUCTION: "Tournage",
-  POST_PRODUCTION: "Post-production",
-  DISTRIBUTION: "Diffusion et frais généraux",
-};
+/** Documents du dossier, dans l'ordre où ils se construisent. */
+export const DOCUMENT_TYPES: DocumentType[] = [
+  "LOGLINE",
+  "SHORT_SYNOPSIS",
+  "LONG_SYNOPSIS",
+  "INTENT_NOTE",
+  "DIRECTING_NOTE",
+  "TREATMENT",
+  "CHARACTER_SHEET",
+  "ORAL_PITCH",
+  "WRITTEN_PITCH",
+  "SERIES_BIBLE",
+  "SCREENPLAY",
+];
 
 /** Ordre des phases de production : celui du budget et du calendrier. */
 export const BUDGET_CATEGORY_ORDER: BudgetCategory[] = [
@@ -102,16 +56,6 @@ export const BUDGET_CATEGORY_ORDER: BudgetCategory[] = [
   "POST_PRODUCTION",
   "DISTRIBUTION",
 ];
-
-export const FUNDING_SOURCE_LABELS: Record<FundingSourceType, string> = {
-  PRODUCER: "Apport producteur",
-  PUBLIC_FUND: "Fonds public",
-  TELEVISION: "Préachat télévision",
-  COPRODUCER: "Coproducteur",
-  INVESTOR: "Investisseur",
-  SPONSOR: "Mécénat / parrainage",
-  OTHER: "Autre",
-};
 
 /** Durées cibles proposées pour un scénario (1 page ≈ 1 minute). */
 export const DURATION_PRESETS = [10, 26, 30, 52, 90, 100, 110, 120, 150, 180];

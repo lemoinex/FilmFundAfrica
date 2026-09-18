@@ -7,8 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, documentApi, projectApi, waitForJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { formatRelative } from "@/lib/format";
-import { DOCUMENT_TYPE_LABELS, DURATION_PRESETS } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
+import { DURATION_PRESETS } from "@/lib/labels";
 import type {
   DocumentSummary,
   DocumentType,
@@ -35,6 +35,7 @@ const RECOMMENDED_ORDER: DocumentType[] = [
 ];
 
 export default function AiWriterPage() {
+  const { t, tn, formatRelative } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { setCredits, user } = useAuth();
@@ -65,9 +66,9 @@ export default function AiWriterPage() {
       setCapacity(capacityData);
       setDuration(projectData.duration ? String(projectData.duration) : "90");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -127,7 +128,7 @@ export default function AiWriterPage() {
       setCredits(generated.credits_remaining);
       setDocuments(await documentApi.list(id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Génération impossible.");
+      setError(err instanceof ApiError ? err.message : t("writer.generationFailed"));
     } finally {
       setGenerating(false);
       setProgress(null);
@@ -150,11 +151,8 @@ export default function AiWriterPage() {
         <Link href={`/projets/${id}`} className="text-sm text-slatey-400 hover:text-slatey-200">
           ← {project.title}
         </Link>
-        <h1 className="mt-3 font-display text-3xl text-slatey-100">AI Writer</h1>
-        <p className="mt-1.5 text-sm text-slatey-400">
-          Chaque document est écrit à partir du contexte du projet et des documents déjà
-          rédigés, pour rester cohérent avec eux.
-        </p>
+        <h1 className="mt-3 font-display text-3xl text-slatey-100">{t("writer.title")}</h1>
+        <p className="mt-1.5 text-sm text-slatey-400">{t("writer.subtitle")}</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
@@ -181,12 +179,15 @@ export default function AiWriterPage() {
                       : "block text-sm text-slatey-200"
                   }
                 >
-                  {DOCUMENT_TYPE_LABELS[type]}
+                  {t(`documentType.${type}`)}
                 </span>
                 <span className="mt-0.5 block text-xs text-slatey-500">
                   {existing
-                    ? `v${existing.current_version} · ${existing.word_count} mots`
-                    : "Non généré"}
+                    ? t("writer.versionWords", {
+                        version: existing.current_version,
+                        words: existing.word_count,
+                      })
+                    : t("writer.notGenerated")}
                 </span>
               </button>
             );
@@ -197,17 +198,22 @@ export default function AiWriterPage() {
         <div className="space-y-5">
           <div className="card p-6">
             <SectionHeading
-              title={DOCUMENT_TYPE_LABELS[selected]}
+              title={t(`documentType.${selected}`)}
               description={
                 typeInfo?.target_pages
-                  ? `Longueur cible : ${typeInfo.target_pages[0]} à ${typeInfo.target_pages[1]} page(s).`
+                  ? t("writer.targetLength", {
+                      min: typeInfo.target_pages[0],
+                      max: typeInfo.target_pages[1],
+                    })
                   : isScreenplay
-                    ? "Longueur pilotée par la durée cible : 1 page ≈ 1 minute."
+                    ? t("writer.screenplayLength")
                     : undefined
               }
               action={
                 typeInfo ? (
-                  <Badge tone="neutral">prompt v{typeInfo.prompt_version}</Badge>
+                  <Badge tone="neutral">
+                    {t("writer.promptVersion", { version: typeInfo.prompt_version })}
+                  </Badge>
                 ) : null
               }
             />
@@ -215,7 +221,7 @@ export default function AiWriterPage() {
             {typeInfo ? (
               <div className="mb-5">
                 <p className="mb-2 text-xs uppercase tracking-wide text-slatey-400">
-                  Structure imposée
+                  {t("writer.outline")}
                 </p>
                 <ol className="grid gap-1 text-sm text-slatey-300 sm:grid-cols-2">
                   {typeInfo.outline.map((section, index) => (
@@ -229,16 +235,18 @@ export default function AiWriterPage() {
             ) : null}
 
             {missingDependencies.length > 0 ? (
-              <Alert tone="warning" title="Documents recommandés avant celui-ci">
-                {missingDependencies.map((d) => DOCUMENT_TYPE_LABELS[d]).join(", ")}. Vous pouvez
-                générer quand même : les sections dépendantes indiqueront « Information non
-                fournie. »
+              <Alert tone="warning" title={t("writer.missingDependencies")}>
+                {t("writer.missingDependenciesBody", {
+                  documents: missingDependencies
+                    .map((type) => t(`documentType.${type}`))
+                    .join(", "),
+                })}
               </Alert>
             ) : null}
 
             {isScreenplay ? (
               <div className="mt-5">
-                <label className="label" htmlFor="duration">Durée cible du scénario</label>
+                <label className="label" htmlFor="duration">{t("writer.screenplayDuration")}</label>
                 <div className="flex flex-wrap gap-2">
                   {availableDurations.map((preset) => (
                     <button
@@ -251,31 +259,26 @@ export default function AiWriterPage() {
                           : "btn-secondary px-3 py-1.5 text-xs"
                       }
                     >
-                      {preset} min
+                      {t("writer.minutes", { count: preset })}
                     </button>
                   ))}
                 </div>
                 <p className="hint">
-                  Soit ~{duration || 90} pages. Un scénario long est écrit en{" "}
-                  {estimatedPasses} passe{estimatedPasses > 1 ? "s" : ""} successive
-                  {estimatedPasses > 1 ? "s" : ""}, chacune reprenant la continuité de la
-                  précédente — et coûtant 1 crédit.
-                  {capacity
-                    ? ` Durée maximale avec la configuration actuelle du serveur : ${capacity.max_minutes} minutes.`
-                    : ""}
+                  {tn("writer.passesHint", estimatedPasses, { pages: duration || 90 })}
+                  {capacity ? t("writer.maxMinutes", { minutes: capacity.max_minutes }) : ""}
                 </p>
               </div>
             ) : null}
 
             <div className="mt-5">
               <label className="label" htmlFor="instructions">
-                Consignes complémentaires (facultatif)
+                {t("writer.instructions")}
               </label>
               <textarea
                 id="instructions"
                 className="field"
                 rows={3}
-                placeholder="Ton, angle à privilégier, contrainte d'un fonds précis…"
+                placeholder={t("writer.instructionsPlaceholder")}
                 value={instructions}
                 onChange={(event) => setInstructions(event.target.value)}
               />
@@ -295,7 +298,7 @@ export default function AiWriterPage() {
                 disabled={generating}
               >
                 {generating ? <Spinner /> : null}
-                {byType.has(selected) ? "Régénérer" : "Générer"}
+                {t(byType.has(selected) ? "writer.regenerate" : "writer.generate")}
               </button>
 
               {byType.has(selected) ? (
@@ -306,14 +309,14 @@ export default function AiWriterPage() {
                     router.push(`/projets/${id}/documents/${byType.get(selected)!.id}`)
                   }
                 >
-                  Ouvrir dans l&apos;éditeur
+                  {t("writer.openInEditor")}
                 </button>
               ) : null}
 
               <span className="ml-auto text-xs text-slatey-400">
-                Coût : {isScreenplay ? estimatedPasses : 1} crédit
-                {(isScreenplay ? estimatedPasses : 1) > 1 ? "s" : ""} · solde{" "}
-                {user?.ai_credits_remaining ?? "—"}
+                {tn("writer.cost", isScreenplay ? estimatedPasses : 1, {
+                  balance: user?.ai_credits_remaining ?? "—",
+                })}
               </span>
             </div>
 
@@ -321,13 +324,19 @@ export default function AiWriterPage() {
               <div className="mt-4 space-y-2">
                 <p className="text-xs text-slatey-400">
                   {progress?.status === "QUEUED"
-                    ? "En file d'attente…"
+                    ? t("writer.queued")
                     : progress && progress.total_passes > 1
-                      ? `Rédaction en cours — passe ${Math.min(progress.completed_passes + 1, progress.total_passes)} sur ${progress.total_passes}.`
-                      : "Rédaction en cours…"}{" "}
+                      ? t("writer.writingPass", {
+                          current: Math.min(
+                            progress.completed_passes + 1,
+                            progress.total_passes,
+                          ),
+                          total: progress.total_passes,
+                        })
+                      : t("writer.writing")}{" "}
                   {isScreenplay && estimatedPasses > 1
-                    ? "Vous pouvez quitter cette page : la génération continue côté serveur."
-                    : "Cela prend généralement moins d'une minute."}
+                    ? t("writer.mayLeave")
+                    : t("writer.underAMinute")}
                 </p>
                 {progress && progress.total_passes > 1 ? (
                   <div
@@ -352,29 +361,32 @@ export default function AiWriterPage() {
           {result ? (
             <div className="card p-6">
               <SectionHeading
-                title="Document généré"
-                description={`${result.document.word_count} mots · version ${result.document.current_version} · ${result.passes} passe(s) · ${Math.round(result.latency_ms / 1000)} s`}
+                title={t("writer.resultTitle")}
+                description={t("writer.resultMeta", {
+                  words: result.document.word_count,
+                  version: result.document.current_version,
+                  passes: result.passes,
+                  seconds: Math.round(result.latency_ms / 1000),
+                })}
                 action={
                   <Link
                     href={`/projets/${id}/documents/${result.document.id}`}
                     className="btn-primary"
                   >
-                    Éditer
+                    {t("common.edit")}
                   </Link>
                 }
               />
 
               {result.provider === "mock" ? (
-                <Alert tone="warning" title="Aucun fournisseur d'IA configuré">
-                  Le serveur tourne avec <code>AI_PROVIDER=mock</code> : le document reprend vos
-                  saisies et la structure attendue, sans rédaction. Renseignez{" "}
-                  <code>AI_PROVIDER</code> et <code>AI_API_KEY</code> pour une génération réelle.
+                <Alert tone="warning" title={t("writer.mockTitle")}>
+                  {t("writer.mockBody")}
                 </Alert>
               ) : null}
 
               {result.missing_information.length > 0 ? (
                 <div className="mt-4">
-                  <Alert tone="info" title="Informations à compléter">
+                  <Alert tone="info" title={t("writer.missingInformation")}>
                     <ul className="mt-1 list-disc space-y-1 pl-4">
                       {result.missing_information.map((item) => (
                         <li key={item}>{item}</li>
@@ -385,14 +397,18 @@ export default function AiWriterPage() {
               ) : null}
 
               <p className="mt-4 text-xs text-slatey-500">
-                Généré avec {result.provider} · {result.model} · prompt v{result.prompt_version}
+                {t("writer.generatedWith", {
+                  provider: result.provider,
+                  model: result.model,
+                  version: result.prompt_version,
+                })}
               </p>
             </div>
           ) : null}
 
           {documents.length > 0 ? (
             <div className="card p-6">
-              <SectionHeading title="Documents du projet" />
+              <SectionHeading title={t("writer.projectDocuments")} />
               <div className="space-y-1.5">
                 {documents.map((document) => (
                   <Link
@@ -401,7 +417,7 @@ export default function AiWriterPage() {
                     className="flex items-center justify-between gap-4 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-ink-800"
                   >
                     <span className="text-slatey-200">
-                      {DOCUMENT_TYPE_LABELS[document.document_type]}
+                      {t(`documentType.${document.document_type}`)}
                     </span>
                     <span className="text-xs text-slatey-500">
                       v{document.current_version} · {formatRelative(document.updated_at)}

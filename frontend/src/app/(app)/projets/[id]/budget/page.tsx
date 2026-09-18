@@ -6,11 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, budgetApi, downloadExport, projectApi } from "@/lib/api";
-import {
-  BUDGET_CATEGORY_LABELS,
-  BUDGET_CATEGORY_ORDER,
-  FUNDING_SOURCE_LABELS,
-} from "@/lib/labels";
+import { useI18n, type MessageKey, type Translate } from "@/lib/i18n";
+import { BUDGET_CATEGORY_ORDER } from "@/lib/labels";
 import type {
   Budget,
   BudgetCategory,
@@ -20,13 +17,24 @@ import type {
   SchedulePhase,
 } from "@/lib/types";
 
-/** Montant lisible : les budgets se comptent en centaines de milliers de FCFA. */
-function money(amount: number, currency: string): string {
-  return `${new Intl.NumberFormat("fr-FR").format(Math.round(amount))} ${currency}`;
-}
+/** Types de source de financement, dans l'ordre d'affichage. */
+const FUNDING_SOURCE_TYPES: FundingSourceType[] = [
+  "PRODUCER",
+  "PUBLIC_FUND",
+  "TELEVISION",
+  "COPRODUCER",
+  "INVESTOR",
+  "SPONSOR",
+  "OTHER",
+];
 
 export default function BudgetPage() {
+  const { t, tn, formatNumber } = useI18n();
   const { id } = useParams<{ id: string }>();
+
+  /** Montant lisible : les budgets se comptent en centaines de milliers. */
+  const money = (amount: number, currency: string) =>
+    t("budget.money", { amount: formatNumber(Math.round(amount)), currency });
 
   const [project, setProject] = useState<Project | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -48,9 +56,9 @@ export default function BudgetPage() {
       setPlan(planData);
       setSchedule(scheduleData);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -70,7 +78,7 @@ export default function BudgetPage() {
       await action();
       await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Action impossible.");
+      setError(err instanceof ApiError ? err.message : t("budget.actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -104,11 +112,8 @@ export default function BudgetPage() {
         <Link href={`/projets/${id}`} className="text-sm text-slatey-400 hover:text-slatey-200">
           ← {project.title}
         </Link>
-        <h1 className="mt-3 font-display text-3xl text-slatey-100">Budget et financement</h1>
-        <p className="mt-1.5 text-sm text-slatey-400">
-          La trame propose les postes qu&apos;un comité de lecture attend. Les montants, eux,
-          ne sont jamais devinés : vous les renseignez.
-        </p>
+        <h1 className="mt-3 font-display text-3xl text-slatey-100">{t("budget.title")}</h1>
+        <p className="mt-1.5 text-sm text-slatey-400">{t("budget.subtitle")}</p>
       </div>
 
       {error ? <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert> : null}
@@ -116,8 +121,10 @@ export default function BudgetPage() {
       {/* ---------------------------------------------------------------- */}
       <div className="card p-6">
         <SectionHeading
-          title="Budget prévisionnel"
-          description={`${budget.items.length} poste(s) · total ${money(budget.total_amount, currency)}`}
+          title={t("budget.forecast")}
+          description={tn("budget.forecastMeta", budget.items.length, {
+            total: money(budget.total_amount, currency),
+          })}
           action={
             <div className="flex flex-wrap gap-2">
               <button
@@ -127,7 +134,7 @@ export default function BudgetPage() {
                 onClick={() => run(() => budgetApi.generate(id))}
               >
                 {busy ? <Spinner /> : null}
-                {empty ? "Installer la trame" : "Compléter la trame"}
+                {t(empty ? "budget.installTemplate" : "budget.completeTemplate")}
               </button>
               <button
                 type="button"
@@ -137,20 +144,19 @@ export default function BudgetPage() {
                     `/api/v1/projects/${id}/export/xlsx`,
                     `${project.title}_budget.xlsx`,
                   ).catch((err) =>
-                    setError(err instanceof ApiError ? err.message : "Export impossible."),
+                    setError(err instanceof ApiError ? err.message : t("project.exportFailed")),
                   )
                 }
               >
-                Exporter en tableur
+                {t("budget.exportSpreadsheet")}
               </button>
             </div>
           }
         />
 
         {empty ? (
-          <Alert tone="info" title="Budget vide">
-            Installez la trame : elle propose les postes attendus pour un projet de type{" "}
-            {project.project_type}, à chiffrer ensuite ligne par ligne.
+          <Alert tone="info" title={t("budget.emptyTitle")}>
+            {t("budget.emptyBody", { type: t(`projectType.${project.project_type}`) })}
           </Alert>
         ) : (
           <div className="space-y-6">
@@ -162,7 +168,7 @@ export default function BudgetPage() {
                 <div key={category}>
                   <div className="mb-2 flex items-baseline justify-between border-b border-ink-700 pb-1.5">
                     <h3 className="text-sm font-medium text-brass-200">
-                      {BUDGET_CATEGORY_LABELS[category]}
+                      {t(`budgetCategory.${category}`)}
                     </h3>
                     <span className="text-xs text-slatey-400">
                       {money(subtotal?.amount ?? 0, currency)}
@@ -184,7 +190,7 @@ export default function BudgetPage() {
                           min={0}
                           className="field py-1 text-right text-xs"
                           defaultValue={item.quantity}
-                          aria-label={`Quantité — ${item.label}`}
+                          aria-label={t("budget.quantityOf", { label: item.label })}
                           onBlur={(event) => {
                             const quantity = Number(event.target.value);
                             if (quantity !== item.quantity) {
@@ -200,7 +206,7 @@ export default function BudgetPage() {
                           min={0}
                           className="field py-1 text-right text-xs"
                           defaultValue={item.unit_price}
-                          aria-label={`Prix unitaire — ${item.label}`}
+                          aria-label={t("budget.unitPriceOf", { label: item.label })}
                           onBlur={(event) => {
                             const unit_price = Number(event.target.value);
                             if (unit_price !== item.unit_price) {
@@ -217,7 +223,7 @@ export default function BudgetPage() {
                         <button
                           type="button"
                           className="text-xs text-slatey-500 hover:text-signal-danger"
-                          aria-label={`Supprimer ${item.label}`}
+                          aria-label={t("budget.deleteItem", { label: item.label })}
                           onClick={() => void run(() => budgetApi.deleteItem(id, item.id))}
                         >
                           ✕
@@ -230,7 +236,7 @@ export default function BudgetPage() {
             })}
 
             <div className="flex items-baseline justify-between border-t border-ink-700 pt-3">
-              <span className="font-display text-lg text-slatey-100">Total</span>
+              <span className="font-display text-lg text-slatey-100">{t("budget.total")}</span>
               <span className="font-display text-lg text-brass-200">
                 {money(budget.total_amount, currency)}
               </span>
@@ -239,6 +245,7 @@ export default function BudgetPage() {
         )}
 
         <AddItemForm
+          t={t}
           disabled={busy}
           onAdd={(payload) => run(() => budgetApi.addItem(id, payload))}
         />
@@ -247,24 +254,24 @@ export default function BudgetPage() {
       {/* ---------------------------------------------------------------- */}
       <div className="card p-6">
         <SectionHeading
-          title="Plan de financement"
-          description="« Acquis » veut dire acquis : une source espérée reste dans le recherché."
+          title={t("budget.plan")}
+          description={t("budget.planHint")}
         />
 
         {plan ? (
           <>
             <div className="mb-5 grid gap-3 sm:grid-cols-4">
-              {[
-                ["Budget total", plan.total_budget],
-                ["Acquis", plan.secured_amount],
-                ["Identifié", plan.identified_amount],
-                ["Reste à financer", plan.sought_amount],
-              ].map(([label, value]) => (
-                <div key={label as string} className="rounded-lg border border-ink-700 p-3">
-                  <p className="text-xs uppercase tracking-wide text-slatey-500">{label}</p>
-                  <p className="mt-1 text-sm text-slatey-100">
-                    {money(value as number, plan.currency)}
-                  </p>
+              {(
+                [
+                  ["budget.totalBudget", plan.total_budget],
+                  ["budget.secured", plan.secured_amount],
+                  ["budget.identified", plan.identified_amount],
+                  ["budget.sought", plan.sought_amount],
+                ] as [MessageKey, number][]
+              ).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-ink-700 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slatey-500">{t(label)}</p>
+                  <p className="mt-1 text-sm text-slatey-100">{money(value, plan.currency)}</p>
                 </div>
               ))}
             </div>
@@ -282,9 +289,11 @@ export default function BudgetPage() {
               />
             </div>
             <p className="mt-1.5 text-xs text-slatey-400">
-              {plan.funded_percentage} % du budget est acquis.
+              {t("budget.fundedShare", { percentage: plan.funded_percentage })}
               {plan.uncovered_amount > 0
-                ? ` ${money(plan.uncovered_amount, plan.currency)} ne sont couverts par aucune source, même espérée.`
+                ? t("budget.uncovered", {
+                    amount: money(plan.uncovered_amount, plan.currency),
+                  })
                 : ""}
             </p>
 
@@ -295,9 +304,9 @@ export default function BudgetPage() {
                   className="flex flex-wrap items-center gap-3 rounded px-1.5 py-1.5 text-sm hover:bg-ink-800"
                 >
                   <span className="text-slatey-200">
-                    {line.source_name || FUNDING_SOURCE_LABELS[line.source_type]}
+                    {line.source_name || t(`fundingSource.${line.source_type}`)}
                   </span>
-                  <Badge tone="neutral">{FUNDING_SOURCE_LABELS[line.source_type]}</Badge>
+                  <Badge tone="neutral">{t(`fundingSource.${line.source_type}`)}</Badge>
                   <span className="text-xs text-slatey-400">
                     {money(line.amount, plan.currency)}
                   </span>
@@ -313,25 +322,24 @@ export default function BudgetPage() {
                         )
                       }
                     />
-                    Acquis
+                    {t("budget.secured")}
                   </label>
                   <button
                     type="button"
                     className="ml-auto text-xs text-slatey-500 hover:text-signal-danger"
                     onClick={() => void run(() => budgetApi.deletePlanLine(id, line.id))}
                   >
-                    Retirer
+                    {t("budget.removeSource")}
                   </button>
                 </div>
               ))}
               {plan.lines.length === 0 ? (
-                <p className="text-sm text-slatey-400">
-                  Aucune source listée. Ajoutez les fonds, préachats et apports envisagés.
-                </p>
+                <p className="text-sm text-slatey-400">{t("budget.noSource")}</p>
               ) : null}
             </div>
 
             <AddSourceForm
+              t={t}
               disabled={busy}
               onAdd={(payload) => run(() => budgetApi.addPlanLine(id, payload))}
             />
@@ -342,8 +350,8 @@ export default function BudgetPage() {
       {/* ---------------------------------------------------------------- */}
       <div className="card p-6">
         <SectionHeading
-          title="Calendrier de production"
-          description="Une ligne par phase : les dates que les financeurs demandent."
+          title={t("budget.schedule")}
+          description={t("budget.scheduleHint")}
         />
         <div className="space-y-2">
           {BUDGET_CATEGORY_ORDER.map((phase) => {
@@ -351,14 +359,17 @@ export default function BudgetPage() {
             return (
               <div key={phase} className="grid gap-2 sm:grid-cols-[1fr_140px_140px]">
                 <span className="self-center text-sm text-slatey-200">
-                  {BUDGET_CATEGORY_LABELS[phase]}
+                  {t(`budgetCategory.${phase}`)}
                 </span>
                 {(["start_date", "end_date"] as const).map((field) => (
                   <input
                     key={field}
                     type="date"
                     className="field py-1 text-xs"
-                    aria-label={`${field === "start_date" ? "Début" : "Fin"} — ${BUDGET_CATEGORY_LABELS[phase]}`}
+                    aria-label={t(
+                      field === "start_date" ? "budget.phaseStart" : "budget.phaseEnd",
+                      { phase: t(`budgetCategory.${phase}`) },
+                    )}
                     defaultValue={row?.[field] ?? ""}
                     onBlur={async (event) => {
                       const value = event.target.value || null;
@@ -372,7 +383,7 @@ export default function BudgetPage() {
                         setSchedule(await budgetApi.schedule(id));
                       } catch (err) {
                         setError(
-                          err instanceof ApiError ? err.message : "Enregistrement impossible.",
+                          err instanceof ApiError ? err.message : t("budget.saveFailed"),
                         );
                       }
                     }}
@@ -389,9 +400,11 @@ export default function BudgetPage() {
 
 /* ------------------------------------------------------------------ */
 function AddItemForm({
+  t,
   disabled,
   onAdd,
 }: {
+  t: Translate;
   disabled: boolean;
   onAdd: (payload: {
     category: BudgetCategory;
@@ -415,38 +428,40 @@ function AddItemForm({
       }}
     >
       <div className="min-w-[200px] flex-1">
-        <label className="label" htmlFor="new-item">Ajouter un poste</label>
+        <label className="label" htmlFor="new-item">{t("budget.addItem")}</label>
         <input
           id="new-item"
           className="field"
-          placeholder="Ex. Location de caméra"
+          placeholder={t("budget.addItemPlaceholder")}
           value={label}
           onChange={(event) => setLabel(event.target.value)}
         />
       </div>
       <select
         className="field w-48"
-        aria-label="Phase du poste"
+        aria-label={t("budget.itemPhase")}
         value={category}
         onChange={(event) => setCategory(event.target.value as BudgetCategory)}
       >
         {BUDGET_CATEGORY_ORDER.map((value) => (
           <option key={value} value={value}>
-            {BUDGET_CATEGORY_LABELS[value]}
+            {t(`budgetCategory.${value}`)}
           </option>
         ))}
       </select>
       <button type="submit" className="btn-secondary" disabled={disabled || !label.trim()}>
-        Ajouter
+        {t("budget.add")}
       </button>
     </form>
   );
 }
 
 function AddSourceForm({
+  t,
   disabled,
   onAdd,
 }: {
+  t: Translate;
   disabled: boolean;
   onAdd: (payload: {
     source_type: FundingSourceType;
@@ -476,24 +491,24 @@ function AddSourceForm({
       }}
     >
       <div className="min-w-[180px] flex-1">
-        <label className="label" htmlFor="new-source">Ajouter une source</label>
+        <label className="label" htmlFor="new-source">{t("budget.addSource")}</label>
         <input
           id="new-source"
           className="field"
-          placeholder="Ex. Fonds de soutien national"
+          placeholder={t("budget.addSourcePlaceholder")}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
       </div>
       <select
         className="field w-52"
-        aria-label="Type de source"
+        aria-label={t("budget.sourceType")}
         value={type}
         onChange={(event) => setType(event.target.value as FundingSourceType)}
       >
-        {(Object.keys(FUNDING_SOURCE_LABELS) as FundingSourceType[]).map((value) => (
+        {FUNDING_SOURCE_TYPES.map((value) => (
           <option key={value} value={value}>
-            {FUNDING_SOURCE_LABELS[value]}
+            {t(`fundingSource.${value}`)}
           </option>
         ))}
       </select>
@@ -501,13 +516,13 @@ function AddSourceForm({
         type="number"
         min={0}
         className="field w-36"
-        placeholder="Montant"
-        aria-label="Montant de la source"
+        placeholder={t("budget.sourceAmount")}
+        aria-label={t("budget.sourceAmountLabel")}
         value={amount}
         onChange={(event) => setAmount(event.target.value)}
       />
       <button type="submit" className="btn-secondary" disabled={disabled || !name.trim()}>
-        Ajouter
+        {t("budget.add")}
       </button>
     </form>
   );

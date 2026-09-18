@@ -92,6 +92,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Variables figees dans le bundle par Next.js : elles doivent etre
+      # presentes au build, pas seulement au demarrage du conteneur.
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
     container_name: filmfund-frontend
     restart: unless-stopped
     environment:

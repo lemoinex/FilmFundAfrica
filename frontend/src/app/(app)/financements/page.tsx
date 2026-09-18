@@ -5,14 +5,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { OpportunityCard } from "@/components/funding";
 import { Alert, EmptyState, SectionHeading, SkeletonCard } from "@/components/ui";
 import { ApiError, fundingApi, type FundingSearchParams } from "@/lib/api";
-import { FUNDING_CATEGORY_LABELS, PROJECT_TYPE_LABELS } from "@/lib/labels";
-import type { FundingCategory, OpportunityPage, ProjectType } from "@/lib/types";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { FUNDING_CATEGORIES, PROJECT_TYPES } from "@/lib/labels";
+import type { OpportunityPage } from "@/lib/types";
 
-const SORT_OPTIONS = [
-  { value: "deadline", label: "Échéance la plus proche" },
-  { value: "recent", label: "Ajout le plus récent" },
-  { value: "amount", label: "Montant le plus élevé" },
-  { value: "name", label: "Ordre alphabétique" },
+const SORT_OPTIONS: { value: string; label: MessageKey }[] = [
+  { value: "deadline", label: "search.sort.deadline" },
+  { value: "recent", label: "search.sort.recent" },
+  { value: "amount", label: "search.sort.amount" },
+  { value: "name", label: "search.sort.name" },
 ];
 
 const EMPTY_FILTERS: FundingSearchParams = {
@@ -29,6 +30,7 @@ const EMPTY_FILTERS: FundingSearchParams = {
 };
 
 export default function FundingSearchPage() {
+  const { t, tn } = useI18n();
   const [filters, setFilters] = useState<FundingSearchParams>(EMPTY_FILTERS);
   const [data, setData] = useState<OpportunityPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,11 +42,11 @@ export default function FundingSearchPage() {
       setData(await fundingApi.search(params));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Recherche impossible.");
+      setError(err instanceof ApiError ? err.message : t("search.failed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(filters), filters.query ? 300 : 0);
@@ -75,9 +77,9 @@ export default function FundingSearchPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        eyebrow="Funding Intelligence"
-        title="Financements"
-        description="Fonds, bourses, résidences, laboratoires, festivals et forums de coproduction."
+        eyebrow={t("search.eyebrow")}
+        title={t("search.title")}
+        description={t("search.subtitle")}
       />
 
       {/* Recherche et filtres */}
@@ -85,21 +87,21 @@ export default function FundingSearchPage() {
         <input
           type="search"
           className="field"
-          placeholder="Rechercher un fonds, un organisme, un mot-clé…"
+          placeholder={t("search.placeholder")}
           value={filters.query ?? ""}
           onChange={(event) => update({ query: event.target.value })}
         />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="label text-xs" htmlFor="country">Pays</label>
+            <label className="label text-xs" htmlFor="country">{t("search.country")}</label>
             <select
               id="country"
               className="field py-1.5 text-sm"
               value={filters.country ?? ""}
               onChange={(event) => update({ country: event.target.value })}
             >
-              <option value="">Tous les pays</option>
+              <option value="">{t("search.allCountries")}</option>
               {(facets.countries ?? []).map((country) => (
                 <option key={country} value={country}>{country}</option>
               ))}
@@ -107,46 +109,48 @@ export default function FundingSearchPage() {
           </div>
 
           <div>
-            <label className="label text-xs" htmlFor="project_type">Type de projet</label>
+            <label className="label text-xs" htmlFor="project_type">{t("search.projectType")}</label>
             <select
               id="project_type"
               className="field py-1.5 text-sm"
               value={filters.project_type ?? ""}
               onChange={(event) => update({ project_type: event.target.value })}
             >
-              <option value="">Tous les types</option>
-              {(Object.keys(PROJECT_TYPE_LABELS) as ProjectType[]).map((type) => (
-                <option key={type} value={type}>{PROJECT_TYPE_LABELS[type]}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label text-xs" htmlFor="category">Type de financement</label>
-            <select
-              id="category"
-              className="field py-1.5 text-sm"
-              value={filters.category ?? ""}
-              onChange={(event) => update({ category: event.target.value })}
-            >
-              <option value="">Tous les dispositifs</option>
-              {(Object.keys(FUNDING_CATEGORY_LABELS) as FundingCategory[]).map((category) => (
-                <option key={category} value={category}>
-                  {FUNDING_CATEGORY_LABELS[category]}
+              <option value="">{t("search.allTypes")}</option>
+              {PROJECT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {t(`projectType.${type}`)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="label text-xs" htmlFor="genre">Genre</label>
+            <label className="label text-xs" htmlFor="category">{t("search.category")}</label>
+            <select
+              id="category"
+              className="field py-1.5 text-sm"
+              value={filters.category ?? ""}
+              onChange={(event) => update({ category: event.target.value })}
+            >
+              <option value="">{t("search.allCategories")}</option>
+              {FUNDING_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {t(`fundingCategory.${category}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label text-xs" htmlFor="genre">{t("search.genre")}</label>
             <select
               id="genre"
               className="field py-1.5 text-sm"
               value={filters.genre ?? ""}
               onChange={(event) => update({ genre: event.target.value })}
             >
-              <option value="">Tous les genres</option>
+              <option value="">{t("search.allGenres")}</option>
               {(facets.genres ?? []).map((genre) => (
                 <option key={genre} value={genre}>{genre}</option>
               ))}
@@ -154,14 +158,14 @@ export default function FundingSearchPage() {
           </div>
 
           <div>
-            <label className="label text-xs" htmlFor="language">Langue</label>
+            <label className="label text-xs" htmlFor="language">{t("search.language")}</label>
             <select
               id="language"
               className="field py-1.5 text-sm"
               value={filters.language ?? ""}
               onChange={(event) => update({ language: event.target.value })}
             >
-              <option value="">Toutes les langues</option>
+              <option value="">{t("search.allLanguages")}</option>
               {(facets.languages ?? []).map((language) => (
                 <option key={language} value={language}>{language}</option>
               ))}
@@ -169,14 +173,14 @@ export default function FundingSearchPage() {
           </div>
 
           <div>
-            <label className="label text-xs" htmlFor="min_amount">Montant minimum</label>
+            <label className="label text-xs" htmlFor="min_amount">{t("search.minAmount")}</label>
             <input
               id="min_amount"
               type="number"
               min={0}
               step={1000}
               className="field py-1.5 text-sm"
-              placeholder="Aucun minimum"
+              placeholder={t("search.noMinimum")}
               value={filters.min_amount ?? ""}
               onChange={(event) =>
                 update({ min_amount: event.target.value ? Number(event.target.value) : undefined })
@@ -185,7 +189,7 @@ export default function FundingSearchPage() {
           </div>
 
           <div>
-            <label className="label text-xs" htmlFor="sort">Trier par</label>
+            <label className="label text-xs" htmlFor="sort">{t("search.sort")}</label>
             <select
               id="sort"
               className="field py-1.5 text-sm"
@@ -193,7 +197,9 @@ export default function FundingSearchPage() {
               onChange={(event) => update({ sort: event.target.value })}
             >
               {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>
+                  {t(option.label)}
+                </option>
               ))}
             </select>
           </div>
@@ -206,7 +212,7 @@ export default function FundingSearchPage() {
                 checked={filters.include_closed ?? false}
                 onChange={(event) => update({ include_closed: event.target.checked })}
               />
-              Inclure les dispositifs clos
+              {t("search.includeClosed")}
             </label>
           </div>
         </div>
@@ -214,15 +220,14 @@ export default function FundingSearchPage() {
         {activeFilterCount > 0 ? (
           <div className="flex items-center justify-between border-t border-ink-800 pt-3">
             <span className="text-xs text-slatey-400">
-              {activeFilterCount} filtre{activeFilterCount > 1 ? "s" : ""} actif
-              {activeFilterCount > 1 ? "s" : ""}
+              {tn("search.activeFilters", activeFilterCount)}
             </span>
             <button
               type="button"
               className="btn-ghost px-3 py-1 text-xs"
               onClick={() => setFilters(EMPTY_FILTERS)}
             >
-              Réinitialiser
+              {t("common.reset")}
             </button>
           </div>
         ) : null}
@@ -238,18 +243,17 @@ export default function FundingSearchPage() {
         </div>
       ) : !data || data.total === 0 ? (
         <EmptyState
-          title="Aucun dispositif ne correspond"
+          title={t("search.empty")}
           description={
             activeFilterCount > 0 || filters.query
-              ? "Élargissez vos critères, ou incluez les dispositifs clos pour consulter les éditions passées."
-              : "La base des financements est encore vide. Un administrateur peut y ajouter des dispositifs depuis l'espace d'administration."
+              ? t("search.emptyFiltered")
+              : t("search.emptyBase")
           }
         />
       ) : (
         <>
           <p className="text-sm text-slatey-400">
-            {data.total} dispositif{data.total > 1 ? "s" : ""} trouvé
-            {data.total > 1 ? "s" : ""}
+            {tn("search.results", data.total)}
           </p>
 
           <div className="space-y-3">
@@ -270,10 +274,10 @@ export default function FundingSearchPage() {
                 disabled={(filters.page ?? 1) <= 1}
                 onClick={() => update({ page: (filters.page ?? 1) - 1 })}
               >
-                Précédent
+                {t("search.previous")}
               </button>
               <span className="text-sm text-slatey-400">
-                Page {filters.page ?? 1} sur {pageCount}
+                {t("search.pageOf", { page: filters.page ?? 1, total: pageCount })}
               </span>
               <button
                 type="button"
@@ -281,7 +285,7 @@ export default function FundingSearchPage() {
                 disabled={(filters.page ?? 1) >= pageCount}
                 onClick={() => update({ page: (filters.page ?? 1) + 1 })}
               >
-                Suivant
+                {t("search.next")}
               </button>
             </div>
           ) : null}

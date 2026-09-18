@@ -7,7 +7,8 @@ import { useState } from "react";
 import { Alert, Spinner } from "@/components/ui";
 import { ApiError, projectApi } from "@/lib/api";
 import { classNames } from "@/lib/format";
-import { DURATION_PRESETS, PROJECT_TYPE_LABELS } from "@/lib/labels";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { DURATION_PRESETS, PROJECT_TYPES } from "@/lib/labels";
 import type { ProjectType } from "@/lib/types";
 
 interface DraftCharacter {
@@ -18,14 +19,14 @@ interface DraftCharacter {
   arc: string;
 }
 
-const STEPS = [
-  { title: "Informations générales", hint: "Ce que le projet est, formellement." },
-  { title: "Concept", hint: "L'idée, en quelques phrases tenables." },
-  { title: "Personnages", hint: "Qui porte le récit — et contre qui." },
-  { title: "Enjeux", hint: "Ce qui se perd si rien ne change." },
-  { title: "Vision du réalisateur", hint: "Comment le film sera fait, et pourquoi ainsi." },
-  { title: "Objectifs", hint: "Ce que vous attendez du projet." },
-  { title: "Public cible", hint: "À qui le film s'adresse." },
+const STEPS: { title: MessageKey; hint: MessageKey }[] = [
+  { title: "newProject.step.general", hint: "newProject.step.generalHint" },
+  { title: "newProject.step.concept", hint: "newProject.step.conceptHint" },
+  { title: "newProject.step.characters", hint: "newProject.step.charactersHint" },
+  { title: "newProject.step.stakes", hint: "newProject.step.stakesHint" },
+  { title: "newProject.step.vision", hint: "newProject.step.visionHint" },
+  { title: "newProject.step.objectives", hint: "newProject.step.objectivesHint" },
+  { title: "newProject.step.audience", hint: "newProject.step.audienceHint" },
 ];
 
 const EMPTY_CHARACTER: DraftCharacter = {
@@ -37,6 +38,7 @@ const EMPTY_CHARACTER: DraftCharacter = {
 };
 
 export default function NewProjectPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function NewProjectPage() {
       router.push(`/projets/${project.id}`);
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Création impossible pour le moment.",
+        err instanceof ApiError ? err.message : t("newProject.failed"),
       );
       setSubmitting(false);
     }
@@ -115,13 +117,10 @@ export default function NewProjectPage() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-7">
         <Link href="/projets" className="text-sm text-slatey-400 hover:text-slatey-200">
-          ← Mes projets
+          {t("newProject.back")}
         </Link>
-        <h1 className="mt-3 font-display text-3xl text-slatey-100">Nouveau projet</h1>
-        <p className="mt-1.5 text-sm text-slatey-400">
-          Seul le titre est obligatoire. Tout le reste peut être complété plus tard — mais plus
-          vous renseignez, meilleurs seront les documents générés.
-        </p>
+        <h1 className="mt-3 font-display text-3xl text-slatey-100">{t("newProject.title")}</h1>
+        <p className="mt-1.5 text-sm text-slatey-400">{t("newProject.subtitle")}</p>
       </div>
 
       {/* Progression */}
@@ -135,16 +134,21 @@ export default function NewProjectPage() {
                 "h-1 w-full rounded-full transition-colors",
                 index <= step ? "bg-brass-400" : "bg-ink-700",
               )}
-              aria-label={`Étape ${index + 1} : ${item.title}`}
+              aria-label={t("newProject.stepAria", {
+                number: index + 1,
+                title: t(item.title),
+              })}
             />
           </li>
         ))}
       </ol>
 
       <div className="card p-6 sm:p-8">
-        <p className="eyebrow mb-1.5">Étape {step + 1} sur {STEPS.length}</p>
-        <h2 className="font-display text-xl text-slatey-100">{STEPS[step].title}</h2>
-        <p className="mt-1 text-sm text-slatey-400">{STEPS[step].hint}</p>
+        <p className="eyebrow mb-1.5">
+          {t("newProject.stepCounter", { number: step + 1, total: STEPS.length })}
+        </p>
+        <h2 className="font-display text-xl text-slatey-100">{t(STEPS[step].title)}</h2>
+        <p className="mt-1 text-sm text-slatey-400">{t(STEPS[step].hint)}</p>
 
         <div className="mt-6 space-y-4">
           {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -152,7 +156,7 @@ export default function NewProjectPage() {
           {step === 0 ? (
             <>
               <div>
-                <label className="label" htmlFor="title">Titre du projet *</label>
+                <label className="label" htmlFor="title">{t("newProject.titleField")}</label>
                 <input
                   id="title"
                   className="field"
@@ -163,30 +167,32 @@ export default function NewProjectPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="label" htmlFor="project_type">Type de projet</label>
+                  <label className="label" htmlFor="project_type">{t("search.projectType")}</label>
                   <select
                     id="project_type"
                     className="field"
                     value={form.project_type}
                     onChange={(event) => update("project_type", event.target.value)}
                   >
-                    {(Object.keys(PROJECT_TYPE_LABELS) as ProjectType[]).map((type) => (
-                      <option key={type} value={type}>{PROJECT_TYPE_LABELS[type]}</option>
+                    {PROJECT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {t(`projectType.${type}`)}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="label" htmlFor="genre">Genre</label>
+                  <label className="label" htmlFor="genre">{t("search.genre")}</label>
                   <input
                     id="genre"
                     className="field"
-                    placeholder="Documentaire de création, drame…"
+                    placeholder={t("newProject.genrePlaceholder")}
                     value={form.genre}
                     onChange={(event) => update("genre", event.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="label" htmlFor="country">Pays</label>
+                  <label className="label" htmlFor="country">{t("register.country")}</label>
                   <input
                     id="country"
                     className="field"
@@ -195,7 +201,7 @@ export default function NewProjectPage() {
                   />
                 </div>
                 <div>
-                  <label className="label" htmlFor="duration">Durée cible (minutes)</label>
+                  <label className="label" htmlFor="duration">{t("newProject.duration")}</label>
                   <input
                     id="duration"
                     type="number"
@@ -211,7 +217,7 @@ export default function NewProjectPage() {
                       <option key={value} value={value} />
                     ))}
                   </datalist>
-                  <p className="hint">Détermine la longueur du scénario : 1 page ≈ 1 minute.</p>
+                  <p className="hint">{t("newProject.durationHint")}</p>
                 </div>
               </div>
             </>
@@ -220,29 +226,29 @@ export default function NewProjectPage() {
           {step === 1 ? (
             <>
               <div>
-                <label className="label" htmlFor="logline">Logline</label>
+                <label className="label" htmlFor="logline">{t("newProject.logline")}</label>
                 <textarea
                   id="logline"
                   className="field"
                   rows={2}
-                  placeholder="Une à deux phrases : qui, ce qu'il veut, ce qui l'en empêche."
+                  placeholder={t("newProject.loglinePlaceholder")}
                   value={form.logline}
                   onChange={(event) => update("logline", event.target.value)}
                 />
               </div>
               <div>
-                <label className="label" htmlFor="concept">Concept</label>
+                <label className="label" htmlFor="concept">{t("newProject.concept")}</label>
                 <textarea
                   id="concept"
                   className="field"
                   rows={5}
-                  placeholder="De quoi parle le film, et par quel dispositif ?"
+                  placeholder={t("newProject.conceptPlaceholder")}
                   value={form.concept}
                   onChange={(event) => update("concept", event.target.value)}
                 />
               </div>
               <div>
-                <label className="label" htmlFor="theme">Thème</label>
+                <label className="label" htmlFor="theme">{t("newProject.theme")}</label>
                 <textarea
                   id="theme"
                   className="field"
@@ -260,7 +266,7 @@ export default function NewProjectPage() {
                 <div key={index} className="rounded-lg border border-ink-700 p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wide text-slatey-400">
-                      Personnage {index + 1}
+                      {t("newProject.character", { number: index + 1 })}
                     </span>
                     {characters.length > 1 ? (
                       <button
@@ -270,26 +276,26 @@ export default function NewProjectPage() {
                           setCharacters((current) => current.filter((_, i) => i !== index))
                         }
                       >
-                        Retirer
+                        {t("newProject.removeCharacter")}
                       </button>
                     ) : null}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <input
                       className="field"
-                      placeholder="Nom"
+                      placeholder={t("newProject.characterName")}
                       value={character.name}
                       onChange={(event) => updateCharacter(index, "name", event.target.value)}
                     />
                     <input
                       className="field"
-                      placeholder="Rôle (protagoniste…)"
+                      placeholder={t("newProject.characterRole")}
                       value={character.role}
                       onChange={(event) => updateCharacter(index, "role", event.target.value)}
                     />
                     <input
                       className="field"
-                      placeholder="Âge"
+                      placeholder={t("newProject.characterAge")}
                       value={character.age}
                       onChange={(event) => updateCharacter(index, "age", event.target.value)}
                     />
@@ -297,14 +303,14 @@ export default function NewProjectPage() {
                   <textarea
                     className="field mt-3"
                     rows={2}
-                    placeholder="Description : situation, désir, contradiction."
+                    placeholder={t("newProject.characterDescription")}
                     value={character.description}
                     onChange={(event) => updateCharacter(index, "description", event.target.value)}
                   />
                   <textarea
                     className="field mt-3"
                     rows={2}
-                    placeholder="Arc : ce qui change en lui du début à la fin."
+                    placeholder={t("newProject.characterArc")}
                     value={character.arc}
                     onChange={(event) => updateCharacter(index, "arc", event.target.value)}
                   />
@@ -315,23 +321,22 @@ export default function NewProjectPage() {
                 className="btn-secondary w-full"
                 onClick={() => setCharacters((current) => [...current, { ...EMPTY_CHARACTER }])}
               >
-                Ajouter un personnage
+                {t("newProject.addCharacter")}
               </button>
               <p className="hint">
-                L&apos;IA n&apos;invente jamais de personnage : elle n&apos;utilise que ceux
-                saisis ici.
+                {t("newProject.charactersHint")}
               </p>
             </div>
           ) : null}
 
           {step === 3 ? (
             <div>
-              <label className="label" htmlFor="stakes">Enjeux</label>
+              <label className="label" htmlFor="stakes">{t("newProject.stakes")}</label>
               <textarea
                 id="stakes"
                 className="field"
                 rows={6}
-                placeholder="Qu'est-ce qui est en jeu ? Que perd le protagoniste s'il échoue ?"
+                placeholder={t("newProject.stakesPlaceholder")}
                 value={form.stakes}
                 onChange={(event) => update("stakes", event.target.value)}
               />
@@ -340,27 +345,27 @@ export default function NewProjectPage() {
 
           {step === 4 ? (
             <div>
-              <label className="label" htmlFor="director_vision">Vision du réalisateur</label>
+              <label className="label" htmlFor="director_vision">{t("newProject.vision")}</label>
               <textarea
                 id="director_vision"
                 className="field"
                 rows={6}
-                placeholder="Parti pris de mise en scène : image, son, montage, rapport aux personnes filmées."
+                placeholder={t("newProject.visionPlaceholder")}
                 value={form.director_vision}
                 onChange={(event) => update("director_vision", event.target.value)}
               />
-              <p className="hint">Ce champ nourrit directement la note de réalisation.</p>
+              <p className="hint">{t("newProject.visionHint")}</p>
             </div>
           ) : null}
 
           {step === 5 ? (
             <div>
-              <label className="label" htmlFor="objectives">Objectifs</label>
+              <label className="label" htmlFor="objectives">{t("newProject.objectives")}</label>
               <textarea
                 id="objectives"
                 className="field"
                 rows={6}
-                placeholder="Festivals visés, diffusion envisagée, partenaires recherchés…"
+                placeholder={t("newProject.objectivesPlaceholder")}
                 value={form.objectives}
                 onChange={(event) => update("objectives", event.target.value)}
               />
@@ -369,12 +374,12 @@ export default function NewProjectPage() {
 
           {step === 6 ? (
             <div>
-              <label className="label" htmlFor="target_audience">Public cible</label>
+              <label className="label" htmlFor="target_audience">{t("newProject.audience")}</label>
               <textarea
                 id="target_audience"
                 className="field"
                 rows={6}
-                placeholder="Qui regarde ce film, où, et pourquoi ?"
+                placeholder={t("newProject.audiencePlaceholder")}
                 value={form.target_audience}
                 onChange={(event) => update("target_audience", event.target.value)}
               />
@@ -389,7 +394,7 @@ export default function NewProjectPage() {
             onClick={() => setStep((current) => Math.max(0, current - 1))}
             disabled={step === 0}
           >
-            Précédent
+            {t("search.previous")}
           </button>
 
           {step < STEPS.length - 1 ? (
@@ -399,7 +404,7 @@ export default function NewProjectPage() {
               onClick={() => setStep((current) => current + 1)}
               disabled={!canContinue}
             >
-              Continuer
+              {t("common.continue")}
             </button>
           ) : (
             <button
@@ -409,7 +414,7 @@ export default function NewProjectPage() {
               disabled={submitting || !form.title.trim()}
             >
               {submitting ? <Spinner /> : null}
-              Créer mon projet
+              {t("projects.create")}
             </button>
           )}
         </div>

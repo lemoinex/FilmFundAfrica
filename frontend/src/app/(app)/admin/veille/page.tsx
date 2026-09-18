@@ -4,24 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, candidateApi } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import type { CandidateStatus, OpportunityCandidate } from "@/lib/types";
 
-const STATUS_LABELS: Record<CandidateStatus, string> = {
-  PENDING: "À relire",
-  APPROVED: "Publié",
-  REJECTED: "Écarté",
-};
+const STATUSES: CandidateStatus[] = ["PENDING", "APPROVED", "REJECTED"];
 
 /** Champs que la relecture peut corriger avant publication. */
-const EDITABLE = [
-  { key: "organization", label: "Organisme *" },
-  { key: "country", label: "Pays" },
-  { key: "deadline", label: "Date limite (AAAA-MM-JJ)" },
-  { key: "application_url", label: "Lien de candidature" },
-] as const;
+const EDITABLE: { key: string; label: MessageKey }[] = [
+  { key: "organization", label: "watch.field.organization" },
+  { key: "country", label: "watch.field.country" },
+  { key: "deadline", label: "watch.field.deadline" },
+  { key: "application_url", label: "watch.field.application_url" },
+];
 
 export default function VeillePage() {
+  const { t, formatDate } = useI18n();
   const [candidates, setCandidates] = useState<OpportunityCandidate[]>([]);
   const [filter, setFilter] = useState<CandidateStatus>("PENDING");
   const [corrections, setCorrections] = useState<Record<string, Record<string, string>>>({});
@@ -35,11 +32,11 @@ export default function VeillePage() {
     try {
       setCandidates(await candidateApi.list(filter));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, t]);
 
   useEffect(() => {
     void load();
@@ -62,11 +59,11 @@ export default function VeillePage() {
         setNotice(detail);
       } else {
         await candidateApi.reject(candidate.id, corrections[candidate.id]?.note);
-        setNotice("Candidat écarté.");
+        setNotice(t("watch.rejected"));
       }
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Action impossible.");
+      setError(err instanceof ApiError ? err.message : t("watch.actionFailed"));
     } finally {
       setBusy(null);
     }
@@ -75,26 +72,22 @@ export default function VeillePage() {
   return (
     <div className="space-y-7">
       <div>
-        <h1 className="font-display text-3xl text-slatey-100">Veille — file de validation</h1>
-        <p className="mt-1.5 text-sm text-slatey-400">
-          La veille automatisée dépose ici ce qu&apos;elle trouve. Rien n&apos;est proposé aux
-          auteurs avant votre relecture : un dispositif inexact engage leur dossier de
-          financement.
-        </p>
+        <h1 className="font-display text-3xl text-slatey-100">{t("watch.title")}</h1>
+        <p className="mt-1.5 text-sm text-slatey-400">{t("watch.subtitle")}</p>
       </div>
 
       {error ? <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert> : null}
       {notice ? <Alert tone="info" onDismiss={() => setNotice(null)}>{notice}</Alert> : null}
 
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(STATUS_LABELS) as CandidateStatus[]).map((status) => (
+        {STATUSES.map((status) => (
           <button
             key={status}
             type="button"
             className={filter === status ? "btn-primary px-3 py-1.5 text-xs" : "btn-secondary px-3 py-1.5 text-xs"}
             onClick={() => setFilter(status)}
           >
-            {STATUS_LABELS[status]}
+            {t(`candidateStatus.${status}`)}
           </button>
         ))}
       </div>
@@ -104,9 +97,7 @@ export default function VeillePage() {
       ) : candidates.length === 0 ? (
         <div className="card p-6">
           <p className="text-sm text-slatey-400">
-            {filter === "PENDING"
-              ? "Aucun candidat à relire. La veille n'a rien déposé depuis sa dernière exécution."
-              : "Aucun candidat dans cet état."}
+            {t(filter === "PENDING" ? "watch.emptyPending" : "watch.emptyOther")}
           </p>
         </div>
       ) : (
@@ -115,8 +106,13 @@ export default function VeillePage() {
             <div key={candidate.id} className="card p-6">
               <SectionHeading
                 title={candidate.name}
-                description={`Source : ${candidate.source_name} · déposé le ${formatDate(candidate.created_at)}`}
-                action={<Badge tone="neutral">{STATUS_LABELS[candidate.status]}</Badge>}
+                description={t("watch.candidateMeta", {
+                  source: candidate.source_name,
+                  date: formatDate(candidate.created_at),
+                })}
+                action={
+                  <Badge tone="neutral">{t(`candidateStatus.${candidate.status}`)}</Badge>
+                }
               />
 
               <a
@@ -125,12 +121,12 @@ export default function VeillePage() {
                 rel="noopener noreferrer"
                 className="text-sm text-brass-300 hover:text-brass-200"
               >
-                Ouvrir la source ↗
+                {t("watch.openSource")}
               </a>
 
               <div className="mt-4">
                 <p className="mb-1.5 text-xs uppercase tracking-wide text-slatey-500">
-                  Champs extraits
+                  {t("watch.extractedFields")}
                 </p>
                 <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                   {Object.entries(candidate.payload).map(([key, value]) => (
@@ -141,9 +137,7 @@ export default function VeillePage() {
                   ))}
                 </dl>
                 {Object.keys(candidate.payload).length === 0 ? (
-                  <p className="text-sm text-slatey-400">
-                    Aucun champ extrait : tout est à saisir.
-                  </p>
+                  <p className="text-sm text-slatey-400">{t("watch.noField")}</p>
                 ) : null}
               </div>
 
@@ -153,7 +147,7 @@ export default function VeillePage() {
                     {EDITABLE.map((field) => (
                       <div key={field.key}>
                         <label className="label" htmlFor={`${candidate.id}-${field.key}`}>
-                          {field.label}
+                          {t(field.label)}
                         </label>
                         <input
                           id={`${candidate.id}-${field.key}`}
@@ -167,11 +161,7 @@ export default function VeillePage() {
                       </div>
                     ))}
                   </div>
-                  <p className="hint">
-                    Ce que vous saisissez l&apos;emporte sur l&apos;extraction : c&apos;est vous
-                    qui avez lu la source. Laissez vide un champ absent de la source plutôt que
-                    de le deviner.
-                  </p>
+                  <p className="hint">{t("watch.editHint")}</p>
 
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-ink-700 pt-5">
                     <button
@@ -181,7 +171,7 @@ export default function VeillePage() {
                       onClick={() => act(candidate, true)}
                     >
                       {busy === candidate.id ? <Spinner /> : null}
-                      Publier le dispositif
+                      {t("watch.publish")}
                     </button>
                     <button
                       type="button"
@@ -189,19 +179,21 @@ export default function VeillePage() {
                       disabled={busy === candidate.id}
                       onClick={() => act(candidate, false)}
                     >
-                      Écarter
+                      {t("watch.reject")}
                     </button>
                     <input
                       className="field max-w-xs"
-                      placeholder="Motif (si écarté)"
-                      aria-label={`Motif — ${candidate.name}`}
+                      placeholder={t("watch.reasonPlaceholder")}
+                      aria-label={t("watch.reasonLabel", { name: candidate.name })}
                       value={corrections[candidate.id]?.note ?? ""}
                       onChange={(event) => correct(candidate.id, "note", event.target.value)}
                     />
                   </div>
                 </>
               ) : candidate.review_note ? (
-                <p className="mt-4 text-sm text-slatey-400">Motif : {candidate.review_note}</p>
+                <p className="mt-4 text-sm text-slatey-400">
+                  {t("watch.reason", { note: candidate.review_note })}
+                </p>
               ) : null}
             </div>
           ))}

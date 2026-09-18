@@ -2,24 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Logo } from "@/components/landing";
 import { useAuth } from "@/lib/auth-context";
 import { classNames } from "@/lib/format";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { isLocale } from "@/lib/i18n/locale";
 
 const NAVIGATION = [
-  { href: "/tableau-de-bord", label: "Tableau de bord", icon: "grid" },
-  { href: "/projets", label: "Mes projets", icon: "folder" },
-  { href: "/financements", label: "Financements", icon: "target" },
-  { href: "/abonnement", label: "Abonnement", icon: "card" },
-  { href: "/profil", label: "Profil", icon: "user" },
-] as const;
+  { href: "/tableau-de-bord", label: "nav.dashboard", icon: "grid" },
+  { href: "/projets", label: "nav.projects", icon: "folder" },
+  { href: "/financements", label: "nav.funding", icon: "target" },
+  { href: "/abonnement", label: "nav.subscription", icon: "card" },
+  { href: "/profil", label: "nav.profile", icon: "user" },
+] as const satisfies readonly { href: string; label: MessageKey; icon: string }[];
 
 //: Visible uniquement pour le rôle ADMIN ; l'API le vérifie de son côté.
 const ADMIN_NAVIGATION = [
-  { href: "/admin/financements", label: "Administration", icon: "shield" },
-] as const;
+  { href: "/admin/financements", label: "nav.admin", icon: "shield" },
+] as const satisfies readonly { href: string; label: MessageKey; icon: string }[];
 
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
@@ -40,7 +43,16 @@ function NavIcon({ name }: { name: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t, locale, setLocale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // La préférence enregistrée sur le profil l'emporte à l'ouverture de la
+  // session : c'est elle qui suit la personne d'un appareil à l'autre, alors
+  // que le cookie ne vaut que pour ce navigateur.
+  const preferred = user?.profile?.preferred_locale;
+  useEffect(() => {
+    if (isLocale(preferred) && preferred !== locale) setLocale(preferred);
+  }, [preferred, locale, setLocale]);
 
   const displayName = user?.profile
     ? `${user.profile.first_name} ${user.profile.last_name}`.trim()
@@ -57,7 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-16 items-center gap-2.5 border-b border-ink-800 px-5">
           <Logo className="h-6 w-6" />
-          <span className="font-display text-base text-slatey-100">FilmFund Africa</span>
+          <span className="font-display text-base text-slatey-100">{t("common.appName")}</span>
         </div>
 
         <nav className="space-y-1 p-3">
@@ -79,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <NavIcon name={item.icon} />
-                {item.label}
+                {t(item.label)}
               </Link>
             );
           })}
@@ -87,13 +99,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="absolute inset-x-0 bottom-0 border-t border-ink-800 p-3">
           <div className="rounded-lg bg-ink-800 p-3">
-            <p className="text-xs text-slatey-400">Crédits IA restants</p>
+            <p className="text-xs text-slatey-400">{t("nav.creditsRemaining")}</p>
             <p className="mt-0.5 font-display text-xl tabular-nums text-brass-200">
               {user?.ai_credits_remaining ?? "—"}
             </p>
           </div>
           <button type="button" onClick={logout} className="btn-ghost mt-2 w-full justify-start text-sm">
-            Se déconnecter
+            {t("nav.logout")}
           </button>
         </div>
       </aside>
@@ -113,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             className="btn-ghost px-2 lg:hidden"
             onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Ouvrir le menu"
+            aria-label={t("nav.openMenu")}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
@@ -121,8 +133,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="ml-auto flex items-center gap-3">
+            <LanguageSwitcher />
             <Link href="/projets/nouveau" className="btn-primary hidden sm:inline-flex">
-              Nouveau projet
+              {t("nav.newProject")}
             </Link>
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brass-500/15 text-xs font-semibold text-brass-200">

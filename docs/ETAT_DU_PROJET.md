@@ -242,11 +242,20 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 - Next.js 14 (App Router), TypeScript strict, Tailwind. 19 routes, build de production
   vérifié, `tsc --noEmit` sans erreur.
-- **12 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
+- **Interface bilingue français / anglais.** Catalogues typés dans
+  `frontend/src/lib/i18n/` : le français définit les clés, l'anglais est typé d'après lui,
+  si bien qu'une clé oubliée fait échouer `tsc`. La langue vient du profil
+  (`preferred_locale`), puis d'un cookie relu par le rendu serveur — `<html lang>` est donc
+  juste dès le premier octet, et l'interface ne s'affiche jamais brièvement dans la mauvaise
+  langue. Accords, dates, nombres et durées relatives viennent d'`Intl`, pas du catalogue.
+  Sélecteur de langue dans l'en-tête, sur les pages d'authentification, sur la page publique
+  et dans le profil.
+- **15 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
   neuve : inscription → confirmation d'adresse → connexion, non-énumération visible à l'écran,
   création de projet, génération d'un document puis ouverture dans l'éditeur, limites d'offre
-  (projets, crédits, export), trame de budget et couverture du plan de financement. Ils
-  démarrent eux-mêmes les deux serveurs : `npm run test:e2e`.
+  (projets, crédits, export), trame de budget et couverture du plan de financement, bascule de
+  langue (rendu serveur, persistance, accord du singulier anglais). Ils démarrent eux-mêmes
+  les deux serveurs : `npm run test:e2e`.
 - Landing page complète en dix sections (problème, solution, AI Writer, Funding Intelligence,
   matching, budget, pour qui, tarifs, FAQ, CTA final).
 - Direction artistique sobre : encre profonde, accent laiton, typographie display pour les
@@ -259,7 +268,17 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   lint, tests, migrations appliquées sur PostgreSQL et contrôle de dérive entre modèles et
   migrations, typage strict, build, puis parcours Playwright. Les tests tournent sur SQLite ;
   vérifier les migrations sur leur vraie cible évite de découvrir l'écart au déploiement.
-- **230 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **Suivi des erreurs (Sentry), désactivé par défaut.** Sans `SENTRY_DSN`, rien n'est
+  initialisé et aucune requête ne part vers un tiers ; avec un DSN, les exceptions de l'API
+  **et du worker** sont remontées, et `GET /health` publie l'état sous `error_tracking`
+  (`disabled`, `active`, ou `unavailable` si le paquet manque alors qu'un DSN est configuré).
+  Un rapport d'erreur partant chez un tiers, il n'emporte ni identifiants, ni adresses
+  e-mail, ni numéros de téléphone, ni jetons d'URL, ni contenu de dossier (synopsis,
+  scénarios, budgets) : l'expurgation est testée, et trois réglages ferment ce qu'elle ne
+  peut pas nommer — corps de requête, données d'identification et variables locales des
+  piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
+  portent les jetons de confirmation dans l'URL.
+- **241 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -367,6 +386,14 @@ Installation manuelle : sections 6 et 7 du README.
 3. **Brancher la veille sur des sources réelles** : le pipeline et la file de validation
    fonctionnent, mais le nœud « source » des workflows pointe encore sur une URL d'exemple.
    C'est un travail éditorial : choisir les portails à suivre, puis relire ce qu'ils remontent.
-4. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
-   d'extension déjà en place.
-5. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.
+4. **Créer le projet Sentry et renseigner les DSN.** Le branchement est fait des deux côtés,
+   mais il ne s'active qu'avec un DSN : il faut un compte et un projet Sentry, que personne
+   ici ne peut inventer. Sans DSN, rien ne part — c'est le comportement par défaut, et il est
+   testé.
+5. **Produit analytics** : le point d'extension est le même que celui de Sentry
+   (`app/core/logging.py` et `app/core/observability.py`), mais aucun outil n'y est branché.
+6. **Traduire les messages de l'API.** L'interface est bilingue ; les `detail` des réponses
+   HTTP, les libellés des critères de compatibilité et la structure annoncée par
+   `GET /documents/types` restent en français. Cela demande de faire circuler la langue de
+   l'appelant (`Accept-Language` ou `preferred_locale`) jusqu'aux services, et de sortir les
+   chaînes des couches métier — un chantier backend distinct de celui qui vient d'être mené.

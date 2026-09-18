@@ -3,8 +3,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui";
-import { formatDate } from "@/lib/format";
-import { FUNDING_CATEGORY_LABELS, FUNDING_STATUS_LABELS } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
 import type { MatchCriterion, MatchState, OpportunitySummary } from "@/lib/types";
 
 /**
@@ -15,6 +14,7 @@ import type { MatchCriterion, MatchState, OpportunitySummary } from "@/lib/types
  * explicitement plutôt que de laisser croire que la fiche est à jour.
  */
 export function SourceLine({ opportunity }: { opportunity: OpportunitySummary }) {
+  const { t, formatDate } = useI18n();
   const verified = opportunity.last_verified_at;
 
   return (
@@ -26,42 +26,50 @@ export function SourceLine({ opportunity }: { opportunity: OpportunitySummary })
           rel="noopener noreferrer"
           className="text-slatey-400 underline decoration-ink-600 underline-offset-2 hover:text-brass-300"
         >
-          {opportunity.source_name || "Source"}
+          {opportunity.source_name || t("funding.source")}
         </a>
       ) : (
-        <span className="text-signal-warning">Source non renseignée</span>
+        <span className="text-signal-warning">{t("funding.sourceMissing")}</span>
       )}
       {" · "}
       {verified ? (
-        <>Vérifié le {formatDate(verified)}</>
+        <>{t("funding.verifiedOn", { date: formatDate(verified) })}</>
       ) : (
-        <span className="text-signal-warning">jamais vérifié</span>
+        <span className="text-signal-warning">{t("funding.neverVerified")}</span>
       )}
     </p>
   );
 }
 
 export function DeadlineBadge({ opportunity }: { opportunity: OpportunitySummary }) {
+  const { t, tn, formatDate } = useI18n();
   const days = opportunity.days_left;
 
   if (opportunity.deadline == null) {
-    return <Badge tone="neutral">Sans date limite</Badge>;
+    return <Badge tone="neutral">{t("funding.noDeadline")}</Badge>;
   }
   if (days != null && days < 0) {
-    return <Badge tone="danger">Échéance dépassée</Badge>;
+    return <Badge tone="danger">{t("funding.deadlinePassed")}</Badge>;
   }
   if (days != null && days <= 14) {
-    return <Badge tone="warning">J-{days}</Badge>;
+    return <Badge tone="warning">{tn("funding.daysLeft", days)}</Badge>;
   }
   return <Badge tone="neutral">{formatDate(opportunity.deadline)}</Badge>;
 }
 
 export function StatusBadge({ opportunity }: { opportunity: OpportunitySummary }) {
-  if (opportunity.is_demo) return <Badge tone="warning">DEMO DATA — NOT REAL</Badge>;
-  if (opportunity.status === "UNVERIFIED") return <Badge tone="warning">Non vérifié</Badge>;
-  if (opportunity.status === "CLOSED") return <Badge tone="neutral">Clos</Badge>;
-  if (opportunity.status === "UPCOMING") return <Badge tone="neutral">À venir</Badge>;
-  return <Badge tone="success">{FUNDING_STATUS_LABELS[opportunity.status]}</Badge>;
+  const { t } = useI18n();
+  // La mention de démonstration a la même valeur dans les deux catalogues :
+  // elle doit rester reconnaissable telle quelle, quelle que soit la langue.
+  if (opportunity.is_demo) return <Badge tone="warning">{t("funding.demoData")}</Badge>;
+
+  const tone =
+    opportunity.status === "OPEN"
+      ? "success"
+      : opportunity.status === "UNVERIFIED"
+        ? "warning"
+        : "neutral";
+  return <Badge tone={tone}>{t(`fundingStatus.${opportunity.status}`)}</Badge>;
 }
 
 /** Barre de compatibilité, teintée selon le niveau. */
@@ -99,6 +107,7 @@ const STATE_MARKS: Record<MatchState, { mark: string; className: string }> = {
 };
 
 export function CriterionRow({ criterion }: { criterion: MatchCriterion }) {
+  const { t } = useI18n();
   const { mark, className } = STATE_MARKS[criterion.state];
 
   return (
@@ -108,7 +117,7 @@ export function CriterionRow({ criterion }: { criterion: MatchCriterion }) {
         <span className="text-slatey-200">{criterion.label}</span>
         {criterion.blocking && criterion.state === "unmet" ? (
           <span className="ml-2 text-xs uppercase tracking-wide text-signal-danger">
-            bloquant
+            {t("funding.blocking")}
           </span>
         ) : null}
         <br />
@@ -130,6 +139,7 @@ export function OpportunityCard({
   href?: string;
   trailing?: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const body = (
     <div className="card p-5 transition-colors hover:border-brass-500/40">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -141,7 +151,7 @@ export function OpportunityCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Badge tone="brass">{FUNDING_CATEGORY_LABELS[opportunity.category]}</Badge>
+        <Badge tone="brass">{t(`fundingCategory.${opportunity.category}`)}</Badge>
         {opportunity.country ? <Badge tone="neutral">{opportunity.country}</Badge> : null}
         {opportunity.amount_label ? (
           <Badge tone="neutral">{opportunity.amount_label}</Badge>
@@ -167,10 +177,10 @@ export function OpportunityCard({
 
 /** Rappel obligatoire affiché avec tout score de compatibilité. */
 export function ScoreDisclaimer({ children }: { children?: React.ReactNode }) {
+  const { t } = useI18n();
   return (
     <p className="rounded-lg border border-ink-700 bg-ink-900/60 px-4 py-3 text-xs leading-relaxed text-slatey-400">
-      {children ??
-        "Le score de compatibilité est un indicateur d'aide à la décision. Il ne garantit en aucun cas l'obtention d'un financement : les conditions officielles de l'organisme font foi et doivent être vérifiées sur son site."}
+      {children ?? t("funding.scoreDisclaimer")}
     </p>
   );
 }

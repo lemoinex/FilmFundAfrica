@@ -28,9 +28,11 @@ l'exporter dans un format exploitable par un comité de lecture.
 9. [Données de démonstration](#9-données-de-démonstration)
 10. [Configuration de l'IA](#10-configuration-de-lia)
 11. [Configuration de n8n](#11-configuration-de-n8n)
-12. [Tests](#12-tests)
-13. [Déploiement](#13-déploiement)
-14. [Règles produit non négociables](#14-règles-produit-non-négociables)
+12. [Langue de l'interface](#12-langue-de-linterface)
+13. [Observabilité](#13-observabilité)
+14. [Tests](#14-tests)
+15. [Déploiement](#15-déploiement)
+16. [Règles produit non négociables](#16-règles-produit-non-négociables)
 
 ---
 
@@ -148,7 +150,11 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
 | `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
 | `N8N_API_KEY` | Clé de l'automatisation (veille, tâches planifiées) ; vide = routes fermées | vide |
+| `SENTRY_DSN` | Suivi des erreurs du backend et du worker ; vide = aucun envoi vers un tiers | vide |
+| `SENTRY_TRACES_SAMPLE_RATE` | Part des requêtes tracées pour la performance | `0` |
+| `DEFAULT_LOCALE` | Langue servie à qui n'a pas encore choisi (`fr` ou `en`) | `fr` |
 | `NEXT_PUBLIC_API_URL` | URL de l'API vue par le navigateur | `http://localhost:8000` |
+| `NEXT_PUBLIC_SENTRY_DSN` | Suivi des erreurs du navigateur, **lu au build** ; vide = greffon non chargé | vide |
 
 **Aucune clé API réelle ne doit être commitée.** `.env` est ignoré par git.
 
@@ -371,13 +377,88 @@ python -c "from app.workers.tasks import reset_monthly_credits; print(reset_mont
 
 ---
 
-## 12. Tests
+## 12. Langue de l'interface
+
+L'interface est disponible en **français** et en **anglais**. Le sélecteur figure dans
+l'en-tête de l'application, sur les pages d'authentification, sur la page publique, et
+dans le profil.
+
+La langue affichée est déterminée dans cet ordre :
+
+1. la préférence enregistrée sur le profil (`preferred_locale`), qui suit le compte d'un
+   appareil à l'autre ;
+2. le cookie `filmfund_locale`, propre au navigateur — c'est lui que lit le rendu serveur,
+   pour que `<html lang>` soit juste dès le premier octet envoyé ;
+3. `DEFAULT_LOCALE`, à défaut.
+
+### Ajouter une langue
+
+Les catalogues sont dans `frontend/src/lib/i18n/` : `fr.ts` est la langue de référence et
+définit les clés, `en.ts` est typé `Record<MessageKey, string>` d'après elle. **Une clé
+ajoutée au français et oubliée ailleurs fait échouer `tsc`** — c'est la seule garantie qui
+tienne dans la durée, une traduction manquante ne se voyant pas à la relecture.
+
+Pour une troisième langue : ajouter `xx.ts` sur le modèle de `en.ts`, puis l'inscrire dans
+`LOCALES`, `LOCALE_NAMES` (`locale.ts`) et `CATALOGS` (`index.tsx` et `translate.ts`).
+Les accords et les formats de date, de nombre et de durée relative viennent d'`Intl` :
+rien à traduire de ce côté.
+
+### Ce qui reste en français, quelle que soit la langue choisie
+
+* Les **messages d'erreur renvoyés par l'API** (`detail` des réponses HTTP) : ils sont
+  rédigés côté serveur, qui ne connaît pas encore la langue de l'appelant.
+* Les **documents générés** par l'AI Writer, ainsi que la structure annoncée par
+  `GET /documents/types` : leur langue est celle des prompts, pas celle de l'interface.
+* Les **libellés des critères** de compatibilité et de maturité, calculés par le backend.
+
+---
+
+## 13. Observabilité
+
+Sans `SENTRY_DSN`, rien n'est initialisé : l'application tourne exactement comme avant et
+aucune requête ne part vers un tiers. C'est le même principe que `AI_PROVIDER=mock` ou
+`PAYMENT_PROVIDER=manual` — l'installation par défaut ne dépend d'aucun service externe.
+
+Avec un DSN, les exceptions de l'API **et du worker** sont remontées. `GET /health` publie
+l'état sous `error_tracking` : `disabled`, `active`, ou `unavailable` quand un DSN est
+configuré mais que le paquet `sentry-sdk` manque — un déploiement qui se croit suivi sans
+l'être ne doit pas rester silencieux.
+
+### Ce qui ne part jamais
+
+Un rapport d'erreur part chez un tiers : il ne peut pas emporter ce que les gens nous ont
+confié. `backend/app/core/observability.py` expurge, avant tout envoi :
+
+* les **identifiants** — en-têtes `Authorization`, cookies, signatures de webhook, mots de
+  passe, jetons de réinitialisation ou de confirmation traînant dans une URL ;
+* les **données personnelles** — adresses e-mail, numéros de téléphone ;
+* le **contenu des dossiers** — synopsis, scénarios, budgets : c'est le travail des
+  auteurs.
+
+Trois réglages ferment ce que l'expurgation par nom de clé ne peut pas reconnaître :
+`send_default_pii=False`, `max_request_body_size="never"` et `include_local_variables=False`
+— cette dernière parce que les variables locales portent les prompts et les segments de
+scénario sous les noms de variables du code, qu'aucune liste ne peut énumérer. On perd en
+confort de diagnostic ce qu'on gagne à ne pas exfiltrer le travail des auteurs.
+
+Le navigateur suit la même règle (`frontend/src/lib/observability.ts`), avec un risque en
+plus : les fils d'Ariane de navigation portent l'URL complète, donc les jetons de
+`/verifier-email?token=…`. Ils sont expurgés au même titre. L'enrobage Sentry n'est
+appliqué au build que si `NEXT_PUBLIC_SENTRY_DSN` est défini : sans DSN, le bundle est
+identique à ce qu'il était (≈ 87 kB de JS partagé, contre ≈ 136 kB avec).
+
+L'identifiant de requête (`X-Request-ID`) est posé en étiquette sur chaque événement :
+une erreur remontée se relie aux journaux JSON sans avoir à joindre son contenu.
+
+---
+
+## 14. Tests
 
 ```bash
 cd frontend
 npm run typecheck
 npm run build
-npm run test:e2e           # 12 parcours de bout en bout (Playwright)
+npm run test:e2e           # 15 parcours de bout en bout (Playwright)
 ```
 
 ### Intégration continue
@@ -428,7 +509,7 @@ poste et couverture du plan de financement.
 
 ---
 
-## 13. Déploiement
+## 15. Déploiement
 
 L'application est conçue pour un hébergement conteneurisé :
 
@@ -466,7 +547,7 @@ les utilisateurs téléversent des fichiers.
 
 ---
 
-## 14. Règles produit non négociables
+## 16. Règles produit non négociables
 
 Ces règles sont implémentées, testées, et ne doivent pas être contournées :
 

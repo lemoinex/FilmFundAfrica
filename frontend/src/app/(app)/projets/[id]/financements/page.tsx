@@ -16,11 +16,11 @@ import { Markdown } from "@/components/markdown";
 import { Alert, Badge, EmptyState, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
 import { ApiError, fundingApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { formatRelative } from "@/lib/format";
-import { FUNDING_CATEGORY_LABELS } from "@/lib/labels";
+import { useI18n, type PluralKey, type Translate, type TranslatePlural } from "@/lib/i18n";
 import type { MatchExplanation, MatchListResponse, MatchResult } from "@/lib/types";
 
 export default function ProjectFundingPage() {
+  const { t, tn, formatRelative } = useI18n();
   const { id } = useParams<{ id: string }>();
   const { setCredits, user } = useAuth();
 
@@ -36,9 +36,9 @@ export default function ProjectFundingPage() {
     try {
       setData(await fundingApi.matches(id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -50,7 +50,7 @@ export default function ProjectFundingPage() {
     try {
       setData(await fundingApi.computeMatches(id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Analyse impossible.");
+      setError(err instanceof ApiError ? err.message : t("match.failed"));
     } finally {
       setAnalysing(false);
     }
@@ -64,7 +64,7 @@ export default function ProjectFundingPage() {
       setExplanations((current) => ({ ...current, [opportunityId]: explanation }));
       setCredits(explanation.credits_remaining);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Explication impossible.");
+      setError(err instanceof ApiError ? err.message : t("match.explainFailed"));
     } finally {
       setExplaining(null);
     }
@@ -97,10 +97,9 @@ export default function ProjectFundingPage() {
 
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl text-slatey-100">Financements compatibles</h1>
+            <h1 className="font-display text-3xl text-slatey-100">{t("match.title")}</h1>
             <p className="mt-1.5 text-sm text-slatey-400">
-              Analyse calculée par règles — aucun crédit IA consommé. Dernier calcul{" "}
-              {formatRelative(data.computed_at)}.
+              {t("match.subtitle", { when: formatRelative(data.computed_at) })}
             </p>
           </div>
 
@@ -111,7 +110,7 @@ export default function ProjectFundingPage() {
             disabled={analysing}
           >
             {analysing ? <Spinner /> : null}
-            Relancer l&apos;analyse
+            {t("match.rerun")}
           </button>
         </div>
       </div>
@@ -120,11 +119,11 @@ export default function ProjectFundingPage() {
 
       {data.total === 0 ? (
         <EmptyState
-          title="Aucun dispositif dans la base"
-          description="La base des financements est encore vide. Un administrateur peut y ajouter des dispositifs ; l'analyse se relancera ensuite automatiquement."
+          title={t("match.emptyBase")}
+          description={t("match.emptyBaseHint")}
           action={
             <Link href="/financements" className="btn-secondary">
-              Voir les financements
+              {t("match.seeFunding")}
             </Link>
           }
         />
@@ -132,10 +131,9 @@ export default function ProjectFundingPage() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slatey-300">
-              <span className="font-semibold text-slatey-100">{results.length}</span>{" "}
-              opportunité{results.length > 1 ? "s" : ""}
+              {tn("match.count", results.length)}
               {onlyEligible && ineligibleCount > 0
-                ? ` · ${ineligibleCount} écartée${ineligibleCount > 1 ? "s" : ""} pour inéligibilité`
+                ? tn("match.excluded", ineligibleCount)
                 : ""}
             </p>
             {ineligibleCount > 0 ? (
@@ -146,7 +144,7 @@ export default function ProjectFundingPage() {
                   checked={!onlyEligible}
                   onChange={(event) => setOnlyEligible(!event.target.checked)}
                 />
-                Afficher les dispositifs inéligibles
+                {t("match.showIneligible")}
               </label>
             ) : null}
           </div>
@@ -155,6 +153,8 @@ export default function ProjectFundingPage() {
             {results.map((result) => (
               <MatchCard
                 key={result.opportunity.id}
+                t={t}
+                tn={tn}
                 projectId={id}
                 result={result}
                 open={expanded === result.opportunity.id}
@@ -179,6 +179,8 @@ export default function ProjectFundingPage() {
 }
 
 function MatchCard({
+  t,
+  tn,
   projectId,
   result,
   open,
@@ -188,6 +190,8 @@ function MatchCard({
   onExplain,
   creditsLeft,
 }: {
+  t: Translate;
+  tn: TranslatePlural;
   projectId: string;
   result: MatchResult;
   open: boolean;
@@ -211,7 +215,7 @@ function MatchCard({
             >
               {opportunity.name}
             </Link>
-            {!result.eligible ? <Badge tone="danger">Inéligible</Badge> : null}
+            {!result.eligible ? <Badge tone="danger">{t("match.ineligible")}</Badge> : null}
           </div>
           <p className="mt-0.5 text-xs text-slatey-400">{opportunity.organization}</p>
         </div>
@@ -219,7 +223,7 @@ function MatchCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Badge tone="brass">{FUNDING_CATEGORY_LABELS[opportunity.category]}</Badge>
+        <Badge tone="brass">{t(`fundingCategory.${opportunity.category}`)}</Badge>
         {opportunity.amount_label ? (
           <Badge tone="neutral">{opportunity.amount_label}</Badge>
         ) : null}
@@ -229,21 +233,35 @@ function MatchCard({
 
       {/* Synthèse */}
       <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-        <Summary tone="success" count={result.met_conditions.length} label="remplie" />
-        <Summary tone="danger" count={result.missing_conditions.length} label="non remplie" />
-        <Summary tone="neutral" count={result.unknown_conditions.length} label="à vérifier" />
+        <Summary
+          tone="success"
+          tn={tn}
+          count={result.met_conditions.length}
+          label="match.conditionsMet"
+        />
+        <Summary
+          tone="danger"
+          tn={tn}
+          count={result.missing_conditions.length}
+          label="match.conditionsUnmet"
+        />
+        <Summary
+          tone="neutral"
+          tn={tn}
+          count={result.unknown_conditions.length}
+          label="match.conditionsUnknown"
+        />
       </div>
 
       {result.assessed_ratio < 100 ? (
         <p className="mt-3 text-xs text-slatey-500">
-          Score calculé sur {result.assessed_ratio} % de la grille : complétez votre projet pour
-          l&apos;affiner. Les critères non évaluables ne sont ni comptés pour, ni contre vous.
+          {t("match.partialScore", { ratio: result.assessed_ratio })}
         </p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-800 pt-4">
         <button type="button" className="btn-secondary px-3 py-1.5 text-xs" onClick={onToggle}>
-          {open ? "Masquer le détail" : "Voir le détail du score"}
+          {t(open ? "match.hideDetail" : "match.showDetail")}
         </button>
 
         {explanation ? null : (
@@ -254,14 +272,14 @@ function MatchCard({
             disabled={explaining || creditsLeft < 1}
             title={
               creditsLeft < 1
-                ? "Crédits IA épuisés"
+                ? t("match.noCredits")
                 : result.has_explanation
-                  ? "Explication déjà rédigée : aucun crédit ne sera débité"
-                  : "Consomme 1 crédit IA"
+                  ? t("match.alreadyExplained")
+                  : t("match.costsOneCredit")
             }
           >
             {explaining ? <Spinner className="h-3 w-3" /> : null}
-            {result.has_explanation ? "Afficher l'analyse" : "Analyser avec l'IA (1 crédit)"}
+            {t(result.has_explanation ? "match.showExplanation" : "match.explainWithAi")}
           </button>
         )}
 
@@ -269,7 +287,7 @@ function MatchCard({
           href={`/financements/${opportunity.id}`}
           className="btn-ghost px-3 py-1.5 text-xs"
         >
-          Fiche complète
+          {t("match.fullEntry")}
         </Link>
 
         <div className="ml-auto">
@@ -282,7 +300,7 @@ function MatchCard({
         <div className="mt-4 space-y-4 border-t border-ink-800 pt-4">
           <div>
             <p className="mb-1 text-xs uppercase tracking-wide text-slatey-400">
-              Détail des critères
+              {t("match.criteriaDetail")}
             </p>
             <ul className="divide-y divide-ink-800">
               {result.criteria.map((criterion) => (
@@ -294,7 +312,7 @@ function MatchCard({
           {result.required_documents.length > 0 ? (
             <div>
               <p className="mb-2 text-xs uppercase tracking-wide text-slatey-400">
-                Documents exigés
+                {t("match.requiredDocuments")}
               </p>
               <div className="flex flex-wrap gap-2">
                 {result.required_documents.map((document) => {
@@ -311,7 +329,7 @@ function MatchCard({
                   href={`/projets/${projectId}/ai-writer`}
                   className="btn-secondary mt-3 px-3 py-1.5 text-xs"
                 >
-                  Générer les documents manquants
+                  {t("match.generateMissing")}
                 </Link>
               ) : null}
             </div>
@@ -323,11 +341,16 @@ function MatchCard({
       {explanation ? (
         <div className="mt-4 rounded-lg border border-ink-700 bg-ink-800/40 p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs uppercase tracking-wide text-brass-300">Analyse détaillée</p>
+            <p className="text-xs uppercase tracking-wide text-brass-300">
+              {t("match.explanationTitle")}
+            </p>
             <p className="text-xs text-slatey-500">
               {explanation.credits_consumed === 0
-                ? "Analyse déjà produite — aucun crédit débité"
-                : `${explanation.credits_consumed} crédit · ${explanation.provider}`}
+                ? t("match.explanationFree")
+                : t("match.explanationCost", {
+                    credits: explanation.credits_consumed,
+                    provider: explanation.provider,
+                  })}
             </p>
           </div>
           <Markdown content={explanation.explanation} />
@@ -339,12 +362,14 @@ function MatchCard({
 
 function Summary({
   tone,
+  tn,
   count,
   label,
 }: {
   tone: "success" | "danger" | "neutral";
+  tn: TranslatePlural;
   count: number;
-  label: string;
+  label: PluralKey;
 }) {
   const colors = {
     success: "text-signal-success",
@@ -354,9 +379,8 @@ function Summary({
 
   return (
     <p className="text-slatey-400">
-      <span className={`font-semibold tabular-nums ${colors[tone]}`}>{count}</span> condition
-      {count > 1 ? "s" : ""} {label}
-      {count > 1 ? "s" : ""}
+      <span className={`font-semibold tabular-nums ${colors[tone]}`}>{count}</span>{" "}
+      {tn(label, count)}
     </p>
   );
 }

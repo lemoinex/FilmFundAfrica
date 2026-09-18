@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Alert, Badge, EmptyState, ScoreRing, SectionHeading, SkeletonCard } from "@/components/ui";
 import { ApiError, projectApi } from "@/lib/api";
-import { formatRelative } from "@/lib/format";
-import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
 import type { ProjectSummary } from "@/lib/types";
 
 export default function ProjectsPage() {
+  const { t, tn, formatRelative } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,9 +18,9 @@ export default function ProjectsPage() {
     try {
       setProjects(await projectApi.list(term || undefined));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(search), search ? 300 : 0);
@@ -30,15 +30,19 @@ export default function ProjectsPage() {
   return (
     <>
       <SectionHeading
-        title="Mes projets"
-        description="Chaque projet regroupe ses documents, ses versions et son score de maturité."
-        action={<Link href="/projets/nouveau" className="btn-primary">Nouveau projet</Link>}
+        title={t("projects.title")}
+        description={t("projects.subtitle")}
+        action={
+          <Link href="/projets/nouveau" className="btn-primary">
+            {t("nav.newProject")}
+          </Link>
+        }
       />
 
       <input
         type="search"
         className="field mb-5"
-        placeholder="Rechercher un projet par titre…"
+        placeholder={t("projects.searchPlaceholder")}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
@@ -52,15 +56,15 @@ export default function ProjectsPage() {
         </div>
       ) : projects.length === 0 ? (
         <EmptyState
-          title={search ? "Aucun résultat" : "Aucun projet pour l'instant"}
+          title={search ? t("projects.noResult") : t("projects.empty")}
           description={
-            search
-              ? "Aucun projet ne correspond à cette recherche."
-              : "Créez votre premier projet : l'assistant vous guide en sept étapes."
+            search ? t("projects.noResultDescription") : t("projects.emptyShort")
           }
           action={
             search ? null : (
-              <Link href="/projets/nouveau" className="btn-primary">Créer mon projet</Link>
+              <Link href="/projets/nouveau" className="btn-primary">
+                {t("projects.create")}
+              </Link>
             )
           }
         />
@@ -76,17 +80,17 @@ export default function ProjectsPage() {
               <div className="min-w-0 flex-1">
                 <h3 className="truncate font-display text-base text-slatey-100">{project.title}</h3>
                 <p className="mt-0.5 truncate text-xs text-slatey-400">
-                  {PROJECT_TYPE_LABELS[project.project_type]}
+                  {t(`projectType.${project.project_type}`)}
                   {project.genre ? ` · ${project.genre}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Badge tone="neutral">{PROJECT_STATUS_LABELS[project.status]}</Badge>
+                  <Badge tone="neutral">{t(`projectStatus.${project.status}`)}</Badge>
                   <Badge tone="neutral">
-                    {project.document_count} document{project.document_count > 1 ? "s" : ""}
+                    {tn("projects.documentCount", project.document_count)}
                   </Badge>
                 </div>
                 <p className="mt-2.5 text-xs text-slatey-500">
-                  Modifié {formatRelative(project.updated_at)}
+                  {t("projects.updated", { when: formatRelative(project.updated_at) })}
                 </p>
               </div>
             </Link>

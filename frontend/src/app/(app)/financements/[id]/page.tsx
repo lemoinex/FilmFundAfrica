@@ -7,12 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 import { DeadlineBadge, StatusBadge } from "@/components/funding";
 import { Alert, Badge, SectionHeading, SkeletonCard } from "@/components/ui";
 import { ApiError, fundingApi } from "@/lib/api";
-import { formatDate } from "@/lib/format";
-import {
-  DOCUMENT_TYPE_LABELS,
-  FUNDING_CATEGORY_LABELS,
-  PROJECT_TYPE_LABELS,
-} from "@/lib/labels";
+import { useI18n, type Translate } from "@/lib/i18n";
+import { DOCUMENT_TYPES, PROJECT_TYPES } from "@/lib/labels";
 import type { DocumentType, Opportunity, OpportunitySummary, ProjectType } from "@/lib/types";
 
 /** Reconstruit le résumé attendu par les badges à partir de la fiche complète. */
@@ -27,6 +23,7 @@ function toSummary(opportunity: Opportunity): OpportunitySummary {
 }
 
 export default function OpportunityDetailPage() {
+  const { t, formatDate, formatNumber } = useI18n();
   const { id } = useParams<{ id: string }>();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,9 +32,9 @@ export default function OpportunityDetailPage() {
     try {
       setOpportunity(await fundingApi.get(id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -54,27 +51,38 @@ export default function OpportunityDetailPage() {
   }
 
   const summary = toSummary(opportunity);
+  const currency = opportunity.currency;
   const amount =
     opportunity.minimum_budget && opportunity.maximum_budget
-      ? `${opportunity.minimum_budget.toLocaleString("fr-FR")} – ${opportunity.maximum_budget.toLocaleString("fr-FR")} ${opportunity.currency}`
+      ? t("opportunity.amountRange", {
+          min: formatNumber(opportunity.minimum_budget),
+          max: formatNumber(opportunity.maximum_budget),
+          currency,
+        })
       : opportunity.maximum_budget
-        ? `jusqu'à ${opportunity.maximum_budget.toLocaleString("fr-FR")} ${opportunity.currency}`
+        ? t("opportunity.amountUpTo", {
+            max: formatNumber(opportunity.maximum_budget),
+            currency,
+          })
         : opportunity.minimum_budget
-          ? `à partir de ${opportunity.minimum_budget.toLocaleString("fr-FR")} ${opportunity.currency}`
+          ? t("opportunity.amountFrom", {
+              min: formatNumber(opportunity.minimum_budget),
+              currency,
+            })
           : null;
 
   return (
     <div className="space-y-6">
       <div>
         <Link href="/financements" className="text-sm text-slatey-400 hover:text-slatey-200">
-          ← Financements
+          {t("opportunity.backToList")}
         </Link>
 
         <h1 className="mt-3 font-display text-3xl text-slatey-100">{opportunity.name}</h1>
         <p className="mt-1 text-sm text-slatey-400">{opportunity.organization}</p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Badge tone="brass">{FUNDING_CATEGORY_LABELS[opportunity.category]}</Badge>
+          <Badge tone="brass">{t(`fundingCategory.${opportunity.category}`)}</Badge>
           {opportunity.country ? <Badge tone="neutral">{opportunity.country}</Badge> : null}
           <DeadlineBadge opportunity={summary} />
           <StatusBadge opportunity={summary} />
@@ -82,16 +90,14 @@ export default function OpportunityDetailPage() {
       </div>
 
       {opportunity.is_demo ? (
-        <Alert tone="warning" title="Donnée de démonstration">
-          Ce dispositif est fictif (<code>DEMO DATA — NOT REAL</code>). Il sert uniquement à
-          illustrer le fonctionnement de la plateforme et ne correspond à aucun financement réel.
+        <Alert tone="warning" title={t("opportunity.demoTitle")}>
+          <code>{t("funding.demoData")}</code> — {t("opportunity.demoBody")}
         </Alert>
       ) : null}
 
       {opportunity.status === "UNVERIFIED" ? (
-        <Alert tone="warning" title="Fiche non vérifiée">
-          Les informations ci-dessous n&apos;ont pas encore été contrôlées par l&apos;équipe.
-          Vérifiez-les sur le site de l&apos;organisme avant de préparer votre candidature.
+        <Alert tone="warning" title={t("opportunity.unverifiedTitle")}>
+          {t("opportunity.unverifiedBody")}
         </Alert>
       ) : null}
 
@@ -105,43 +111,59 @@ export default function OpportunityDetailPage() {
 
       {/* Critères d'éligibilité */}
       <div className="card p-6">
-        <SectionHeading title="Critères" />
+        <SectionHeading title={t("opportunity.criteria")} />
         <dl className="grid gap-4 sm:grid-cols-2">
-          <Field label="Montant" value={amount} />
+          <Field t={t} label={t("opportunity.amount")} value={amount} />
           <Field
-            label="Date limite"
+            t={t}
+            label={t("opportunity.deadline")}
             value={opportunity.deadline ? formatDate(opportunity.deadline) : null}
           />
           <Field
-            label="Ouverture des candidatures"
+            t={t}
+            label={t("opportunity.opening")}
             value={opportunity.opening_date ? formatDate(opportunity.opening_date) : null}
           />
           <Field
-            label="Pays éligibles"
+            t={t}
+            label={t("opportunity.eligibleCountries")}
             value={
               opportunity.eligible_countries.length
                 ? opportunity.eligible_countries.join(", ")
-                : "Tous les pays"
+                : t("opportunity.allCountries")
             }
           />
           <Field
-            label="Types de projet"
+            t={t}
+            label={t("opportunity.projectTypes")}
             value={
               opportunity.project_types.length
                 ? opportunity.project_types
-                    .map((type) => PROJECT_TYPE_LABELS[type as ProjectType] ?? type)
+                    .map((type) =>
+                      PROJECT_TYPES.includes(type as ProjectType)
+                        ? t(`projectType.${type as ProjectType}`)
+                        : type,
+                    )
                     .join(", ")
-                : "Tous les types"
+                : t("opportunity.allTypes")
             }
           />
           <Field
-            label="Genres"
-            value={opportunity.genres.length ? opportunity.genres.join(", ") : "Tous les genres"}
+            t={t}
+            label={t("opportunity.genres")}
+            value={
+              opportunity.genres.length
+                ? opportunity.genres.join(", ")
+                : t("opportunity.allGenres")
+            }
           />
           <Field
-            label="Langues"
+            t={t}
+            label={t("opportunity.languages")}
             value={
-              opportunity.languages.length ? opportunity.languages.join(", ") : "Toutes les langues"
+              opportunity.languages.length
+                ? opportunity.languages.join(", ")
+                : t("opportunity.allLanguages")
             }
           />
         </dl>
@@ -150,13 +172,11 @@ export default function OpportunityDetailPage() {
       {/* Pièces à fournir */}
       <div className="card p-6">
         <SectionHeading
-          title="Pièces à fournir"
-          description="Les documents marqués sont générables depuis l'AI Writer."
+          title={t("opportunity.requirements")}
+          description={t("opportunity.requirementsHint")}
         />
         {opportunity.requirement_items.length === 0 && !opportunity.requirements ? (
-          <p className="text-sm text-slatey-400">
-            Information non fournie. Consultez le règlement sur le site de l&apos;organisme.
-          </p>
+          <p className="text-sm text-slatey-400">{t("opportunity.requirementsMissing")}</p>
         ) : (
           <>
             {opportunity.requirement_items.length > 0 ? (
@@ -166,13 +186,15 @@ export default function OpportunityDetailPage() {
                     <span className="text-brass-400">·</span>
                     <span className="text-slatey-200">{requirement.label}</span>
                     {requirement.is_mandatory ? null : (
-                      <Badge tone="neutral">facultatif</Badge>
+                      <Badge tone="neutral">{t("opportunity.requirementOptional")}</Badge>
                     )}
                     {requirement.required_document_type ? (
                       <Badge tone="brass">
-                        {DOCUMENT_TYPE_LABELS[
-                          requirement.required_document_type as DocumentType
-                        ] ?? requirement.required_document_type}
+                        {DOCUMENT_TYPES.includes(
+                          requirement.required_document_type as DocumentType,
+                        )
+                          ? t(`documentType.${requirement.required_document_type as DocumentType}`)
+                          : requirement.required_document_type}
                       </Badge>
                     ) : null}
                   </li>
@@ -190,11 +212,12 @@ export default function OpportunityDetailPage() {
 
       {/* Traçabilité et candidature */}
       <div className="card p-6">
-        <SectionHeading title="Source et candidature" />
+        <SectionHeading title={t("opportunity.sourceSection")} />
         <dl className="grid gap-4 sm:grid-cols-2">
-          <Field label="Source de l'information" value={opportunity.source_name} />
+          <Field t={t} label={t("opportunity.sourceName")} value={opportunity.source_name} />
           <Field
-            label="Dernière vérification"
+            t={t}
+            label={t("opportunity.lastCheck")}
             value={
               opportunity.last_verified_at ? formatDate(opportunity.last_verified_at) : null
             }
@@ -209,7 +232,7 @@ export default function OpportunityDetailPage() {
               rel="noopener noreferrer"
               className="btn-primary"
             >
-              Candidater sur le site de l&apos;organisme
+              {t("opportunity.apply")}
             </a>
           ) : null}
           {opportunity.source_url ? (
@@ -219,7 +242,7 @@ export default function OpportunityDetailPage() {
               rel="noopener noreferrer"
               className="btn-secondary"
             >
-              Consulter la source
+              {t("opportunity.openSource")}
             </a>
           ) : null}
           {opportunity.website ? (
@@ -229,27 +252,25 @@ export default function OpportunityDetailPage() {
               rel="noopener noreferrer"
               className="btn-ghost"
             >
-              Site de l&apos;organisme
+              {t("opportunity.website")}
             </a>
           ) : null}
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-slatey-500">
-          Les conditions officielles publiées par l&apos;organisme font foi. Vérifiez-les avant
-          de déposer votre dossier : une fiche peut avoir été modifiée depuis sa dernière
-          vérification.
+          {t("opportunity.officialTerms")}
         </p>
       </div>
     </div>
   );
 }
 
-function Field({ label, value }: { label: string; value?: string | null }) {
+function Field({ t, label, value }: { t: Translate; label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-slatey-500">{label}</dt>
       <dd className="mt-0.5 text-sm text-slatey-200">
-        {value || <span className="text-slatey-500">Information non fournie.</span>}
+        {value || <span className="text-slatey-500">{t("opportunity.notProvided")}</span>}
       </dd>
     </div>
   );

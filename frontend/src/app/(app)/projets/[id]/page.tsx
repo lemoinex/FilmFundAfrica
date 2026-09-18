@@ -14,16 +14,11 @@ import {
   Spinner,
 } from "@/components/ui";
 import { ApiError, documentApi, downloadExport, projectApi } from "@/lib/api";
-import { estimatePages, formatRelative } from "@/lib/format";
-import {
-  DOCUMENT_STATUS_LABELS,
-  DOCUMENT_TYPE_LABELS,
-  PROJECT_STATUS_LABELS,
-  PROJECT_TYPE_LABELS,
-} from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
 import type { DocumentSummary, Project, ReadinessScore } from "@/lib/types";
 
 export default function ProjectDetailPage() {
+  const { t, formatRelative, formatPages } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -44,9 +39,9 @@ export default function ProjectDetailPage() {
       setDocuments(documentsData);
       setScore(scoreData);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chargement impossible.");
+      setError(err instanceof ApiError ? err.message : t("load.failed"));
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
@@ -58,23 +53,23 @@ export default function ProjectDetailPage() {
     try {
       await downloadExport(
         `/api/v1/projects/${id}/export/${kind}`,
-        `${project?.title ?? "dossier"}.${kind}`,
+        `${project?.title ?? t("project.defaultExportName")}.${kind}`,
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Export impossible.");
+      setError(err instanceof ApiError ? err.message : t("project.exportFailed"));
     } finally {
       setBusy(null);
     }
   }
 
   async function handleDelete() {
-    if (!window.confirm("Supprimer définitivement ce projet et tous ses documents ?")) return;
+    if (!window.confirm(t("project.deleteConfirm"))) return;
     setBusy("delete");
     try {
       await projectApi.remove(id);
       router.push("/projets");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Suppression impossible.");
+      setError(err instanceof ApiError ? err.message : t("project.deleteFailed"));
       setBusy(null);
     }
   }
@@ -98,15 +93,15 @@ export default function ProjectDetailPage() {
       {/* En-tête */}
       <div>
         <Link href="/projets" className="text-sm text-slatey-400 hover:text-slatey-200">
-          ← Mes projets
+          {t("newProject.back")}
         </Link>
 
         <div className="mt-3 flex flex-wrap items-start justify-between gap-5">
           <div className="min-w-0">
             <h1 className="font-display text-3xl text-slatey-100">{project.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Badge tone="brass">{PROJECT_TYPE_LABELS[project.project_type]}</Badge>
-              <Badge tone="neutral">{PROJECT_STATUS_LABELS[project.status]}</Badge>
+              <Badge tone="brass">{t(`projectType.${project.project_type}`)}</Badge>
+              <Badge tone="neutral">{t(`projectStatus.${project.status}`)}</Badge>
               {project.genre ? <Badge tone="neutral">{project.genre}</Badge> : null}
               {project.country ? <Badge tone="neutral">{project.country}</Badge> : null}
               {project.duration ? <Badge tone="neutral">{project.duration} min</Badge> : null}
@@ -121,20 +116,20 @@ export default function ProjectDetailPage() {
           <div className="flex shrink-0 items-center gap-4">
             <div className="text-center">
               <ScoreRing value={project.readiness_score} size={72} />
-              <p className="mt-1.5 text-xs text-slatey-400">Maturité</p>
+              <p className="mt-1.5 text-xs text-slatey-400">{t("project.readiness")}</p>
             </div>
           </div>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2.5">
           <Link href={`/projets/${id}/ai-writer`} className="btn-primary">
-            Ouvrir l&apos;AI Writer
+            {t("project.openWriter")}
           </Link>
           <Link href={`/projets/${id}/financements`} className="btn-secondary">
-            Financements compatibles
+            {t("project.matchingFunding")}
           </Link>
           <Link href={`/projets/${id}/budget`} className="btn-secondary">
-            Budget et financement
+            {t("project.budget")}
           </Link>
           <button
             type="button"
@@ -143,7 +138,7 @@ export default function ProjectDetailPage() {
             disabled={busy === "pdf"}
           >
             {busy === "pdf" ? <Spinner /> : null}
-            Exporter le dossier (PDF)
+            {t("project.exportPdf")}
           </button>
           <button
             type="button"
@@ -152,7 +147,7 @@ export default function ProjectDetailPage() {
             disabled={busy === "zip"}
           >
             {busy === "zip" ? <Spinner /> : null}
-            Tout exporter (ZIP)
+            {t("project.exportZip")}
           </button>
           <button
             type="button"
@@ -160,7 +155,7 @@ export default function ProjectDetailPage() {
             onClick={handleDelete}
             disabled={busy === "delete"}
           >
-            Supprimer
+            {t("common.delete")}
           </button>
         </div>
       </div>
@@ -169,8 +164,8 @@ export default function ProjectDetailPage() {
       {score ? (
         <section>
           <SectionHeading
-            title={`Maturité du projet : ${score.total}/100`}
-            description="Indicateur interne d'avancement du dossier. Il ne préjuge d'aucune décision de financement."
+            title={t("project.readinessTitle", { score: score.total })}
+            description={t("project.readinessHint")}
           />
 
           <div className="grid gap-4 lg:grid-cols-5">
@@ -197,11 +192,9 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="card p-5 lg:col-span-2">
-              <h3 className="mb-3 text-sm font-semibold text-slatey-100">À améliorer</h3>
+              <h3 className="mb-3 text-sm font-semibold text-slatey-100">{t("project.toImprove")}</h3>
               {score.improvements.length === 0 ? (
-                <p className="text-sm text-slatey-400">
-                  Le dossier est complet sur tous les critères suivis.
-                </p>
+                <p className="text-sm text-slatey-400">{t("project.nothingToImprove")}</p>
               ) : (
                 <ul className="space-y-2 text-sm text-slatey-300">
                   {score.improvements.map((item) => (
@@ -220,21 +213,21 @@ export default function ProjectDetailPage() {
       {/* Documents */}
       <section>
         <SectionHeading
-          title="Documents du dossier"
+          title={t("project.documents")}
           action={
             <Link href={`/projets/${id}/ai-writer`} className="btn-secondary">
-              Générer un document
+              {t("project.generateDocument")}
             </Link>
           }
         />
 
         {documents.length === 0 ? (
           <EmptyState
-            title="Aucun document"
-            description="L'AI Writer produit vos documents à partir du contexte du projet, dans l'ordre qui garantit leur cohérence."
+            title={t("project.noDocument")}
+            description={t("project.noDocumentHint")}
             action={
               <Link href={`/projets/${id}/ai-writer`} className="btn-primary">
-                Ouvrir l&apos;AI Writer
+                {t("project.openWriter")}
               </Link>
             }
           />
@@ -248,15 +241,19 @@ export default function ProjectDetailPage() {
               >
                 <div className="min-w-0">
                   <p className="font-medium text-slatey-100">
-                    {DOCUMENT_TYPE_LABELS[document.document_type]}
+                    {t(`documentType.${document.document_type}`)}
                   </p>
                   <p className="mt-0.5 text-xs text-slatey-400">
-                    {document.word_count} mots · {estimatePages(document.word_count)} · version{" "}
-                    {document.current_version} · modifié {formatRelative(document.updated_at)}
+                    {t("project.documentMeta", {
+                      words: document.word_count,
+                      pages: formatPages(document.word_count),
+                      version: document.current_version,
+                      when: formatRelative(document.updated_at),
+                    })}
                   </p>
                 </div>
                 <Badge tone={document.status === "FINAL" ? "success" : "neutral"}>
-                  {DOCUMENT_STATUS_LABELS[document.status]}
+                  {t(`documentStatus.${document.status}`)}
                 </Badge>
               </Link>
             ))}
@@ -267,13 +264,12 @@ export default function ProjectDetailPage() {
       {/* Personnages */}
       <section>
         <SectionHeading
-          title="Personnages"
-          description="L'IA ne s'appuie que sur les personnages saisis ici."
+          title={t("project.characters")}
+          description={t("project.charactersHint")}
         />
         {project.characters.length === 0 ? (
           <div className="card p-6 text-sm text-slatey-400">
-            Aucun personnage saisi. Ajoutez-en depuis l&apos;édition du projet pour améliorer la
-            qualité des documents générés.
+            {t("project.noCharacter")}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -297,7 +293,7 @@ export default function ProjectDetailPage() {
                 ) : null}
                 {character.arc ? (
                   <p className="mt-2.5 border-t border-ink-700 pt-2.5 text-sm text-slatey-400">
-                    <span className="text-slatey-500">Arc — </span>
+                    <span className="text-slatey-500">{t("project.arc")}</span>
                     {character.arc}
                   </p>
                 ) : null}

@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 
 import { Alert, SectionHeading, Spinner } from "@/components/ui";
 import { ApiError, billingApi } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Page de paiement du prestataire simulé.
@@ -14,6 +15,7 @@ import { ApiError, billingApi } from "@/lib/api";
  * appelle n'existe qu'en développement.
  */
 function Simulation() {
+  const { t } = useI18n();
   const params = useSearchParams();
   const router = useRouter();
   const reference = params.get("reference");
@@ -28,7 +30,7 @@ function Simulation() {
       await billingApi.simulate(reference, succeed);
       router.push("/abonnement");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Simulation impossible.");
+      setError(err instanceof ApiError ? err.message : t("simulation.failed"));
       setBusy(false);
     }
   }
@@ -36,16 +38,16 @@ function Simulation() {
   return (
     <div className="card mx-auto max-w-lg p-8">
       <SectionHeading
-        title="Paiement simulé"
-        description="Aucun montant réel n'est encaissé : ce prestataire n'existe que pour le développement."
+        title={t("simulation.title")}
+        description={t("simulation.subtitle")}
       />
 
       {!reference ? (
-        <Alert tone="warning">Référence de paiement absente de l&apos;adresse.</Alert>
+        <Alert tone="warning">{t("simulation.missingReference")}</Alert>
       ) : (
         <>
           <p className="text-sm text-slatey-400">
-            Référence <span className="text-slatey-200">{reference}</span>
+            {t("simulation.reference")} <span className="text-slatey-200">{reference}</span>
           </p>
           {error ? (
             <div className="mt-4">
@@ -60,7 +62,7 @@ function Simulation() {
               disabled={busy}
             >
               {busy ? <Spinner /> : null}
-              Confirmer le paiement
+              {t("simulation.confirm")}
             </button>
             <button
               type="button"
@@ -68,7 +70,7 @@ function Simulation() {
               onClick={() => settle(false)}
               disabled={busy}
             >
-              Simuler un échec
+              {t("simulation.fail")}
             </button>
           </div>
         </>
@@ -77,9 +79,14 @@ function Simulation() {
   );
 }
 
+function SimulationFallback() {
+  const { t } = useI18n();
+  return <div className="card p-8 text-sm text-slatey-400">{t("common.loading")}</div>;
+}
+
 export default function SimulationPage() {
   return (
-    <Suspense fallback={<div className="card p-8 text-sm text-slatey-400">Chargement…</div>}>
+    <Suspense fallback={<SimulationFallback />}>
       <Simulation />
     </Suspense>
   );
