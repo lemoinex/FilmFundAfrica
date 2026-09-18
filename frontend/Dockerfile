@@ -31,4 +31,5 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 USER nextjs
 EXPOSE 3000
+# `next start` lit `PORT` de lui-meme : rien a passer en argument.
 CMD ["npm", "start"]

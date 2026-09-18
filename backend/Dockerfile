@@ -19,7 +19,10 @@ RUN mkdir -p /app/storage
 
 EXPOSE 8000
 
+# `PORT` est impose par la plupart des hebergeurs geres (Railway, Render, Fly),
+# et uvicorn ne lit que `UVICORN_PORT` : d'ou l'expansion explicite. La valeur
+# par defaut garde `docker compose` et l'usage local inchanges.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS "http://localhost:${PORT:-8000}/health" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

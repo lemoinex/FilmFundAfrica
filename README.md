@@ -578,6 +578,14 @@ la main. `python -m scripts.seed` n'est utile que pour un jeu de démonstration.
 
 ### Hébergement
 
+Quatre services : l'API, le worker de génération, le frontend et Redis. **Vercel ne
+convient qu'au frontend** — l'API et le worker sont des processus longs, pas des fonctions.
+
+Une configuration prête pour Railway est fournie dans
+[`deploy/railway/`](deploy/railway/README.md) : un fichier par service, les variables
+d'environnement à renseigner, l'ordre de mise en route et les pièges (migrations avec
+plusieurs répliques, variables `NEXT_PUBLIC_*` figées au build, stockage éphémère).
+
 L'application est conçue pour un hébergement conteneurisé :
 
 1. Provisionner PostgreSQL (Supabase, Neon ou instance gérée) et renseigner `DATABASE_URL`.
