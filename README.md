@@ -228,6 +228,28 @@ python -m scripts.seed --reset   # les supprime puis les recrée
 | Producteur | `producteur.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
 | Admin | `admin.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
 
+### Créer un compte administrateur
+
+L'espace d'administration (`/admin/financements`) est réservé au rôle `ADMIN`. Pour créer un
+administrateur réel — ou promouvoir un compte existant :
+
+```bash
+cd backend
+python -m scripts.create_admin --email vous@exemple.com            # création
+python -m scripts.create_admin --email vous@exemple.com --promote  # promotion, mot de passe inchangé
+
+# Avec Docker :
+docker compose exec backend python -m scripts.create_admin --email vous@exemple.com
+```
+
+Le mot de passe est demandé à la saisie, masqué et confirmé : il n'est **jamais** passé en
+argument (l'historique du shell et la liste des processus le rendraient visible) ni écrit dans
+un fichier. Pour un déploiement automatisé, la variable `FILMFUND_ADMIN_PASSWORD` est acceptée,
+à condition de ne pas la versionner. Il doit faire au moins 8 caractères et mêler lettres et
+chiffres. Changer le mot de passe d'un compte révoque ses sessions ouvertes.
+
+Les comptes de démonstration ci-dessus sont publics : ne les utilisez jamais en production.
+
 Le seed crée 3 projets et 3 opportunités **fictives**, marquées `is_demo=true`, au statut
 `UNVERIFIED`, et portant la mention `DEMO DATA — NOT REAL` dans leur description. L'interface
 les affiche avec ce marquage. Elles ne doivent jamais être présentées comme de véritables
