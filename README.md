@@ -578,13 +578,16 @@ la main. `python -m scripts.seed` n'est utile que pour un jeu de démonstration.
 
 ### Hébergement
 
-Quatre services : l'API, le worker de génération, le frontend et Redis. **Vercel ne
-convient qu'au frontend** — l'API et le worker sont des processus longs, pas des fonctions.
+Quatre services : l'API, le worker de génération, le frontend et Redis.
 
-Une configuration prête pour Railway est fournie dans
-[`deploy/railway/`](deploy/railway/README.md) : un fichier par service, les variables
-d'environnement à renseigner, l'ordre de mise en route et les pièges (migrations avec
-plusieurs répliques, variables `NEXT_PUBLIC_*` figées au build, stockage éphémère).
+* **[Railway](deploy/railway/README.md)** — les quatre au même endroit. Un fichier de
+  configuration par service, les variables à renseigner, l'ordre de mise en route et les
+  pièges (migrations avec plusieurs répliques, `NEXT_PUBLIC_*` figées au build, stockage
+  éphémère).
+* **[Vercel](deploy/VERCEL.md)** — `vercel.json` déclare le frontend et l'API comme deux
+  services d'un même domaine, ce qui supprime toute question de CORS. Mais **Vercel
+  n'héberge pas le worker** : sans lui, l'API génère pendant la requête, et un scénario
+  long dépasse le plafond de durée. Le fichier détaille les trois façons de s'en sortir.
 
 L'application est conçue pour un hébergement conteneurisé :
 

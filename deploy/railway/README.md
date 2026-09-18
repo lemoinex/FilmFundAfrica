@@ -3,6 +3,9 @@
 Quatre services, tirés du même dépôt. Les trois premiers se construisent à partir des
 `Dockerfile` déjà présents ; le quatrième est un module Railway.
 
+Pour n'héberger que le frontend et l'API sur Vercel, voir [`../VERCEL.md`](../VERCEL.md) —
+le worker, lui, n'y a pas sa place.
+
 | Service | Répertoire racine | Config | Rôle |
 | --- | --- | --- | --- |
 | `api` | `backend` | `deploy/railway/api.json` | API FastAPI, applique les migrations au démarrage |
