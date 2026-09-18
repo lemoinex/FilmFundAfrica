@@ -79,6 +79,7 @@ filmfund-africa/
 ├── docs/               État du projet, décisions d'architecture
 ├── n8n/                Workflows d'automatisation
 ├── prompts/            → voir backend/app/prompts
+├── .github/workflows/  Intégration continue (lint, tests, migrations, e2e)
 ├── docker-compose.yml
 ├── .env.example
 └── LICENSE
@@ -378,6 +379,21 @@ npm run typecheck
 npm run build
 npm run test:e2e           # 12 parcours de bout en bout (Playwright)
 ```
+
+### Intégration continue
+
+`.github/workflows/ci.yml` rejoue ces contrôles sur chaque pull request et sur `main` :
+
+| Job | Contenu |
+| --- | --- |
+| `backend` | `ruff`, `pytest` (avec un service Redis, qui active le test d'intégration de la limitation de débit), migrations appliquées **sur PostgreSQL**, et `alembic check` |
+| `frontend` | `tsc --noEmit`, `next lint`, build de production |
+| `e2e` | Playwright sur Chromium, après le succès des deux autres |
+
+Le point le moins évident est le plus utile : les tests tournent sur SQLite, mais la
+production vise PostgreSQL. Les migrations sont donc appliquées sur leur vraie cible, et
+`alembic check` échoue si un modèle a changé sans migration — une dérive qui se découvrirait
+sinon au déploiement, sur la base réelle.
 
 Les tests de bout en bout démarrent eux-mêmes une API jetable (SQLite neuve,
 `AI_PROVIDER=mock`) et le frontend : il n'y a rien à lancer avant. Ils supposent seulement

@@ -255,6 +255,10 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
+- **Intégration continue** (`.github/workflows/ci.yml`) sur chaque pull request et sur `main` :
+  lint, tests, migrations appliquées sur PostgreSQL et contrôle de dérive entre modèles et
+  migrations, typage strict, build, puis parcours Playwright. Les tests tournent sur SQLite ;
+  vérifier les migrations sur leur vraie cible évite de découvrir l'écart au déploiement.
 - **230 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
