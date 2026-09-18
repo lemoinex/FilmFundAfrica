@@ -18,7 +18,10 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (payload: Parameters<typeof authApi.register>[0]) => Promise<void>;
+  /** Renvoie le message de confirmation : l'inscription n'ouvre pas de session. */
+  register: (payload: Parameters<typeof authApi.register>[0]) => Promise<string>;
+  /** Confirme l'adresse depuis le lien reçu par e-mail, et ouvre la session. */
+  verifyEmail: (token: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   /** Met à jour le solde de crédits après une génération, sans requête. */
@@ -63,7 +66,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (payload: Parameters<typeof authApi.register>[0]) => {
-      const data = await authApi.register(payload);
+      const { detail } = await authApi.register(payload);
+      return detail;
+    },
+    [],
+  );
+
+  const verifyEmail = useCallback(
+    async (token: string) => {
+      const data = await authApi.verifyEmail(token);
       tokenStore.set(data.access_token, data.refresh_token);
       setUser(data.user);
       router.push("/tableau-de-bord");
@@ -84,8 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, refreshUser, setCredits }),
-    [user, loading, login, register, logout, refreshUser, setCredits],
+    () => ({ user, loading, login, register, verifyEmail, logout, refreshUser, setCredits }),
+    [user, loading, login, register, verifyEmail, logout, refreshUser, setCredits],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

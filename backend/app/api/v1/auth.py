@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 
-from app.core.config import settings
 from app.core.deps import CurrentUser, DbSession
 from app.core.rate_limit import rate_limit_auth
 from app.schemas.auth import (
@@ -14,8 +13,10 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     ResetPasswordRequest,
     TokenPair,
+    VerifyEmailRequest,
 )
 from app.schemas.common import Message
 from app.schemas.user import UserRead
@@ -24,15 +25,63 @@ from app.services.auth_service import AuthService, serialize_user
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
 
+#: Réponse unique de l'inscription et du renvoi de lien : l'adresse soit-elle
+#: libre ou déjà prise, l'appelant lit exactement la même phrase.
+VERIFICATION_SENT = (
+    "Si cette adresse peut être utilisée, un e-mail de confirmation vient d'être "
+    "envoyé. Ouvrez le lien qu'il contient pour activer votre compte."
+)
+
+
+def _with_dev_token(message: str, token: str | None) -> Message:
+    """Ajoute le jeton en développement, jamais ailleurs.
+
+    Sans SMTP configuré, un développeur n'aurait aucun moyen d'activer le compte
+    qu'il vient de créer. `AuthService` ne renvoie ce jeton qu'en environnement
+    `development` : cette fonction ne peut donc pas le divulguer en production.
+    """
+    if token:
+        message += f" [DEV] Jeton : {token}"
+    return Message(detail=message)
+
+
 @router.post(
     "/register",
-    response_model=AuthResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_model=Message,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(rate_limit_auth)],
     summary="Créer un compte",
 )
-def register(payload: RegisterRequest, db: DbSession) -> AuthResponse:
-    return AuthService(db).register(payload)
+def register(payload: RegisterRequest, db: DbSession) -> Message:
+    """Accepte l'inscription sans dire si l'adresse est déjà prise.
+
+    Répondre 409 sur une adresse existante permettait à n'importe qui de tester
+    si une personne est inscrite. Le compte n'est actif qu'une fois le lien reçu
+    par e-mail ouvert ; le titulaire d'une adresse déjà inscrite est prévenu de
+    la tentative, et lui seul.
+    """
+    return _with_dev_token(VERIFICATION_SENT, AuthService(db).register(payload))
+
+
+@router.post(
+    "/verify-email",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_auth)],
+    summary="Confirmer son adresse e-mail",
+)
+def verify_email(payload: VerifyEmailRequest, db: DbSession) -> AuthResponse:
+    """Active le compte et ouvre la session : le lien vaut preuve de possession."""
+    return AuthService(db).verify_email(payload.token)
+
+
+@router.post(
+    "/resend-verification",
+    response_model=Message,
+    dependencies=[Depends(rate_limit_auth)],
+    summary="Renvoyer le lien de confirmation",
+)
+def resend_verification(payload: ResendVerificationRequest, db: DbSession) -> Message:
+    return _with_dev_token(VERIFICATION_SENT, AuthService(db).resend_verification(payload.email))
 
 
 @router.post(
@@ -74,14 +123,12 @@ def me(current_user: CurrentUser) -> UserRead:
     summary="Demander un lien de réinitialisation",
 )
 def forgot_password(payload: ForgotPasswordRequest, db: DbSession) -> Message:
-    debug_token = AuthService(db).request_password_reset(payload.email)
     # Reponse identique que le compte existe ou non : pas d'enumeration.
-    message = (
-        "Si un compte existe pour cette adresse, un lien de réinitialisation vient d'être envoyé."
+    return _with_dev_token(
+        "Si un compte existe pour cette adresse, un lien de réinitialisation "
+        "vient d'être envoyé.",
+        AuthService(db).request_password_reset(payload.email),
     )
-    if debug_token and not settings.is_production:
-        message += f" [DEV] Jeton : {debug_token}"
-    return Message(detail=message)
 
 
 @router.post(

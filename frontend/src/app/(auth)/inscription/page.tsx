@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { Alert, Spinner } from "@/components/ui";
-import { ApiError } from "@/lib/api";
+import { ApiError, authApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { USER_TYPE_LABELS } from "@/lib/labels";
 import type { UserType } from "@/lib/types";
@@ -26,6 +26,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  /** Message de confirmation : identique que l'adresse soit libre ou déjà prise. */
+  const [sent, setSent] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -37,12 +40,14 @@ export default function RegisterPage() {
     setFieldErrors({});
     setSubmitting(true);
     try {
-      await register({
+      const detail = await register({
         ...form,
         country: form.country || undefined,
         city: form.city || undefined,
         profession: form.profession || undefined,
       });
+      setSent(detail);
+      setSubmitting(false);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -54,6 +59,46 @@ export default function RegisterPage() {
       }
       setSubmitting(false);
     }
+  }
+
+  async function handleResend() {
+    setResent(false);
+    try {
+      await authApi.resendVerification(form.email);
+      setResent(true);
+    } catch {
+      // La réponse ne dit jamais si l'adresse existe : un échec réseau non plus
+      // ne doit rien laisser deviner.
+      setResent(true);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="card p-8">
+        <h1 className="font-display text-2xl text-slatey-100">Vérifiez votre boîte mail</h1>
+        <p className="mt-3 text-sm text-slatey-300">{sent}</p>
+        <p className="mt-4 text-sm text-slatey-400">
+          Le lien a été envoyé à <span className="text-slatey-200">{form.email}</span>. Il expire
+          dans 24 heures. Pensez à regarder dans les indésirables.
+        </p>
+
+        {resent ? (
+          <div className="mt-5">
+            <Alert tone="info">Si un lien était en attente, un nouveau vient de partir.</Alert>
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button type="button" className="btn-secondary" onClick={handleResend}>
+            Renvoyer le lien
+          </button>
+          <Link href="/connexion" className="btn-primary">
+            Aller à la connexion
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

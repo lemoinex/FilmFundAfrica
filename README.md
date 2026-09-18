@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          131 tests (pytest)
+│   └── tests/          139 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -129,6 +129,7 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `DATABASE_URL` | Connexion PostgreSQL (compatible Supabase / Neon) | local Docker |
 | `JWT_SECRET` | Signature des jetons — **obligatoire en production** (≥ 32 caractères) | — |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée du jeton d'accès | `60` |
+| `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Durée du lien de confirmation d'adresse | `1440` |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
 | `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
@@ -376,11 +377,12 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 131 tests
+pytest                    # 139 tests
 ruff check .              # lint
 ```
 
-Couverture : inscription, connexion, rafraîchissement et réinitialisation de mot de passe,
+Couverture : inscription en deux temps et **non-énumération des comptes à l'inscription**,
+connexion, rafraîchissement et réinitialisation de mot de passe,
 **révocation des sessions au changement de mot de passe**, non-énumération à la connexion,
 refus de démarrage avec une configuration de production non sécurisée, **non-contournement de
 la limitation de débit par `X-Forwarded-For`**, CRUD projets, **isolation stricte des données
@@ -414,6 +416,11 @@ réalité trente tentatives de connexion par minute. Avec lui, la limite vaut po
 déploiement entier. Si Redis devient injoignable, l'API continue de répondre en comptant en
 mémoire (limite dégradée, jamais d'indisponibilité) et `GET /health` renvoie
 `"rate_limit": "redis-unreachable"` avec un statut `degraded` — à surveiller.
+
+**Configurez SMTP.** L'activation d'un compte passe par un lien envoyé par e-mail : sans
+`SMTP_HOST`, le message est seulement journalisé et personne ne peut activer son compte. Seul
+l'environnement `development` fait exception — l'API y renvoie le jeton dans sa réponse, ce
+qu'elle ne fait jamais ailleurs.
 
 **Déployez le worker de génération** (`python -m app.workers.runner`) à côté de l'API : c'est
 lui qui écrit les documents. Sans worker, l'API s'en charge, et un scénario long tient la

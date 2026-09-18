@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 14
     password_reset_expire_minutes: int = 60
+    #: Duree de validite du lien de confirmation d'adresse (24 h par defaut).
+    email_verification_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:3000"
     #: IP des proxys de confiance, seules autorisees a definir X-Forwarded-For.
     trusted_proxy_ips: str = ""

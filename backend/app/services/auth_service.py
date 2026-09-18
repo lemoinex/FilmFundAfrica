@@ -8,19 +8,23 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import AuthenticationError, ConflictError, NotFoundError
+from app.core.errors import AuthenticationError, NotFoundError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    generate_reset_token,
+    generate_url_token,
     hash_password,
-    hash_reset_token,
+    hash_url_token,
     verify_password,
 )
 from app.models.enums import PlanCode
-from app.models.user import PasswordResetToken, Profile, User
-from app.repositories.user import PasswordResetRepository, UserRepository
+from app.models.user import EmailVerificationToken, PasswordResetToken, Profile, User
+from app.repositories.user import (
+    EmailVerificationRepository,
+    PasswordResetRepository,
+    UserRepository,
+)
 from app.schemas.auth import AuthResponse, RegisterRequest, TokenPair
 from app.schemas.user import UserRead
 from app.services.credit_service import CreditService
@@ -38,18 +42,42 @@ class AuthService:
         self.db = db
         self.users = UserRepository(db)
         self.resets = PasswordResetRepository(db)
+        self.verifications = EmailVerificationRepository(db)
         self.credits = CreditService(db)
         self.email = EmailService()
 
     # ------------------------------------------------------------------
-    def register(self, payload: RegisterRequest) -> AuthResponse:
+    def register(self, payload: RegisterRequest) -> str | None:
+        """Cree un compte non confirme et envoie le lien d'activation.
+
+        La reponse est la MEME que l'adresse soit libre ou deja prise : un 409
+        sur adresse existante permettait a n'importe qui de tester si une
+        personne est inscrite. C'est le titulaire de l'adresse, et lui seul, qui
+        apprend la tentative — par e-mail.
+
+        Le mot de passe est hache dans les deux cas : sans cela, la branche
+        « adresse deja prise » repondrait en quelques millisecondes la ou l'autre
+        en prend deux cents, et l'ecart de temps rendrait le 409 supprime.
+
+        Retourne le jeton en clair UNIQUEMENT en environnement `development`,
+        comme la reinitialisation de mot de passe : le renvoyer ailleurs
+        permettrait d'activer un compte ouvert avec l'adresse d'autrui.
+        """
         email = payload.email.strip().lower()
-        if self.users.email_exists(email):
-            raise ConflictError("Un compte existe déjà avec cette adresse e-mail.")
+        hashed = hash_password(payload.password)
+
+        existing = self.users.get_by_email(email)
+        if existing is not None:
+            self.email.send_registration_attempt(existing.email)
+            logger.info(
+                "inscription sur adresse déjà utilisée",
+                extra={"event": "register_existing_email"},
+            )
+            return None
 
         user = User(
             email=email,
-            hashed_password=hash_password(payload.password),
+            hashed_password=hashed,
             user_type=payload.user_type,
             is_active=True,
             is_verified=False,
@@ -67,7 +95,53 @@ class AuthService:
         self.db.refresh(user)
 
         logger.info("inscription", extra={"event": "user_registered"})
+        return self._issue_verification(user)
+
+    # ------------------------------------------------------------------
+    def _issue_verification(self, user: User) -> str | None:
+        """Emet un lien de confirmation et invalide les precedents."""
+        self.verifications.invalidate_for_user(user.id)
+        raw_token = generate_url_token()
+        self.verifications.add(
+            EmailVerificationToken(
+                user_id=user.id,
+                token_hash=hash_url_token(raw_token),
+                expires_at=datetime.now(UTC)
+                + timedelta(minutes=settings.email_verification_expire_minutes),
+                created_at=datetime.now(UTC),
+            )
+        )
+        self.db.commit()
+
+        verify_url = f"{settings.frontend_url}/verifier-email?token={raw_token}"
+        self.email.send_email_verification(user.email, verify_url)
+        return raw_token if settings.is_development else None
+
+    # ------------------------------------------------------------------
+    def verify_email(self, raw_token: str) -> AuthResponse:
+        """Active le compte et ouvre la session dans la foulee."""
+        token = self.verifications.get_valid(hash_url_token(raw_token))
+        if token is None:
+            raise AuthenticationError("Lien de confirmation invalide ou expiré.")
+        user = self.users.get(token.user_id)
+        if user is None:
+            raise NotFoundError("Compte introuvable.")
+
+        user.is_verified = True
+        token.used_at = datetime.now(UTC)
+        user.last_login_at = datetime.now(UTC)
+        self.db.commit()
+        self.db.refresh(user)
+        logger.info("adresse confirmée", extra={"event": "email_verified"})
         return self._auth_response(user)
+
+    # ------------------------------------------------------------------
+    def resend_verification(self, email: str) -> str | None:
+        """Renvoie le lien de confirmation, sans jamais dire si le compte existe."""
+        user = self.users.get_by_email(email)
+        if user is None or user.is_verified:
+            return None
+        return self._issue_verification(user)
 
     # ------------------------------------------------------------------
     def login(self, email: str, password: str) -> AuthResponse:
@@ -84,6 +158,14 @@ class AuthService:
             raise invalid
         if not user.is_active:
             raise AuthenticationError("Ce compte est suspendu.")
+        if not user.is_verified:
+            # Ce message n'est atteignable qu'avec le bon mot de passe : il ne
+            # revele donc rien a qui ne connait pas deja le compte.
+            raise AuthenticationError(
+                "Adresse non confirmée. Ouvrez le lien reçu par e-mail, "
+                "ou demandez-en un nouveau.",
+                code="email_not_verified",
+            )
 
         user.last_login_at = datetime.now(UTC)
         self.credits.refresh_period_if_needed(user)
@@ -121,11 +203,11 @@ class AuthService:
             return None
 
         self.resets.invalidate_for_user(user.id)
-        raw_token = generate_reset_token()
+        raw_token = generate_url_token()
         self.resets.add(
             PasswordResetToken(
                 user_id=user.id,
-                token_hash=hash_reset_token(raw_token),
+                token_hash=hash_url_token(raw_token),
                 expires_at=datetime.now(UTC)
                 + timedelta(minutes=settings.password_reset_expire_minutes),
                 created_at=datetime.now(UTC),
@@ -139,7 +221,7 @@ class AuthService:
 
     # ------------------------------------------------------------------
     def reset_password(self, raw_token: str, new_password: str) -> None:
-        token = self.resets.get_valid(hash_reset_token(raw_token))
+        token = self.resets.get_valid(hash_url_token(raw_token))
         if token is None:
             raise AuthenticationError("Lien de réinitialisation invalide ou expiré.")
         user = self.users.get(token.user_id)

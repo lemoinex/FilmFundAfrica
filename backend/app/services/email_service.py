@@ -64,5 +64,39 @@ class EmailService:
         )
         return self.send(to, "Réinitialisation de votre mot de passe", body)
 
+    def send_email_verification(self, to: str, verify_url: str) -> bool:
+        body = (
+            "Bonjour,\n\n"
+            "Bienvenue sur FilmFund Africa. Confirmez cette adresse pour activer "
+            "votre compte :\n\n"
+            f"{verify_url}\n\n"
+            f"Ce lien expire dans {settings.email_verification_expire_minutes // 60} heures.\n"
+            "Si vous n'êtes pas à l'origine de cette inscription, ignorez ce message : "
+            "aucun compte ne sera activé.\n\n"
+            "— L'équipe FilmFund Africa"
+        )
+        return self.send(to, "Confirmez votre adresse e-mail", body)
+
+    def send_registration_attempt(self, to: str) -> bool:
+        """Prévient le titulaire qu'on a tenté de s'inscrire avec son adresse.
+
+        C'est la contrepartie de la réponse unique à l'inscription : puisque
+        l'API ne dit plus si l'adresse est prise, c'est son propriétaire — et
+        lui seul — qui l'apprend.
+        """
+        body = (
+            "Bonjour,\n\n"
+            "Quelqu'un vient de tenter de créer un compte FilmFund Africa avec "
+            "cette adresse, qui est déjà la vôtre.\n\n"
+            "Si c'était vous, connectez-vous simplement : "
+            f"{settings.frontend_url}/connexion\n"
+            "Mot de passe oublié ? "
+            f"{settings.frontend_url}/mot-de-passe-oublie\n\n"
+            "Si ce n'était pas vous, il n'y a rien à faire : aucun compte n'a été "
+            "créé et le vôtre est inchangé.\n\n"
+            "— L'équipe FilmFund Africa"
+        )
+        return self.send(to, "Tentative d'inscription avec votre adresse", body)
+
     def send_notification(self, to: str, title: str, body: str) -> bool:
         return self.send(to, f"[FilmFund Africa] {title}", body)

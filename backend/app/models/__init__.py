@@ -22,13 +22,14 @@ from app.models.funding import (
 from app.models.jobs import GenerationJob
 from app.models.project import Character, Project
 from app.models.system import AppSetting, AuditLog, Notification
-from app.models.user import PasswordResetToken, Profile, User
+from app.models.user import EmailVerificationToken, PasswordResetToken, Profile, User
 
 __all__ = [
     "Base",
     "User",
     "Profile",
     "PasswordResetToken",
+    "EmailVerificationToken",
     "Project",
     "Character",
     "Document",

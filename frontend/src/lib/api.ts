@@ -167,7 +167,28 @@ export const authApi = {
     country?: string;
     city?: string;
     profession?: string;
-  }) => request<AuthResponse>("/api/v1/auth/register", { method: "POST", body: payload, auth: false }),
+  }) =>
+    // L'inscription n'ouvre pas de session : elle envoie un lien de
+    // confirmation, et répond la même chose que l'adresse soit libre ou prise.
+    request<{ detail: string }>("/api/v1/auth/register", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    }),
+
+  verifyEmail: (token: string) =>
+    request<AuthResponse>("/api/v1/auth/verify-email", {
+      method: "POST",
+      body: { token },
+      auth: false,
+    }),
+
+  resendVerification: (email: string) =>
+    request<{ detail: string }>("/api/v1/auth/resend-verification", {
+      method: "POST",
+      body: { email },
+      auth: false,
+    }),
 
   login: (email: string, password: string) =>
     request<AuthResponse>("/api/v1/auth/login", {

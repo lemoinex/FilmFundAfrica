@@ -92,3 +92,23 @@ class PasswordResetToken(Base, UUIDPrimaryKeyMixin):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EmailVerificationToken(Base, UUIDPrimaryKeyMixin):
+    """Confirme qu'une adresse appartient bien a la personne qui s'inscrit.
+
+    C'est ce qui permet a l'inscription de repondre la meme chose que l'adresse
+    soit libre ou deja prise : rien n'est accorde avant que le lien recu par
+    e-mail ne soit ouvert.
+    """
+
+    __tablename__ = "email_verification_tokens"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    #: Le jeton clair n'est jamais stocke : seul son SHA-256 l'est.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

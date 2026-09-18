@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.models.user import PasswordResetToken, Profile, User
+from app.models.user import EmailVerificationToken, PasswordResetToken, Profile, User
 from app.repositories.base import BaseRepository
 
 
@@ -47,12 +47,17 @@ class ProfileRepository(BaseRepository[Profile]):
         return self.db.scalar(select(Profile).where(Profile.user_id == user_id))
 
 
-class PasswordResetRepository(BaseRepository[PasswordResetToken]):
-    model = PasswordResetToken
+class _SingleUseTokenRepository(BaseRepository):
+    """Jetons a usage unique envoyes par e-mail.
 
-    def get_valid(self, token_hash: str) -> PasswordResetToken | None:
+    Meme regle pour la reinitialisation et la confirmation d'adresse : un jeton
+    deja consomme ou expire est traite comme inexistant, et emettre un nouveau
+    jeton invalide les precedents.
+    """
+
+    def get_valid(self, token_hash: str):
         token = self.db.scalar(
-            select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+            select(self.model).where(self.model.token_hash == token_hash)
         )
         if token is None or token.used_at is not None:
             return None
@@ -66,10 +71,18 @@ class PasswordResetRepository(BaseRepository[PasswordResetToken]):
     def invalidate_for_user(self, user_id: str) -> None:
         now = datetime.now(UTC)
         tokens = self.db.scalars(
-            select(PasswordResetToken).where(
-                PasswordResetToken.user_id == user_id,
-                PasswordResetToken.used_at.is_(None),
+            select(self.model).where(
+                self.model.user_id == user_id,
+                self.model.used_at.is_(None),
             )
         )
         for token in tokens:
             token.used_at = now
+
+
+class PasswordResetRepository(_SingleUseTokenRepository):
+    model = PasswordResetToken
+
+
+class EmailVerificationRepository(_SingleUseTokenRepository):
+    model = EmailVerificationToken

@@ -88,12 +88,16 @@ def decode_token(token: str, expected_type: TokenType | None = None) -> dict[str
     return payload
 
 
-def generate_reset_token() -> str:
-    """Jeton opaque de reinitialisation, stocke hashe en base."""
+def generate_url_token() -> str:
+    """Jeton opaque transmis par e-mail (reinitialisation, verification).
+
+    Stocke hashe en base : une fuite de la table ne permet pas de forger un
+    lien valide.
+    """
     return secrets.token_urlsafe(48)
 
 
-def hash_reset_token(token: str) -> str:
+def hash_url_token(token: str) -> str:
     import hashlib
 
     return hashlib.sha256(token.encode("utf-8")).hexdigest()

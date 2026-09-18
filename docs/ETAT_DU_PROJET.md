@@ -15,7 +15,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 - Monorepo `backend/` + `frontend/`, `docker-compose.yml` à six services (frontend, backend,
   worker, postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
-- Schéma PostgreSQL complet : **22 tables**, contraintes d'intégrité, index, migration Alembic
+- Schéma PostgreSQL complet : **23 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
 - Configuration centralisée et typée (`pydantic-settings`), aucun secret en dur.
@@ -27,6 +27,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 ### Authentification et sécurité
 
 - Inscription, connexion, déconnexion, jetons d'accès et de rafraîchissement (JWT), profil.
+- **Inscription en deux temps, sans énumération de comptes** : l'API répond exactement la même
+  chose que l'adresse soit libre ou déjà prise, et le compte n'est actif qu'une fois ouvert le
+  lien reçu par e-mail. Le mot de passe est haché dans les deux cas, sans quoi l'écart de temps
+  de réponse (mesuré : 298 ms contre 306 ms) rétablirait l'oracle supprimé. Le titulaire d'une
+  adresse déjà inscrite est prévenu de la tentative, et lui seul. Le lien ne sert qu'une fois,
+  expire en 24 heures, n'est stocké que haché, et n'est jamais renvoyé par l'API hors
+  environnement `development`. Un compte non confirmé ne peut pas se connecter — message
+  atteignable seulement avec le bon mot de passe, donc sans rien révéler à un tiers.
 - Réinitialisation de mot de passe par jeton à usage unique et à durée limitée ; seul le
   SHA-256 du jeton est stocké en base.
 - Mots de passe hachés avec bcrypt ; politique de robustesse à l'inscription.
@@ -166,15 +174,16 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **131 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **139 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression. Les trois limites connues les plus lourdes — limitation de débit
-  non partagée entre répliques, génération tenue dans la requête HTTP, et durée de scénario
-  plafonnée par le budget de sortie du fournisseur — sont corrigées. Le test d'intégration sur un vrai serveur
+  des tests de non-régression. Les quatre limites connues les plus lourdes — limitation de débit
+  non partagée entre répliques, génération tenue dans la requête HTTP, durée de scénario
+  plafonnée par le budget de sortie du fournisseur, et énumération de comptes à
+  l'inscription — sont corrigées. Le test d'intégration sur un vrai serveur
   Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
@@ -205,17 +214,17 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 2. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
    aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
    dette à combler.
-3. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
-   permet à un tiers de tester si une adresse est inscrite. La connexion, elle, ne révèle rien
-   (message et temps de réponse identiques). Le supprimer suppose de basculer sur une
-   inscription en deux temps avec confirmation par e-mail.
-4. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
+3. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
    une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
    entre deux passes, non implémenté.
-5. **Continuité d'un très long scénario** — chaque passe ne voit que la fin de la précédente
+4. **Continuité d'un très long scénario** — chaque passe ne voit que la fin de la précédente
    (3500 caractères). Sur quarante passes, la dérive de style et de détails secondaires
    s'accumule mécaniquement. Le découpage suit la structure dramatique, ce qui limite la
    casse, mais un scénario de dix heures demandera une relecture d'ensemble.
+5. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
+   désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
+   seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc
+   obligatoire dès qu'on quitte le poste de développement, où le jeton reste renvoyé par l'API.
 6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
@@ -230,7 +239,8 @@ Indispensables en production : `DATABASE_URL`, `JWT_SECRET` (fort et unique), `C
 (domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`. Avec
 plusieurs répliques, `REDIS_URL` s'ajoute à cette liste : sans lui, la limitation de débit
 annoncée est multipliée par le nombre de répliques, et les générations s'exécutent dans la
-requête HTTP. Le worker (`python -m app.workers.runner`) se déploie à côté de l'API.
+requête HTTP. Le worker (`python -m app.workers.runner`) se déploie à côté de l'API. `SMTP_*` devient
+indispensable dès `staging` : sans lui, aucun compte ne peut être activé.
 
 ---
 
