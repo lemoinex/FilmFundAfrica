@@ -65,15 +65,15 @@ filmfund-africa/
 │   ├── app/
 │   │   ├── api/v1/     Routes HTTP
 │   │   ├── core/       Configuration, sécurité, base de données, erreurs, logs
-│   │   ├── models/     Tables SQLAlchemy (21 tables)
+│   │   ├── models/     Tables SQLAlchemy (22 tables)
 │   │   ├── prompts/    Prompts versionnés, un module par document
 │   │   ├── repositories/  Requêtes SQL isolées
 │   │   ├── schemas/    Contrats d'entrée/sortie Pydantic
 │   │   ├── services/   Logique métier + couche d'abstraction IA
-│   │   └── workers/    Tâches planifiées appelables par n8n
+│   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          96 tests (pytest)
+│   └── tests/          230 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -129,15 +129,24 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `DATABASE_URL` | Connexion PostgreSQL (compatible Supabase / Neon) | local Docker |
 | `JWT_SECRET` | Signature des jetons — **obligatoire en production** (≥ 32 caractères) | — |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée du jeton d'accès | `60` |
+| `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Durée du lien de confirmation d'adresse | `1440` |
+| `PAYMENT_PROVIDER` | `manual` (encaissement hors ligne) ou `mock` (simulé, développement) | `manual` |
+| `PAYMENT_WEBHOOK_SECRET` | Secret signant les notifications du prestataire | vide |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
 | `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
-| `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote le découpage des scénarios | `8000` |
+| `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote la taille d'une passe | `8000` |
+| `SCREENPLAY_MAX_PASSES` | Plafond de sécurité du nombre de passes d'un scénario | `40` |
 | `AI_CREDITS_FREE/PRO/PRODUCER` | Quotas mensuels par offre | `1` / `300` / `500` |
 | `RATE_LIMIT_AUTH_PER_MINUTE` | Limitation sur les routes d'authentification | `10` |
+| `REDIS_URL` | Compteurs de limitation partagés entre répliques ; vide = compteurs en mémoire | vide |
+| `REDIS_TIMEOUT_SECONDS` | Délai au-delà duquel l'appel à Redis est abandonné | `0.25` |
+| `JOB_TIMEOUT_SECONDS` | Durée **sans signe de vie** au-delà de laquelle une génération est déclarée interrompue | `900` |
+| `JOB_STALE_SECONDS` | Âge à partir duquel une tâche en attente est reprise par le balayage | `60` |
 | `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
 | `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
+| `N8N_API_KEY` | Clé de l'automatisation (veille, tâches planifiées) ; vide = routes fermées | vide |
 | `NEXT_PUBLIC_API_URL` | URL de l'API vue par le navigateur | `http://localhost:8000` |
 
 **Aucune clé API réelle ne doit être commitée.** `.env` est ignoré par git.
@@ -178,6 +187,16 @@ cp ../.env.example .env        # puis ajustez DATABASE_URL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+Avec `REDIS_URL`, lancez le worker de génération dans un second terminal :
+
+```bash
+python -m app.workers.runner
+```
+
+Sans lui, l'API exécute les générations elle-même : c'est fonctionnel, mais un scénario long
+tient alors la requête HTTP ouverte plusieurs minutes. `GET /health` indique lequel des deux
+modes est actif (`"generation": "worker"` ou `"inline-no-worker"`).
 
 L'API écoute sur `http://localhost:8000`. La documentation OpenAPI est générée
 automatiquement sur `/docs` (Swagger) et `/redoc`.
@@ -357,21 +376,39 @@ python -c "from app.workers.tasks import reset_monthly_credits; print(reset_mont
 cd frontend
 npm run typecheck
 npm run build
+npm run test:e2e           # 12 parcours de bout en bout (Playwright)
 ```
+
+Les tests de bout en bout démarrent eux-mêmes une API jetable (SQLite neuve,
+`AI_PROVIDER=mock`) et le frontend : il n'y a rien à lancer avant. Ils supposent seulement
+que les dépendances Python du backend sont installées ; `E2E_PYTHON` permet de désigner
+l'interpréteur à utiliser (`E2E_PYTHON=backend/.venv/bin/python npm run test:e2e`). Le
+navigateur s'installe une fois avec `npx playwright install chromium`, ou `PLAYWRIGHT_CHROMIUM_PATH`
+pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 96 tests
+pytest                    # 230 tests
 ruff check .              # lint
 ```
 
-Couverture : inscription, connexion, rafraîchissement et réinitialisation de mot de passe,
+Couverture, côté API : inscription en deux temps et **non-énumération des comptes à l'inscription**,
+connexion, rafraîchissement et réinitialisation de mot de passe,
 **révocation des sessions au changement de mot de passe**, non-énumération à la connexion,
 refus de démarrage avec une configuration de production non sécurisée, **non-contournement de
 la limitation de débit par `X-Forwarded-For`**, CRUD projets, **isolation stricte des données
 entre utilisateurs**, quotas de projets et de crédits, **export réservé aux offres qui
 l'incluent**, génération IA, cohérence inter-documents, découpage des scénarios longs,
-versioning et restauration, exports PDF/DOCX/ZIP, contrôle d'accès administrateur.
+versioning et restauration, **continuité entre les passes d'un scénario long**,
+exports PDF/DOCX/ZIP/XLSX, **budget et plan de financement** (trame par type de projet,
+totaux recalculés, couverture acquise contre espérée), contrôle d'accès administrateur,
+**limitation de débit partagée entre répliques**, **génération asynchrone** (réserve des
+crédits, remboursement en cas d'échec, avancement par passe, reprise des tâches perdues).
+
+Couverture, côté navigateur : inscription → confirmation d'adresse → connexion, non-énumération
+visible à l'écran, création de projet, génération d'un document et ouverture dans l'éditeur,
+limites d'offre (projets, crédits, export), installation de la trame de budget, chiffrage d'un
+poste et couverture du plan de financement.
 
 ---
 
@@ -391,9 +428,25 @@ L'application est conçue pour un hébergement conteneurisé :
 Derrière un proxy inverse, renseignez `TRUSTED_PROXY_IPS` avec son adresse : sans cela
 l'en-tête `X-Forwarded-For` est ignoré (et la limitation de débit s'applique à l'IP du proxy).
 
-**À faire avant une mise en production réelle** : la limitation de débit est en mémoire
-(mono-instance) — la basculer sur Redis pour plusieurs répliques ; brancher Sentry et un
-stockage d'objets si les utilisateurs téléversent des fichiers.
+**Avec plusieurs répliques, renseignez `REDIS_URL`.** Sans lui, chaque réplique compte les
+appels de son côté : avec trois répliques, `RATE_LIMIT_AUTH_PER_MINUTE=10` autorise en
+réalité trente tentatives de connexion par minute. Avec lui, la limite vaut pour le
+déploiement entier. Si Redis devient injoignable, l'API continue de répondre en comptant en
+mémoire (limite dégradée, jamais d'indisponibilité) et `GET /health` renvoie
+`"rate_limit": "redis-unreachable"` avec un statut `degraded` — à surveiller.
+
+**Configurez SMTP.** L'activation d'un compte passe par un lien envoyé par e-mail : sans
+`SMTP_HOST`, le message est seulement journalisé et personne ne peut activer son compte. Seul
+l'environnement `development` fait exception — l'API y renvoie le jeton dans sa réponse, ce
+qu'elle ne fait jamais ailleurs.
+
+**Déployez le worker de génération** (`python -m app.workers.runner`) à côté de l'API : c'est
+lui qui écrit les documents. Sans worker, l'API s'en charge, et un scénario long tient la
+requête ouverte jusqu'à l'expiration du proxy. Le worker est sans état : plusieurs instances
+peuvent tourner en parallèle, chaque tâche n'étant exécutée que par une seule d'entre elles.
+
+**À faire avant une mise en production réelle** : brancher Sentry et un stockage d'objets si
+les utilisateurs téléversent des fichiers.
 
 ---
 

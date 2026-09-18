@@ -133,6 +133,9 @@ export default function ProjectDetailPage() {
           <Link href={`/projets/${id}/financements`} className="btn-secondary">
             Financements compatibles
           </Link>
+          <Link href={`/projets/${id}/budget`} className="btn-secondary">
+            Budget et financement
+          </Link>
           <button
             type="button"
             className="btn-secondary"

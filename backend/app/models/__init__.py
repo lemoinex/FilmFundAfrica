@@ -19,15 +19,19 @@ from app.models.funding import (
     FundingRequirement,
     ProjectFundingMatch,
 )
+from app.models.ingestion import OpportunityCandidate
+from app.models.jobs import GenerationJob
+from app.models.payment import Payment
 from app.models.project import Character, Project
 from app.models.system import AppSetting, AuditLog, Notification
-from app.models.user import PasswordResetToken, Profile, User
+from app.models.user import EmailVerificationToken, PasswordResetToken, Profile, User
 
 __all__ = [
     "Base",
     "User",
     "Profile",
     "PasswordResetToken",
+    "EmailVerificationToken",
     "Project",
     "Character",
     "Document",
@@ -46,4 +50,7 @@ __all__ = [
     "Notification",
     "AuditLog",
     "AppSetting",
+    "GenerationJob",
+    "Payment",
+    "OpportunityCandidate",
 ]

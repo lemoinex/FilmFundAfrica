@@ -8,23 +8,36 @@
 
 import type {
   AuthResponse,
+  Budget,
+  CheckoutResponse,
+  BudgetCategory,
+  BudgetItem,
   Character,
   DashboardResponse,
   DocumentSummary,
   DocumentType,
   DocumentTypeInfo,
   DocumentVersion,
+  FundingPlan,
+  FundingPlanLine,
+  FundingSourceType,
+  GenerationJob,
   GenerationResult,
   MatchExplanation,
   MatchListResponse,
   NotificationItem,
   Opportunity,
+  OpportunityCandidate,
   OpportunityPage,
+  Payment,
+  Plan,
   Project,
   ProjectDocument,
   ProjectSummary,
   ReadinessScore,
   RefineAction,
+  SchedulePhase,
+  SubscriptionState,
   ScreenplayCapacity,
   User,
 } from "./types";
@@ -166,7 +179,28 @@ export const authApi = {
     country?: string;
     city?: string;
     profession?: string;
-  }) => request<AuthResponse>("/api/v1/auth/register", { method: "POST", body: payload, auth: false }),
+  }) =>
+    // L'inscription n'ouvre pas de session : elle envoie un lien de
+    // confirmation, et répond la même chose que l'adresse soit libre ou prise.
+    request<{ detail: string }>("/api/v1/auth/register", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    }),
+
+  verifyEmail: (token: string) =>
+    request<AuthResponse>("/api/v1/auth/verify-email", {
+      method: "POST",
+      body: { token },
+      auth: false,
+    }),
+
+  resendVerification: (email: string) =>
+    request<{ detail: string }>("/api/v1/auth/resend-verification", {
+      method: "POST",
+      body: { email },
+      auth: false,
+    }),
 
   login: (email: string, password: string) =>
     request<AuthResponse>("/api/v1/auth/login", {
@@ -259,7 +293,7 @@ export const documentApi = {
       overwrite?: boolean;
     } = {},
   ) =>
-    request<GenerationResult>(
+    request<GenerationJob>(
       `/api/v1/projects/${projectId}/documents/${documentType}/generate`,
       { method: "POST", body: { language: "fr", overwrite: true, ...payload } },
     ),
@@ -275,7 +309,7 @@ export const documentApi = {
     }),
 
   refine: (projectId: string, documentId: string, action: RefineAction, instructions?: string) =>
-    request<GenerationResult>(
+    request<GenerationJob>(
       `/api/v1/projects/${projectId}/documents/${documentId}/refine`,
       { method: "POST", body: { action, instructions: instructions ?? null } },
     ),
@@ -400,6 +434,206 @@ export const dashboardApi = {
   markRead: (id: string) =>
     request<{ detail: string }>(`/api/v1/notifications/${id}/read`, { method: "POST" }),
 };
+
+export const candidateApi = {
+  /** File de validation de la veille : rien n'est publié sans relecture. */
+  list: (status?: string) =>
+    request<OpportunityCandidate[]>(
+      `/api/v1/admin/candidates${status ? `?status=${status}` : ""}`,
+    ),
+
+  approve: (candidateId: string, corrections: Record<string, unknown> = {}) =>
+    request<{ detail: string }>(`/api/v1/admin/candidates/${candidateId}/approve`, {
+      method: "POST",
+      body: corrections,
+    }),
+
+  reject: (candidateId: string, note?: string) =>
+    request<OpportunityCandidate>(`/api/v1/admin/candidates/${candidateId}/reject`, {
+      method: "POST",
+      body: { note: note ?? null },
+    }),
+};
+
+export const billingApi = {
+  plans: () => request<Plan[]>("/api/v1/billing/plans"),
+
+  subscription: () => request<SubscriptionState>("/api/v1/billing/subscription"),
+
+  payments: () => request<Payment[]>("/api/v1/billing/payments"),
+
+  /** Ouvre un paiement : rien n'est accordé tant qu'il n'a pas abouti. */
+  checkout: (planCode: string, phoneNumber?: string) =>
+    request<CheckoutResponse>("/api/v1/billing/checkout", {
+      method: "POST",
+      body: { plan_code: planCode, phone_number: phoneNumber ?? null },
+    }),
+
+  cancel: () =>
+    request<{ detail: string }>("/api/v1/billing/cancel", { method: "POST" }),
+
+  /** Réservée au prestataire simulé, en développement. */
+  simulate: (reference: string, succeed = true) =>
+    request<{ detail: string }>(
+      `/api/v1/billing/simulate/${reference}?succeed=${succeed}`,
+      { method: "POST" },
+    ),
+};
+
+export const budgetApi = {
+  get: (projectId: string) => request<Budget>(`/api/v1/projects/${projectId}/budget`),
+
+  /** Installe les postes attendus pour ce type de projet, sans montants. */
+  generate: (projectId: string, replace = false) =>
+    request<Budget>(`/api/v1/projects/${projectId}/budget/generate`, {
+      method: "POST",
+      body: { replace },
+    }),
+
+  updateBudget: (projectId: string, payload: { currency?: string; notes?: string }) =>
+    request<Budget>(`/api/v1/projects/${projectId}/budget`, { method: "PUT", body: payload }),
+
+  addItem: (
+    projectId: string,
+    payload: {
+      category: BudgetCategory;
+      label: string;
+      quantity?: number;
+      unit?: string | null;
+      unit_price?: number;
+    },
+  ) =>
+    request<BudgetItem>(`/api/v1/projects/${projectId}/budget/items`, {
+      method: "POST",
+      body: payload,
+    }),
+
+  updateItem: (
+    projectId: string,
+    itemId: string,
+    payload: Partial<{
+      category: BudgetCategory;
+      label: string;
+      quantity: number;
+      unit: string | null;
+      unit_price: number;
+    }>,
+  ) =>
+    request<BudgetItem>(`/api/v1/projects/${projectId}/budget/items/${itemId}`, {
+      method: "PUT",
+      body: payload,
+    }),
+
+  deleteItem: (projectId: string, itemId: string) =>
+    request<{ detail: string }>(`/api/v1/projects/${projectId}/budget/items/${itemId}`, {
+      method: "DELETE",
+    }),
+
+  plan: (projectId: string) =>
+    request<FundingPlan>(`/api/v1/projects/${projectId}/funding-plan`),
+
+  addPlanLine: (
+    projectId: string,
+    payload: {
+      source_type: FundingSourceType;
+      source_name?: string | null;
+      amount?: number;
+      is_secured?: boolean;
+      expected_date?: string | null;
+    },
+  ) =>
+    request<FundingPlanLine>(`/api/v1/projects/${projectId}/funding-plan/lines`, {
+      method: "POST",
+      body: payload,
+    }),
+
+  updatePlanLine: (
+    projectId: string,
+    lineId: string,
+    payload: Partial<{
+      source_type: FundingSourceType;
+      source_name: string | null;
+      amount: number;
+      is_secured: boolean;
+      expected_date: string | null;
+    }>,
+  ) =>
+    request<FundingPlanLine>(`/api/v1/projects/${projectId}/funding-plan/lines/${lineId}`, {
+      method: "PUT",
+      body: payload,
+    }),
+
+  deletePlanLine: (projectId: string, lineId: string) =>
+    request<{ detail: string }>(
+      `/api/v1/projects/${projectId}/funding-plan/lines/${lineId}`,
+      { method: "DELETE" },
+    ),
+
+  schedule: (projectId: string) =>
+    request<SchedulePhase[]>(`/api/v1/projects/${projectId}/schedule`),
+
+  setPhase: (
+    projectId: string,
+    payload: {
+      phase: BudgetCategory;
+      start_date?: string | null;
+      end_date?: string | null;
+      notes?: string | null;
+    },
+  ) =>
+    request<SchedulePhase>(`/api/v1/projects/${projectId}/schedule`, {
+      method: "PUT",
+      body: payload,
+    }),
+};
+
+export const jobApi = {
+  get: (jobId: string) => request<GenerationJob>(`/api/v1/jobs/${jobId}`),
+
+  listForProject: (projectId: string) =>
+    request<GenerationJob[]>(`/api/v1/projects/${projectId}/jobs`),
+};
+
+/** Première attente avant d'interroger une tâche, en millisecondes. */
+const JOB_POLL_START_MS = 1000;
+/** Plafond de l'attente : au-delà, l'écran paraîtrait figé. */
+const JOB_POLL_MAX_MS = 5000;
+
+/**
+ * Suit une génération jusqu'à son état terminal et renvoie son résultat.
+ *
+ * L'attente entre deux interrogations s'allonge progressivement : une logline
+ * est prête en quelques secondes, un scénario de 110 pages demande plusieurs
+ * minutes — inutile d'interroger le serveur toutes les secondes pendant tout
+ * ce temps.
+ */
+export async function waitForJob(
+  job: GenerationJob,
+  options: { onProgress?: (job: GenerationJob) => void; signal?: AbortSignal } = {},
+): Promise<GenerationResult> {
+  let current = job;
+  let delay = JOB_POLL_START_MS;
+  options.onProgress?.(current);
+
+  while (current.status === "QUEUED" || current.status === "RUNNING") {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay = Math.min(Math.round(delay * 1.4), JOB_POLL_MAX_MS);
+    if (options.signal?.aborted) {
+      throw new ApiError("Suivi de la génération interrompu.", 0, "job_tracking_aborted");
+    }
+    current = await jobApi.get(current.id);
+    options.onProgress?.(current);
+  }
+
+  if (current.status === "FAILED" || current.result === null) {
+    throw new ApiError(
+      current.error_message ?? "La génération a échoué.",
+      500,
+      current.error_code ?? "job_failed",
+    );
+  }
+  return current.result;
+}
 
 /** Télécharge un export en réutilisant le jeton d'accès courant. */
 export async function downloadExport(path: string, fallbackName: string): Promise<void> {

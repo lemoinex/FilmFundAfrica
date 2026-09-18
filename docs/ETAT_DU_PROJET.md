@@ -1,8 +1,8 @@
 # État du projet — rapport de livraison
 
 Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation), Phase 2
-(AI Writer) et Phase 3 (Funding Intelligence)**, plus l'export qui figure parmi les
-fonctionnalités indispensables du MVP.
+(AI Writer), Phase 3 (Funding Intelligence), Phase 4 (Budget), Phase 5 (Abonnements) et Phase 6 (Automatisation)**, plus l'export qui figure
+parmi les fonctionnalités indispensables du MVP.
 
 Ce document dit ce qui fonctionne réellement, ce qui est partiel et ce qui n'est pas commencé.
 Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
@@ -13,9 +13,9 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Fondations
 
-- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à quatre services (frontend, backend,
-  postgres, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
-- Schéma PostgreSQL complet : **21 tables**, contraintes d'intégrité, index, migration Alembic
+- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à six services (frontend, backend,
+  worker, postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
+- Schéma PostgreSQL complet : **25 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
 - Configuration centralisée et typée (`pydantic-settings`), aucun secret en dur.
@@ -27,6 +27,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 ### Authentification et sécurité
 
 - Inscription, connexion, déconnexion, jetons d'accès et de rafraîchissement (JWT), profil.
+- **Inscription en deux temps, sans énumération de comptes** : l'API répond exactement la même
+  chose que l'adresse soit libre ou déjà prise, et le compte n'est actif qu'une fois ouvert le
+  lien reçu par e-mail. Le mot de passe est haché dans les deux cas, sans quoi l'écart de temps
+  de réponse (mesuré : 298 ms contre 306 ms) rétablirait l'oracle supprimé. Le titulaire d'une
+  adresse déjà inscrite est prévenu de la tentative, et lui seul. Le lien ne sert qu'une fois,
+  expire en 24 heures, n'est stocké que haché, et n'est jamais renvoyé par l'API hors
+  environnement `development`. Un compte non confirmé ne peut pas se connecter — message
+  atteignable seulement avec le bon mot de passe, donc sans rien révéler à un tiers.
 - Réinitialisation de mot de passe par jeton à usage unique et à durée limitée ; seul le
   SHA-256 du jeton est stocké en base.
 - Mots de passe hachés avec bcrypt ; politique de robustesse à l'inscription.
@@ -38,6 +46,13 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - Limitation de débit sur les routes d'authentification et de génération IA, **non contournable
   par un en-tête `X-Forwarded-For` forgé** : cet en-tête n'est lu que si la connexion provient
   d'un proxy déclaré dans `TRUSTED_PROXY_IPS`. Les compteurs inactifs sont purgés.
+- **Limite partagée entre répliques** : avec `REDIS_URL`, les compteurs vivent dans Redis
+  (fenêtre glissante par ensemble ordonné, comptage en transaction `MULTI`/`EXEC`) et la limite
+  vaut pour le déploiement entier. Sans lui, chaque réplique compte de son côté et la limite
+  réelle est multipliée par leur nombre — mesuré : 10 connexions acceptées pour une limite
+  annoncée à 5, avec deux répliques. Si Redis devient injoignable, l'API continue de répondre
+  en comptant en mémoire (un coupe-circuit évite d'attendre un serveur muet à chaque appel) et
+  `GET /health` passe en `degraded` avec `"rate_limit": "redis-unreachable"`.
 - **Révocation des sessions** : un changement ou une réinitialisation de mot de passe invalide
   immédiatement tous les jetons émis auparavant, jetons de rafraîchissement compris.
 - **Le jeton de réinitialisation n'est jamais renvoyé par l'API** hors environnement
@@ -71,11 +86,34 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - **Cohérence inter-documents** : chaque prompt reçoit le contexte structuré du projet et le
   contenu des documents dont il dépend. La note de réalisation voit la note d'intention et le
   synopsis ; le scénario voit le traitement et les personnages.
+- **Génération hors requête HTTP** : une demande est acceptée en quelques millisecondes et
+  exécutée par un worker. Mesuré sur un scénario de 110 pages (8 passes, fournisseur à 1,5 s
+  par appel) : réponse en **10 ms** pour une génération de **12,2 s**, avec l'avancement
+  visible passe après passe. Les crédits sont **réservés à la mise en file** — sans quoi on
+  pourrait empiler des générations au-delà de son quota — et **rendus si la tâche échoue**. La
+  base est la source de vérité : une file Redis perdue ne perd aucune tâche, un balayage les
+  reprend, et une tâche dont le worker a disparu échoue proprement plutôt que de rester en
+  cours — le délai se comptant depuis le **dernier signe de vie** et non depuis le démarrage,
+  une génération longue mais vivante n'est jamais prise pour une tâche morte. Sans `REDIS_URL` ou sans worker, l'API génère elle-même : `GET /health` dit lequel
+  des deux modes est actif.
+- **Continuité tenue sur toute la longueur** : chaque passe reçoit non seulement la fin de la
+  précédente, mais les faits établis par **toutes** celles d'avant — personnages apparus (avec
+  leur nombre de répliques), lieux utilisés, segments déjà écrits. Ces faits sont extraits du
+  texte produit par lecture du format standard (en-têtes de séquence, noms en majuscules) :
+  aucun appel supplémentaire au fournisseur, donc aucun crédit. Un texte hors format ne produit
+  simplement rien plutôt qu'un fait faux. Le rappel est borné (~900 caractères à la 40ᵉ passe,
+  quelle que soit la longueur) : il ne prend pas la place du texte à écrire.
 - **Scénarios longs en plusieurs passes** : un scénario dépassant ce qu'un appel unique peut
   produire est découpé selon la structure en trois actes ; chaque passe reçoit la fin de la
   précédente pour la continuité des personnages, des lieux et de la numérotation des séquences.
   Le coût en crédits est annoncé avant lancement.
-- Durée cible du scénario au choix (10 à 120 minutes), appliquant la règle « 1 page ≈ 1 minute ».
+- **Durée cible libre**, appliquant la règle « 1 page ≈ 1 minute » : le nombre de passes suit
+  la durée demandée, il n'est plus plafonné à dix. `AI_MAX_OUTPUT_TOKENS` fixe ce qu'une passe
+  produit, plus la longueur totale du scénario. Avec les valeurs par défaut, la durée maximale
+  réalisable passe de **138 à 681 minutes** ; surtout, avec un `AI_MAX_OUTPUT_TOKENS` modeste
+  (4000), un long métrage de 120 minutes était refusé et ne l'est plus. Un plafond de sécurité
+  (`SCREENPLAY_MAX_PASSES`, 40 par défaut) refuse toujours explicitement une durée aberrante,
+  en indiquant ce qui est réalisable.
 - Actions de retravail : **Régénérer, Améliorer, Raccourcir, Développer, Corriger**.
 - **Versioning complet** : chaque génération, sauvegarde manuelle ou restauration crée une
   version horodatée, avec son origine, le modèle et la version de prompt utilisés. Consultation
@@ -122,6 +160,47 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   avec lien vers l'AI Writer), et **espace d'administration** réservé au rôle `ADMIN`.
 - Notification automatique lorsqu'un projet dépasse 70 % de compatibilité avec un dispositif.
 
+### Budget et plan de financement
+
+- **Trame de budget par type de projet** (documentaire, long métrage, court métrage, série TV,
+  série web, animation) : 22 à 27 postes répartis sur les cinq phases de production, dans
+  l'ordre où un comité de lecture les attend. La trame propose **la structure, jamais les
+  montants** : un tarif plausible inventé serait un chiffre faux dans un dossier de
+  financement. Régénérer complète sans écraser les lignes déjà chiffrées.
+- **Tous les totaux sont calculés, jamais saisis** : le montant d'une ligne vaut quantité ×
+  prix unitaire, le total du budget la somme des lignes, et le plan de financement suit le
+  budget. Sous-totaux et part relative par phase.
+- **Plan de financement où « acquis » veut dire acquis** : une source seulement espérée compte
+  dans l'identifié et dans le recherché, pas dans le financé. Quatre chiffres distincts — budget
+  total, acquis, identifié, non couvert même par l'espéré — plutôt qu'un pourcentage unique qui
+  flatterait le dossier.
+- **Calendrier de production** : une ligne par phase, dates de début et de fin.
+- **Export XLSX** à trois feuilles (budget, plan de financement, calendrier), réservé aux offres
+  qui incluent l'export. Les montants y sont des **formules** et non des valeurs figées : un
+  financeur qui corrige un prix voit le total suivre.
+- Le critère « Budget » du score de maturité lit ces tables : chiffrer le dossier fait monter le
+  score immédiatement (mesuré sur un parcours réel : 4/100 → 19/100).
+
+### Abonnements et paiements
+
+- **Cycle d'abonnement complet** : souscription, activation sur paiement abouti, résiliation,
+  échéance. Trois règles le portent. *Un paiement donne des droits, il ne les suppose pas* :
+  rien n'est accordé tant qu'il n'est pas abouti — en mobile money, la personne doit encore
+  valider sur son téléphone. *Les notifications sont idempotentes* : la référence porte une
+  contrainte d'unicité, et une notification rejouée — ce que font tous les prestataires — ne
+  prolonge pas l'abonnement une seconde fois. *Résilier n'est pas couper* : la période déjà
+  payée va à son terme, c'est l'échéance qui fait redescendre à l'offre gratuite.
+- **Notifications authentifiées** : signature HMAC-SHA256 vérifiée en temps constant avant
+  toute lecture du contenu. Sans secret configuré, aucune notification n'est acceptée — une
+  vérification qui s'ouvre quand la configuration est incomplète ne protège rien.
+- **Couche prestataire interchangeable**, sur le modèle de `AIProvider` : `manual`
+  (encaissement hors ligne validé depuis l'administration, et tracé au nom de qui valide) et
+  `mock` (simulé, refusé en production). Chaque paiement est une ligne conservée, jamais
+  écrasée, avec la charge utile reçue du prestataire.
+- Renouveler avant l'échéance **prolonge** la période au lieu de la raccourcir.
+- Écran d'abonnement : offres et prix venant du serveur, solde de crédits, historique des
+  paiements, résiliation.
+
 ### Tableau de bord et administration
 
 - Statistiques (projets, documents générés, opportunités compatibles, échéances), cartes projet
@@ -131,10 +210,43 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   des offres et de leurs prix, **CRUD complet des dispositifs de financement et de leurs pièces
   exigées**.
 
+### Veille automatisée et tâches planifiées
+
+- **Le pipeline n8n n'écrit jamais dans la base vivante.** Il dépose des *candidats* dans une
+  file de validation ; un administrateur les relit depuis `/admin/veille`, corrige ce qui doit
+  l'être, puis publie ou écarte. Une opportunité proposée à un auteur engage son dossier de
+  financement : elle ne peut pas venir d'une classification automatique non relue. Vérifié de
+  bout en bout : deux candidats déposés, **zéro dispositif visible** avant relecture.
+- **Deux garde-fous à l'entrée** : pas d'URL source, pas de candidat ; et déduplication par
+  empreinte de la source — un second passage de la veille sur les mêmes pages produit
+  0 nouveau candidat et 2 doublons, au lieu de remplir la file. Une décision humaine tient :
+  un candidat écarté ne revient pas dans la file au passage suivant.
+- **Aucune valeur devinée** : une date illisible est écartée avec une trace dans les journaux,
+  jamais complétée. Les corrections du relecteur l'emportent sur l'extraction — c'est lui qui a
+  lu la source. La traçabilité (`source_url`, `source_name`, `last_verified_at`) suit le
+  candidat jusqu'au dispositif publié.
+- **Routes d'automatisation authentifiées** par clé partagée comparée en temps constant. Sans
+  clé configurée, elles sont fermées : une automatisation ouverte par défaut serait une porte
+  d'entrée sur la base de financements.
+- **Tâches planifiées déclenchables par liste fermée** (`notify_upcoming_deadlines`,
+  `notify_incomplete_projects`, `send_pending_notification_emails`, `reset_monthly_credits`,
+  `expire_due_subscriptions`) : une route acceptant un nom libre exposerait tout le module.
+  Toutes sont idempotentes.
+- **Envoi effectif des notifications par e-mail** : le drapeau `email_sent` existait sans que
+  rien ne l'écrive. Une notification n'est marquée envoyée que si l'envoi a réussi — sans SMTP,
+  elle reste en attente et repartira, au lieu d'être perdue.
+- Les deux workflows n8n appellent désormais ces routes, au lieu d'exécuter des commandes shell
+  dans le conteneur backend.
+
 ### Interface
 
-- Next.js 14 (App Router), TypeScript strict, Tailwind. 17 routes, build de production
+- Next.js 14 (App Router), TypeScript strict, Tailwind. 19 routes, build de production
   vérifié, `tsc --noEmit` sans erreur.
+- **12 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
+  neuve : inscription → confirmation d'adresse → connexion, non-énumération visible à l'écran,
+  création de projet, génération d'un document puis ouverture dans l'éditeur, limites d'offre
+  (projets, crédits, export), trame de budget et couverture du plan de financement. Ils
+  démarrent eux-mêmes les deux serveurs : `npm run test:e2e`.
 - Landing page complète en dix sections (problème, solution, AI Writer, Funding Intelligence,
   matching, budget, pour qui, tarifs, FAQ, CTA final).
 - Direction artistique sobre : encre profonde, accent laiton, typographie display pour les
@@ -143,13 +255,17 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **96 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **230 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression.
+  des tests de non-régression. Les cinq limites connues les plus lourdes — limitation de débit
+  non partagée entre répliques, génération tenue dans la requête HTTP, durée de scénario
+  plafonnée par le budget de sortie du fournisseur, énumération de comptes à l'inscription,
+  et perte de continuité d'une passe à l'autre — sont corrigées. Le test d'intégration sur un vrai serveur
+  Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
   dépassement de quota ; puis saisie admin d'un dispositif → recherche filtrée → matching
@@ -163,37 +279,44 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 | Fonctionnalité | Ce qui existe | Ce qui manque |
 | --- | --- | --- |
-| **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration | La base est vide au démarrage : elle s'alimente par saisie administrateur. Le pipeline de veille automatisée (collecte, classification, validation) reste en Phase 6 |
-| **Budget et plan de financement** | Tables `budgets`, `budget_items`, `funding_plans`, `funding_plan_lines`, `production_schedules` ; catégories de postes ; calculs de financement acquis/recherché/pourcentage sur le modèle ; le critère « Budget » du score les lit déjà | Générateur de budget, API, interface |
-| **Notifications** | Table, API de lecture et de marquage, affichage au tableau de bord, tâches de détection d'échéances et de dossiers incomplets | Envoi effectif des e-mails (le service SMTP existe et journalise à défaut), déclenchement planifié |
-| **Abonnements** | Trois offres en base avec prix et quotas configurables depuis l'administration, quotas appliqués | Aucun paiement : changer d'offre se fait aujourd'hui par l'administration |
+| **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration, et pipeline de veille avec file de validation | La base est vide au démarrage : la veille doit être branchée sur des sources réelles, et chaque candidat relu |
 | **Internationalisation** | Champ `preferred_locale`, paramètre de langue accepté par les prompts (français / anglais) | Traduction de l'interface : elle est en français |
 
 ---
 
 ## KNOWN ISSUES
 
-1. **Limitation de débit en mémoire** — correcte sur une instance unique, sans effet réparti sur
-   plusieurs répliques. À basculer sur Redis avant une montée en charge horizontale.
-2. **Génération synchrone** — un scénario de 110 pages enchaîne plusieurs appels au fournisseur
-   et peut dépasser plusieurs minutes, en tenant la requête HTTP ouverte. Une file de tâches
-   (Redis + worker) est le prolongement naturel ; l'architecture y est préparée.
-3. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
+1. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-4. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
-   (8000), le découpage couvre jusqu'à 138 minutes. Au-delà, l'API refuse explicitement
-   (`screenplay_too_long`) plutôt que de facturer un scénario tronqué, et l'interface n'affiche
-   que les durées réellement productibles, obtenues auprès du serveur. Augmenter
-   `AI_MAX_OUTPUT_TOKENS` relève la limite.
-5. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
-   aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
-   dette à combler.
-6. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
-   permet à un tiers de tester si une adresse est inscrite. La connexion, elle, ne révèle rien
-   (message et temps de réponse identiques). Le supprimer suppose de basculer sur une
-   inscription en deux temps avec confirmation par e-mail.
-7. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+2. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
+   une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
+   entre deux passes, non implémenté.
+3. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
+   désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
+   seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc
+   obligatoire dès qu'on quitte le poste de développement, où le jeton reste renvoyé par l'API.
+4. **Budget : aucun repère de prix** — la trame donne les postes, l'auteur cherche les tarifs
+   ailleurs. Une base de coûts indicative par pays rendrait le chiffrage plus rapide, mais
+   suppose des données vérifiées que le produit n'a pas : proposer des montants inventés serait
+   pire que ne rien proposer. Le drapeau d'offre `allows_advanced_budget` reste inutilisé — le
+   module est ouvert à tous, seul l'export XLSX suit la règle d'offre commune aux exports.
+5. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
+   désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
+   registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
+   de dix heures demandera toujours une relecture d'ensemble.
+6. **Aucun prestataire de paiement réel** — le cycle d'abonnement fonctionne de bout en bout,
+   mais avec `manual` (encaissement hors ligne) ou `mock` (simulé). Brancher CinetPay, PayDunya,
+   Wave ou Flutterwave revient à écrire une classe implémentant `PaymentProvider` : trois
+   méthodes, documentées dans `app/services/payments/base.py`.
+7. **La veille n'a aucune source branchée** — le pipeline, la file de validation et les
+   garde-fous sont en place, mais le nœud « source » des workflows pointe sur une URL d'exemple.
+   Brancher un portail réel demande de choisir les sources et d'en lire la structure ; aucune
+   n'est proposée par défaut, faute de pouvoir en vérifier la fiabilité ici.
+8. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
+   dans une seule taille de fenêtre. Firefox, WebKit et l'affichage mobile ne sont pas testés ;
+   les ajouter ne demande qu'une ligne de configuration, mais allonge d'autant chaque exécution.
+9. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 
@@ -204,7 +327,11 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 Voir [`.env.example`](../.env.example) et la section 4 du [README](../README.md).
 
 Indispensables en production : `DATABASE_URL`, `JWT_SECRET` (fort et unique), `CORS_ORIGINS`
-(domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`.
+(domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`. Avec
+plusieurs répliques, `REDIS_URL` s'ajoute à cette liste : sans lui, la limitation de débit
+annoncée est multipliée par le nombre de répliques, et les générations s'exécutent dans la
+requête HTTP. Le worker (`python -m app.workers.runner`) se déploie à côté de l'API. `SMTP_*` devient
+indispensable dès `staging` : sans lui, aucun compte ne peut être activé.
 
 ---
 
@@ -229,16 +356,13 @@ Installation manuelle : sections 6 et 7 du README.
 1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
-2. **Phase 4 — Budget** : générateur de budget par type de projet, plan de financement,
-   calendrier de production, export XLSX.
-3. **Passer la génération en asynchrone** : Redis + worker, avec suivi de progression par passe
-   pour les scénarios longs.
-4. **Tests frontend** : Playwright sur inscription → projet → génération → export.
-5. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
-   (mobile money notamment), gestion du cycle d'abonnement.
-6. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
-   classification → validation humaine → base), notifications par e-mail. Il alimentera la base
-   de financements que l'administration remplit aujourd'hui à la main.
-7. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
+2. **Brancher un prestataire de paiement réel** : le cycle d'abonnement est complet et la
+   couche prestataire est en place, mais aucun prestataire réel n'y est branché — cela demande
+   un compte, des clés et la documentation exacte de son API. Écrire cette intégration « de
+   mémoire » produirait un code qui compile et qui échoue en production.
+3. **Brancher la veille sur des sources réelles** : le pipeline et la file de validation
+   fonctionnent, mais le nœud « source » des workflows pointe encore sur une URL d'exemple.
+   C'est un travail éditorial : choisir les portails à suivre, puis relire ce qu'ils remontent.
+4. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
-8. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.
+5. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

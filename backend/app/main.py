@@ -14,6 +14,7 @@ from app.api.v1.health import router as health_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import request_logging_middleware, setup_logging
+from app.core.rate_limit import auth_limiter
 
 logger = logging.getLogger("filmfund")
 
@@ -40,6 +41,12 @@ async def lifespan(app: FastAPI):
         "démarrage de l'API",
         extra={"event": "startup"},
     )
+    if auth_limiter.backend_name == "memory" and settings.is_production:
+        logger.warning(
+            "limitation de débit en mémoire : chaque réplique applique sa propre "
+            "limite. Renseignez REDIS_URL pour une limite partagée.",
+            extra={"event": "rate_limit_not_shared"},
+        )
     if settings.ai_provider == "mock":
         logger.warning(
             "AI_PROVIDER=mock : les documents ne seront pas rédigés par une IA. "

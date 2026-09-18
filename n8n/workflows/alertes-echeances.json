@@ -1,5 +1,5 @@
 {
-  "name": "FilmFund — Alertes échéances",
+  "name": "FilmFund — Tâches planifiées",
   "nodes": [
     {
       "parameters": {
@@ -46,21 +46,53 @@
     },
     {
       "parameters": {
-        "command": "cd /app && python -c \"from app.workers.tasks import notify_upcoming_deadlines, notify_incomplete_projects; print(notify_upcoming_deadlines(), notify_incomplete_projects())\""
+        "fieldToSplitOut": "tasks",
+        "options": {}
       },
-      "id": "run-tasks",
-      "name": "Notifications (échéances + dossiers incomplets)",
-      "type": "n8n-nodes-base.executeCommand",
+      "id": "fan-out",
+      "name": "Une tâche par élément",
+      "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [920, 240],
-      "notes": "Nécessite que n8n puisse exécuter des commandes dans le conteneur backend. En production, préférer une route API protégée ou un cron applicatif."
+      "position": [900, 300],
+      "notes": "Les tâches sont idempotentes : les rejouer ne produit pas de doublons."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Liste fermée côté serveur : `GET /api/v1/automation/tasks` la renvoie.\nreturn [{ json: { tasks: [\n  'notify_upcoming_deadlines',\n  'notify_incomplete_projects',\n  'send_pending_notification_emails',\n  'reset_monthly_credits',\n  'expire_due_subscriptions',\n] } }];"
+      },
+      "id": "task-list",
+      "name": "Tâches à déclencher",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://backend:8000/api/v1/automation/tasks/{{ $json.tasks }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-API-Key", "value": "={{ $env.FILMFUND_API_KEY }}" }]
+        },
+        "options": {}
+      },
+      "id": "run-task",
+      "name": "Déclencher la tâche",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 300],
+      "notes": "Route protégée par clé partagée, plutôt qu'une commande shell dans le conteneur backend."
     }
   ],
   "connections": {
     "Chaque jour à 06:00": { "main": [[{ "node": "API disponible ?", "type": "main", "index": 0 }]] },
     "API disponible ?": { "main": [[{ "node": "Statut OK", "type": "main", "index": 0 }]] },
-    "Statut OK": {
-      "main": [[{ "node": "Notifications (échéances + dossiers incomplets)", "type": "main", "index": 0 }]]
+    "Statut OK": { "main": [[{ "node": "Tâches à déclencher", "type": "main", "index": 0 }]] },
+    "Tâches à déclencher": {
+      "main": [[{ "node": "Une tâche par élément", "type": "main", "index": 0 }]]
+    },
+    "Une tâche par élément": {
+      "main": [[{ "node": "Déclencher la tâche", "type": "main", "index": 0 }]]
     }
   },
   "settings": { "executionOrder": "v1" },

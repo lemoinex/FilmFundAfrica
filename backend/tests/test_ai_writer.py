@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import pytest
 
+from app.core.errors import AppError
 from app.models.enums import DocumentType
 from app.prompts import PROMPT_REGISTRY, PromptContext, get_prompt
 from app.services.ai.service import AIService
 from app.services.screenplay_service import (
+    SCREENPLAY_MAX_TOKENS_PER_CALL,
     build_segment_prompt,
     last_scene_number,
+    pages_per_pass,
     plan_segments,
 )
+from tests.conftest import job_result
 
 
 def _generate(client, headers, project_id, document_type="SHORT_SYNOPSIS", **payload):
@@ -40,8 +44,7 @@ def test_document_types_endpoint_lists_prompts(client, auth_headers):
 
 def test_generate_creates_document_and_first_version(client, auth_headers, project):
     response = _generate(client, auth_headers, project["id"])
-    assert response.status_code == 201, response.text
-    result = response.json()
+    result = job_result(response)
 
     assert result["document"]["document_type"] == "SHORT_SYNOPSIS"
     assert result["document"]["current_version"] == 1
@@ -59,8 +62,8 @@ def test_generate_creates_document_and_first_version(client, auth_headers, proje
 
 
 def test_regenerating_adds_a_version_without_duplicating_document(client, auth_headers, project):
-    first = _generate(client, auth_headers, project["id"]).json()
-    second = _generate(client, auth_headers, project["id"]).json()
+    first = job_result(_generate(client, auth_headers, project["id"]))
+    second = job_result(_generate(client, auth_headers, project["id"]))
 
     assert first["document"]["id"] == second["document"]["id"]
     assert second["document"]["current_version"] == 2
@@ -78,7 +81,7 @@ def test_overwrite_false_protects_existing_content(client, auth_headers, project
 
 
 def test_manual_save_then_restore_previous_version(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     original = document["content"]
 
     saved = client.put(
@@ -99,7 +102,7 @@ def test_manual_save_then_restore_previous_version(client, auth_headers, project
 
 
 def test_saving_identical_content_does_not_create_a_version(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     response = client.put(
         f"/api/v1/projects/{project['id']}/documents/{document['id']}",
         json={"content": document["content"]},
@@ -110,14 +113,13 @@ def test_saving_identical_content_does_not_create_a_version(client, auth_headers
 
 @pytest.mark.parametrize("action", ["IMPROVE", "SHORTEN", "EXPAND", "CORRECT"])
 def test_refine_actions(client, auth_headers, project, action):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     response = client.post(
         f"/api/v1/projects/{project['id']}/documents/{document['id']}/refine",
         json={"action": action},
         headers=auth_headers,
     )
-    assert response.status_code == 200
-    assert response.json()["document"]["current_version"] == 2
+    assert job_result(response)["document"]["current_version"] == 2
 
 
 def test_generation_consumes_credits_and_stops_at_zero(client, make_user):
@@ -129,8 +131,7 @@ def test_generation_consumes_credits_and_stops_at_zero(client, make_user):
     ).json()["id"]
 
     first = _generate(client, headers, project_id)
-    assert first.status_code == 201
-    assert first.json()["credits_remaining"] == 0
+    assert job_result(first)["credits_remaining"] == 0
 
     second = _generate(client, headers, project_id)
     assert second.status_code == 402
@@ -179,6 +180,50 @@ def test_screenplay_length_follows_target_duration(db_session, project):
     assert "90 pages de scénario" in prompt_90.user_prompt
     assert "120 pages de scénario" in prompt_120.user_prompt
     assert prompt_120.target_words_hint > prompt_90.target_words_hint
+
+
+def test_a_feature_length_screenplay_no_longer_depends_on_the_token_budget():
+    """Le défaut corrigé : un plafond de passes fixe rendait un long métrage
+    irréalisable dès que le fournisseur produisait peu par appel.
+
+    Avec l'ancien plafond de 10 passes et `AI_MAX_OUTPUT_TOKENS=4000`, la durée
+    maximale tombait à 66 minutes : un scénario de 120 minutes était refusé.
+    """
+    with pytest.raises(AppError) as refused:
+        plan_segments(120, max_tokens_per_call=4000, max_passes=10)
+    assert refused.value.code == "screenplay_too_long"
+
+    # Le nombre de passes suit désormais la durée demandée.
+    segments = plan_segments(120, max_tokens_per_call=4000)
+    assert sum(segment.pages for segment in segments) >= 115
+    assert all(segment.pages <= pages_per_pass(4000) for segment in segments)
+
+
+def test_the_pass_count_follows_the_requested_duration():
+    short = plan_segments(120, max_tokens_per_call=8000)
+    long = plan_segments(240, max_tokens_per_call=8000)
+    assert len(long) > len(short)
+    # Chaque passe reste sous le plafond de sortie d'un appel.
+    assert all(segment.pages <= pages_per_pass(8000) for segment in long)
+
+
+def test_the_safety_ceiling_still_refuses_an_absurd_duration():
+    """Le plafond n'est plus une limite d'usage, mais il protège encore."""
+    with pytest.raises(AppError) as refused:
+        plan_segments(5000, max_tokens_per_call=8000)
+    assert refused.value.code == "screenplay_too_long"
+    # Le message dit ce qui est réalisable plutôt que de laisser l'auteur deviner.
+    assert "Maximum réalisable" in refused.value.detail
+
+
+def test_announced_capacity_matches_what_the_planner_accepts(client, auth_headers):
+    """L'interface n'affiche que des durées réellement productibles."""
+    capacity = client.get("/api/v1/documents/screenplay-capacity", headers=auth_headers).json()
+    budget = AIService.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL)
+
+    assert len(plan_segments(capacity["max_minutes"], budget)) <= capacity["max_passes"]
+    with pytest.raises(AppError):
+        plan_segments(capacity["max_minutes"] + 1, budget)
 
 
 def test_short_screenplay_fits_a_single_pass():
@@ -247,8 +292,7 @@ def test_long_screenplay_generation_costs_one_credit_per_pass(client, make_user)
         json={"language": "fr", "target_duration_minutes": 110},
         headers=headers,
     )
-    assert response.status_code == 201, response.text
-    result = response.json()
+    result = job_result(response)
     assert result["passes"] > 1
     assert result["credits_consumed"] == result["passes"]
 
@@ -269,11 +313,12 @@ def test_screenplay_target_is_independent_of_project_duration(client, make_user)
         json={"language": "fr", "target_duration_minutes": capacity["max_minutes"]},
         headers=headers,
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "SUCCEEDED", response.text
 
 
 def test_restoring_a_version_resyncs_project_fields(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     original = document["content"].strip()
 
     client.put(
@@ -328,8 +373,21 @@ def test_missing_information_is_extracted():
     assert AIService.extract_missing_information("## Synopsis\n\nUn récit.") == []
 
 
+def test_mock_provider_titles_the_document_with_the_real_project(
+    client, auth_headers, project
+):
+    """Le contexte est indexé par libellé (« Titre ») et non par attribut.
+
+    Chercher la mauvaise clé faisait intituler « Projet sans titre » tous les
+    documents produits par le fournisseur par défaut.
+    """
+    content = job_result(_generate(client, auth_headers, project["id"]))["document"]["content"]
+    assert project["title"] in content.splitlines()[0]
+    assert "Projet sans titre" not in content
+
+
 def test_mock_provider_never_invents_content(client, auth_headers, project):
-    content = _generate(client, auth_headers, project["id"]).json()["document"]["content"]
+    content = job_result(_generate(client, auth_headers, project["id"]))["document"]["content"]
     assert "MODE `mock`" in content
     assert "Information non fournie." in content
     # Le seul personnage present est celui saisi par l'utilisateur.

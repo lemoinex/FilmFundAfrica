@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 import zipfile
 
+from tests.conftest import job_result
+
 
 def _generate(client, headers, project_id, document_type="SHORT_SYNOPSIS"):
     return client.post(
@@ -27,7 +29,7 @@ def test_pdf_export_requires_at_least_one_document(client, auth_headers, project
 
 
 def test_docx_export(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     response = client.get(
         f"/api/v1/projects/{project['id']}/export/docx/{document['id']}", headers=auth_headers
     )

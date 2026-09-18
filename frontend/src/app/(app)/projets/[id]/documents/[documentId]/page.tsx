@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Markdown } from "@/components/markdown";
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
-import { ApiError, documentApi, downloadExport } from "@/lib/api";
+import { ApiError, documentApi, downloadExport, waitForJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { estimatePages, formatDateTime } from "@/lib/format";
 import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS, ORIGIN_LABELS } from "@/lib/labels";
@@ -100,7 +100,10 @@ export default function DocumentEditorPage() {
     setBusyAction(action);
     try {
       if (savedContent.current !== content) await save(content);
-      const result = await documentApi.refine(id, documentId, action);
+      // Le retravail suit le même chemin que la génération : une tâche, puis
+      // son résultat.
+      const job = await documentApi.refine(id, documentId, action);
+      const result = await waitForJob(job);
       setDocument(result.document);
       setContent(result.document.content);
       savedContent.current = result.document.content;
@@ -266,6 +269,7 @@ export default function DocumentEditorPage() {
       <div className="card p-6 sm:p-8">
         {mode === "edit" ? (
           <textarea
+            aria-label="Contenu du document"
             className="field min-h-[60vh] w-full resize-y font-mono text-[13.5px] leading-relaxed"
             value={content}
             onChange={(event) => {

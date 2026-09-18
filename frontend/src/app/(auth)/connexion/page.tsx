@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { Alert, Spinner } from "@/components/ui";
-import { ApiError } from "@/lib/api";
+import { ApiError, authApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
@@ -13,16 +13,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /** Vrai quand le compte existe mais que son adresse n'est pas confirmée. */
+  const [unverified, setUnverified] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    setUnverified(false);
+    setResent(false);
     try {
       await login(email, password);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Connexion impossible pour le moment.");
+      // Ce cas n'est atteint qu'avec le bon mot de passe : proposer le renvoi
+      // ici ne révèle donc rien à qui ne connaît pas déjà le compte.
+      setUnverified(err instanceof ApiError && err.code === "email_not_verified");
       setSubmitting(false);
+    }
+  }
+
+  async function handleResend() {
+    try {
+      await authApi.resendVerification(email);
+    } finally {
+      setResent(true);
     }
   }
 
@@ -33,6 +49,17 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-4">
         {error ? <Alert tone="danger">{error}</Alert> : null}
+
+        {unverified && !resent ? (
+          <button type="button" className="btn-secondary w-full" onClick={handleResend}>
+            Renvoyer le lien de confirmation
+          </button>
+        ) : null}
+        {resent ? (
+          <Alert tone="info">
+            Si un lien était en attente, un nouveau vient de partir vers cette adresse.
+          </Alert>
+        ) : null}
 
         <div>
           <label className="label" htmlFor="email">Adresse e-mail</label>

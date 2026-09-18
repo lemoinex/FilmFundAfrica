@@ -14,13 +14,22 @@ from app.core.deps import CurrentAdmin, DbSession
 from app.core.errors import NotFoundError
 from app.models.billing import AIUsage, SubscriptionPlan
 from app.models.document import Document
-from app.models.enums import PlanCode, ProjectStatus, ProjectType
+from app.models.enums import CandidateStatus, PlanCode, ProjectStatus, ProjectType
+from app.models.payment import Payment
 from app.models.project import Project
 from app.models.user import User
+from app.schemas.billing import PaymentRead
 from app.schemas.common import Message
+from app.schemas.ingestion import (
+    CandidateApproval,
+    CandidateRead,
+    CandidateRejection,
+)
 from app.schemas.user import AdminUserUpdate, UserRead
 from app.services.auth_service import serialize_user
 from app.services.credit_service import CreditService
+from app.services.ingestion_service import IngestionService
+from app.services.subscription_service import SubscriptionService
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -176,3 +185,88 @@ def update_plan(plan_code: PlanCode, payload: dict, db: DbSession, _: CurrentAdm
     db.commit()
     db.refresh(plan)
     return {"detail": "Offre mise à jour.", "code": str(plan.code)}
+
+
+# ---------------------------------------------------------------------------
+# Paiements et abonnements
+# ---------------------------------------------------------------------------
+@router.get("/payments", response_model=list[PaymentRead], summary="Paiements")
+def list_payments(
+    db: DbSession,
+    _: CurrentAdmin,
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[PaymentRead]:
+    return [
+        PaymentRead.model_validate(payment)
+        for payment in SubscriptionService(db).list_payments(limit=limit)
+    ]
+
+
+@router.post(
+    "/payments/{payment_id}/validate",
+    response_model=PaymentRead,
+    summary="Valider un encaissement hors ligne",
+)
+def validate_payment(payment_id: str, db: DbSession, admin: CurrentAdmin) -> PaymentRead:
+    """Active l'abonnement d'un paiement encaissé hors ligne.
+
+    C'est la contrepartie du mode `manual` : sans prestataire qui notifie, la
+    validation est humaine — et tracée, le paiement gardant le nom de qui l'a
+    validé.
+    """
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise NotFoundError("Paiement introuvable.")
+    return PaymentRead.model_validate(
+        SubscriptionService(db).mark_paid_manually(payment, admin)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Veille automatisée : validation des candidats
+# ---------------------------------------------------------------------------
+@router.get(
+    "/candidates", response_model=list[CandidateRead], summary="File de validation de la veille"
+)
+def list_candidates(
+    db: DbSession,
+    _: CurrentAdmin,
+    status: CandidateStatus | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[CandidateRead]:
+    return [
+        CandidateRead.model_validate(candidate)
+        for candidate in IngestionService(db).list_candidates(status, limit)
+    ]
+
+
+@router.post(
+    "/candidates/{candidate_id}/approve",
+    response_model=Message,
+    summary="Publier un candidat après relecture",
+)
+def approve_candidate(
+    candidate_id: str, payload: CandidateApproval, db: DbSession, admin: CurrentAdmin
+) -> Message:
+    """Crée le dispositif à partir du candidat relu.
+
+    Les corrections apportées ici l'emportent sur ce qu'a extrait la veille :
+    c'est la personne qui a lu la source.
+    """
+    service = IngestionService(db)
+    candidate = service.get(candidate_id)
+    opportunity = service.approve(candidate, admin, payload.model_dump(exclude_unset=True))
+    return Message(detail=f"Dispositif publié : {opportunity.name}.")
+
+
+@router.post(
+    "/candidates/{candidate_id}/reject",
+    response_model=CandidateRead,
+    summary="Écarter un candidat",
+)
+def reject_candidate(
+    candidate_id: str, payload: CandidateRejection, db: DbSession, admin: CurrentAdmin
+) -> CandidateRead:
+    service = IngestionService(db)
+    candidate = service.get(candidate_id)
+    return CandidateRead.model_validate(service.reject(candidate, admin, payload.note))

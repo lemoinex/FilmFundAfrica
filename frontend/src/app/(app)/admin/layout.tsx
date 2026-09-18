@@ -7,7 +7,10 @@ import { Alert } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { classNames } from "@/lib/format";
 
-const ADMIN_TABS = [{ href: "/admin/financements", label: "Financements" }];
+const ADMIN_TABS = [
+  { href: "/admin/financements", label: "Financements" },
+  { href: "/admin/veille", label: "Veille" },
+];
 
 /**
  * Garde côté interface. Elle évite d'afficher un écran inutilisable, mais

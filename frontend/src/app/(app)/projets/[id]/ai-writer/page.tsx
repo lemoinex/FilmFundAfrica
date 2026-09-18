@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
-import { ApiError, documentApi, projectApi } from "@/lib/api";
+import { ApiError, documentApi, projectApi, waitForJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { formatRelative } from "@/lib/format";
 import { DOCUMENT_TYPE_LABELS, DURATION_PRESETS } from "@/lib/labels";
@@ -13,6 +13,7 @@ import type {
   DocumentSummary,
   DocumentType,
   DocumentTypeInfo,
+  GenerationJob,
   GenerationResult,
   Project,
   ScreenplayCapacity,
@@ -46,6 +47,7 @@ export default function AiWriterPage() {
   const [duration, setDuration] = useState<string>("");
   const [instructions, setInstructions] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState<GenerationJob | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,13 +112,17 @@ export default function AiWriterPage() {
   async function handleGenerate() {
     setError(null);
     setResult(null);
+    setProgress(null);
     setGenerating(true);
     try {
-      const generated = await documentApi.generate(id, selected, {
+      // La génération est une tâche : l'API l'accepte, le serveur l'exécute,
+      // et l'on suit son avancement au lieu de tenir une requête ouverte.
+      const job = await documentApi.generate(id, selected, {
         target_duration_minutes: isScreenplay && duration ? Number(duration) : null,
         additional_instructions: instructions.trim() || null,
         overwrite: true,
       });
+      const generated = await waitForJob(job, { onProgress: setProgress });
       setResult(generated);
       setCredits(generated.credits_remaining);
       setDocuments(await documentApi.list(id));
@@ -124,6 +130,7 @@ export default function AiWriterPage() {
       setError(err instanceof ApiError ? err.message : "Génération impossible.");
     } finally {
       setGenerating(false);
+      setProgress(null);
     }
   }
 
@@ -311,12 +318,34 @@ export default function AiWriterPage() {
             </div>
 
             {generating ? (
-              <p className="mt-4 text-xs text-slatey-400">
-                Rédaction en cours…{" "}
-                {isScreenplay && estimatedPasses > 1
-                  ? `${estimatedPasses} passes à écrire, cela peut prendre plusieurs minutes.`
-                  : "Cela prend généralement moins d'une minute."}
-              </p>
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-slatey-400">
+                  {progress?.status === "QUEUED"
+                    ? "En file d'attente…"
+                    : progress && progress.total_passes > 1
+                      ? `Rédaction en cours — passe ${Math.min(progress.completed_passes + 1, progress.total_passes)} sur ${progress.total_passes}.`
+                      : "Rédaction en cours…"}{" "}
+                  {isScreenplay && estimatedPasses > 1
+                    ? "Vous pouvez quitter cette page : la génération continue côté serveur."
+                    : "Cela prend généralement moins d'une minute."}
+                </p>
+                {progress && progress.total_passes > 1 ? (
+                  <div
+                    className="h-1.5 overflow-hidden rounded-full bg-ink-700"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={progress.total_passes}
+                    aria-valuenow={progress.completed_passes}
+                  >
+                    <div
+                      className="h-full bg-brass-500 transition-all duration-500"
+                      style={{
+                        width: `${Math.round((progress.completed_passes / progress.total_passes) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
 

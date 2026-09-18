@@ -1,7 +1,9 @@
 import type {
+  BudgetCategory,
   DocumentStatus,
   DocumentType,
   FundingCategory,
+  FundingSourceType,
   FundingStatus,
   ProjectStatus,
   ProjectType,
@@ -84,5 +86,32 @@ export const FUNDING_STATUS_LABELS: Record<FundingStatus, string> = {
   UNVERIFIED: "Non vérifié",
 };
 
+export const BUDGET_CATEGORY_LABELS: Record<BudgetCategory, string> = {
+  DEVELOPMENT: "Développement",
+  PRE_PRODUCTION: "Préparation",
+  PRODUCTION: "Tournage",
+  POST_PRODUCTION: "Post-production",
+  DISTRIBUTION: "Diffusion et frais généraux",
+};
+
+/** Ordre des phases de production : celui du budget et du calendrier. */
+export const BUDGET_CATEGORY_ORDER: BudgetCategory[] = [
+  "DEVELOPMENT",
+  "PRE_PRODUCTION",
+  "PRODUCTION",
+  "POST_PRODUCTION",
+  "DISTRIBUTION",
+];
+
+export const FUNDING_SOURCE_LABELS: Record<FundingSourceType, string> = {
+  PRODUCER: "Apport producteur",
+  PUBLIC_FUND: "Fonds public",
+  TELEVISION: "Préachat télévision",
+  COPRODUCER: "Coproducteur",
+  INVESTOR: "Investisseur",
+  SPONSOR: "Mécénat / parrainage",
+  OTHER: "Autre",
+};
+
 /** Durées cibles proposées pour un scénario (1 page ≈ 1 minute). */
-export const DURATION_PRESETS = [10, 26, 30, 52, 90, 100, 110, 120];
+export const DURATION_PRESETS = [10, 26, 30, 52, 90, 100, 110, 120, 150, 180];

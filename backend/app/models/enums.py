@@ -87,6 +87,37 @@ class SubscriptionStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+class PaymentStatus(StrEnum):
+    """Cycle de vie d'un paiement.
+
+    `PENDING` couvre l'attente d'une confirmation du prestataire — en mobile
+    money, la personne doit encore valider sur son telephone. Seul `SUCCEEDED`
+    donne droit a quoi que ce soit.
+    """
+
+    PENDING = "PENDING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+    @property
+    def is_final(self) -> bool:
+        return self is not PaymentStatus.PENDING
+
+
+class CandidateStatus(StrEnum):
+    """Etat d'un candidat de la veille automatisee.
+
+    Un candidat n'atteint la base vivante qu'apres passage par `APPROVED`,
+    decide par une personne.
+    """
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class NotificationType(StrEnum):
     NEW_OPPORTUNITY = "NEW_OPPORTUNITY"
     DEADLINE_SOON = "DEADLINE_SOON"
@@ -118,3 +149,28 @@ class AIOperation(StrEnum):
     IMPROVE_DOCUMENT = "IMPROVE_DOCUMENT"
     SCORE_PROJECT = "SCORE_PROJECT"
     MATCH_FUNDING = "MATCH_FUNDING"
+
+
+class JobKind(StrEnum):
+    """Nature d'une tache de generation."""
+
+    GENERATE_DOCUMENT = "GENERATE_DOCUMENT"
+    REFINE_DOCUMENT = "REFINE_DOCUMENT"
+
+
+class JobStatus(StrEnum):
+    """Cycle de vie d'une tache de generation.
+
+    `QUEUED` -> `RUNNING` -> `SUCCEEDED` ou `FAILED`. Une tache ne repasse
+    jamais a un etat anterieur : le frontend peut arreter de l'interroger des
+    qu'elle est dans un etat terminal.
+    """
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+    @property
+    def is_final(self) -> bool:
+        return self in (JobStatus.SUCCEEDED, JobStatus.FAILED)

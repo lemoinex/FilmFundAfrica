@@ -21,10 +21,18 @@ os.environ.update(
         "RATE_LIMIT_AUTH_PER_MINUTE": "1000",
         "RATE_LIMIT_AI_PER_MINUTE": "1000",
         "SMTP_HOST": "",
+        # Prestataire simulé : la chaîne de paiement s'exerce en entier, y
+        # compris le rejet d'une notification mal signée, sans compte nulle part.
+        "PAYMENT_PROVIDER": "mock",
+        "PAYMENT_WEBHOOK_SECRET": "test-webhook-secret",
+        # Clé de l'automatisation : sans elle, les routes n8n restent fermées
+        # et les tests d'authentification n'auraient rien à vérifier.
+        "N8N_API_KEY": "cle-automatisation-de-test",
     }
 )
 
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 from app.core.database import SessionLocal, engine  # noqa: E402
 from app.core.rate_limit import ai_limiter, auth_limiter  # noqa: E402
@@ -67,6 +75,20 @@ def db_session() -> Generator:
         yield session
 
 
+def job_result(response) -> dict:
+    """Résultat d'une génération, à partir de la réponse qui l'a lancée.
+
+    Le lancement répond 202 avec une tâche. Aucun worker n'est configuré en
+    test (`REDIS_URL` vide) : l'API exécute la tâche elle-même, elle est donc
+    déjà terminée quand la réponse arrive.
+    """
+    assert response.status_code == 202, response.text
+    job = response.json()
+    assert job["status"] == "SUCCEEDED", job
+    assert job["result"] is not None, job
+    return job["result"]
+
+
 def register_payload(email: str = "user@example.com", **overrides) -> dict:
     payload = {
         "email": email,
@@ -80,16 +102,74 @@ def register_payload(email: str = "user@example.com", **overrides) -> dict:
     return payload
 
 
+def pending_verification_token(email: str) -> str:
+    """Jeton de confirmation en attente pour cette adresse.
+
+    En test (`ENVIRONMENT=test`), l'API ne renvoie jamais le jeton : le lire en
+    base est la seule façon d'ouvrir le lien, exactement comme un utilisateur
+    ouvre celui qu'il a reçu par e-mail.
+    """
+    from app.core.security import hash_url_token
+    from app.models.user import EmailVerificationToken, User
+
+    with SessionLocal() as db:
+        user = db.scalars(select(User).where(User.email == email.strip().lower())).one()
+        tokens = db.scalars(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.user_id == user.id,
+                EmailVerificationToken.used_at.is_(None),
+            )
+        ).all()
+        assert tokens, f"aucun jeton de confirmation en attente pour {email}"
+        # Le jeton clair n'est pas stocké : on le retrouve par son empreinte.
+        raw = _RAW_TOKENS.get(tokens[-1].token_hash)
+        assert raw is not None, "jeton non capturé"
+        assert hash_url_token(raw) == tokens[-1].token_hash
+        return raw
+
+
+#: Jetons émis pendant les tests, indexés par empreinte (voir `_capture_tokens`).
+_RAW_TOKENS: dict[str, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def _capture_tokens(monkeypatch):
+    """Retient les jetons émis, comme le ferait la boîte mail du destinataire."""
+    from app.core import security
+
+    original = security.generate_url_token
+
+    def _remember() -> str:
+        raw = original()
+        _RAW_TOKENS[security.hash_url_token(raw)] = raw
+        return raw
+
+    monkeypatch.setattr("app.services.auth_service.generate_url_token", _remember)
+    yield
+    _RAW_TOKENS.clear()
+
+
+def register_and_verify(client, email: str = "user@example.com", **overrides) -> dict:
+    """Inscrit un compte et ouvre son lien de confirmation.
+
+    L'inscription n'ouvre plus de session : le compte s'active en ouvrant le
+    lien reçu par e-mail. C'est ce parcours-là que les tests rejouent.
+    """
+    response = client.post("/api/v1/auth/register", json=register_payload(email, **overrides))
+    assert response.status_code == 202, response.text
+    verified = client.post(
+        "/api/v1/auth/verify-email", json={"token": pending_verification_token(email)}
+    )
+    assert verified.status_code == 200, verified.text
+    return verified.json()
+
+
 @pytest.fixture
 def make_user(client: TestClient):
-    """Crée un compte et renvoie (headers d'authentification, corps de réponse)."""
+    """Crée un compte, confirme l'adresse, et renvoie (headers, corps)."""
 
     def _make(email: str = "user@example.com", plan: str | None = None, **overrides):
-        response = client.post(
-            "/api/v1/auth/register", json=register_payload(email, **overrides)
-        )
-        assert response.status_code == 201, response.text
-        data = response.json()
+        data = register_and_verify(client, email, **overrides)
 
         if plan:
             from app.models.enums import PlanCode

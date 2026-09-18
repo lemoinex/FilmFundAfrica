@@ -9,6 +9,7 @@ coherente avec le synopsis, le traitement avec le synopsis long, etc.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -33,6 +34,7 @@ from app.services.credit_service import CreditService
 from app.services.scoring_service import ScoringService
 from app.services.screenplay_service import (
     SCREENPLAY_MAX_TOKENS_PER_CALL,
+    ScreenplayState,
     assemble,
     build_segment_prompt,
     plan_segments,
@@ -97,13 +99,16 @@ class DocumentService:
         return PromptContext.from_project(project, existing_documents=dependencies)
 
     # ------------------------------------------------------------------
-    def generate(
-        self,
-        user: User,
-        project: Project,
-        document_type: DocumentType,
-        payload: GenerateRequest,
-    ) -> GenerationResult:
+    def prepare_generation(
+        self, project: Project, document_type: DocumentType, payload: GenerateRequest
+    ) -> int:
+        """Valide la demande et renvoie le nombre d'appels au fournisseur.
+
+        Appelee avant la mise en file : un refus prévisible (type inapplicable,
+        document déjà présent, scénario trop long) doit répondre tout de suite,
+        pas échouer plus tard dans une tâche que l'utilisateur devra aller
+        consulter. Aucun appel à l'IA ici — le découpage est déterministe.
+        """
         template = get_prompt(document_type)
         if template.applies_to and project.project_type not in template.applies_to:
             raise AppError(
@@ -119,21 +124,57 @@ class DocumentService:
                 code="document_exists",
             )
 
+        return len(self._plan_segments(project, document_type, payload)) or 1
+
+    @staticmethod
+    def prepare_refine(document: Document) -> None:
+        if not document.content.strip():
+            raise AppError(
+                "Ce document est vide : générez-le avant de le retravailler.",
+                code="document_empty",
+            )
+
+    def _plan_segments(
+        self, project: Project, document_type: DocumentType, payload: GenerateRequest
+    ) -> list:
+        if document_type != DocumentType.SCREENPLAY:
+            return []
+        # Plafond par appel identique à celui de `/documents/screenplay-capacity` :
+        # il ne dépend que du fournisseur, pas de la durée enregistrée sur le projet.
+        return plan_segments(
+            payload.target_duration_minutes or project.duration or 90,
+            self.ai.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL),
+        )
+
+    # ------------------------------------------------------------------
+    def generate(
+        self,
+        user: User,
+        project: Project,
+        document_type: DocumentType,
+        payload: GenerateRequest,
+        *,
+        reserved_credits: int | None = None,
+        on_pass: Callable[[int, int], None] | None = None,
+    ) -> GenerationResult:
+        """Génère un document.
+
+        `reserved_credits` : les crédits ont déjà été débités à la mise en file
+        de la tâche. On ne les débite donc pas une seconde fois ici, mais on
+        journalise l'appel au fournisseur comme d'habitude.
+        """
+        template = get_prompt(document_type)
+        passes = self.prepare_generation(project, document_type, payload)
+        segments = self._plan_segments(project, document_type, payload)
+
         language = LANGUAGE_LABELS.get(payload.language or "fr", "français")
         context = self.build_context(project, document_type)
 
-        if document_type == DocumentType.SCREENPLAY:
-            # Plafond par appel identique à celui de `/documents/screenplay-capacity` :
-            # il ne dépend que du fournisseur, pas de la durée enregistrée sur le projet.
-            segments = plan_segments(
-                payload.target_duration_minutes or project.duration or 90,
-                self.ai.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL),
-            )
-        else:
-            segments = []
-
-        passes = len(segments) or 1
-        cost = self.credits.check_credits(user, AIOperation.GENERATE_DOCUMENT, units=passes)
+        cost = (
+            self.credits.check_credits(user, AIOperation.GENERATE_DOCUMENT, units=passes)
+            if reserved_credits is None
+            else reserved_credits
+        )
 
         if segments:
             text, telemetry = self._run_screenplay_passes(
@@ -145,6 +186,7 @@ class DocumentService:
                 language=language,
                 target_minutes=payload.target_duration_minutes or project.duration or 90,
                 instructions=payload.additional_instructions,
+                on_pass=on_pass,
             )
             prompt_version = template.version
         else:
@@ -191,6 +233,8 @@ class DocumentService:
             output_tokens=telemetry.output_tokens,
             latency_ms=telemetry.latency_ms,
             units=passes,
+            # Deja debite a la mise en file : on journalise sans reprelever.
+            consume=reserved_credits is None,
             # Les passes d'un scenario ont deja ete journalisees une par une.
             log_usage=not segments,
         )
@@ -244,10 +288,14 @@ class DocumentService:
         language: str,
         target_minutes: int,
         instructions: str | None,
+        on_pass: Callable[[int, int], None] | None = None,
     ) -> tuple[str, _Telemetry]:
         """Écrit le scénario segment par segment, avec continuité entre les passes."""
         parts: list[str] = []
         telemetry = _Telemetry(provider=self.ai.provider.name, model=self.ai.model)
+        # Les faits etablis par TOUTES les passes precedentes, pas seulement la
+        # derniere : un personnage du premier acte doit rester connu au dernier.
+        state = ScreenplayState()
 
         for segment in segments:
             prompt = build_segment_prompt(
@@ -258,11 +306,13 @@ class DocumentService:
                 target_minutes=target_minutes,
                 previous_text=parts[-1] if parts else "",
                 user_instructions=instructions,
+                state=state,
             )
             response = self._run_or_log_failure(
                 prompt, user, project, DocumentType.SCREENPLAY, AIOperation.GENERATE_DOCUMENT
             )
             parts.append(response.text)
+            state.absorb(response.text, segment.label)
 
             # Chaque passe réussie est journalisée immédiatement : si une passe
             # ultérieure échoue, les appels déjà facturés par le fournisseur
@@ -299,19 +349,30 @@ class DocumentService:
                 },
             )
 
+            # L'utilisateur voit avancer une génération qui dure plusieurs
+            # minutes, plutôt qu'un écran figé.
+            if on_pass is not None:
+                on_pass(len(parts), len(segments))
+
         return assemble(parts), telemetry
 
     # ------------------------------------------------------------------
     def refine(
-        self, user: User, project: Project, document: Document, payload: RefineRequest
+        self,
+        user: User,
+        project: Project,
+        document: Document,
+        payload: RefineRequest,
+        *,
+        reserved_credits: int | None = None,
     ) -> GenerationResult:
-        if not document.content.strip():
-            raise AppError(
-                "Ce document est vide : générez-le avant de le retravailler.",
-                code="document_empty",
-            )
+        self.prepare_refine(document)
 
-        cost = self.credits.check_credits(user, AIOperation.IMPROVE_DOCUMENT)
+        cost = (
+            self.credits.check_credits(user, AIOperation.IMPROVE_DOCUMENT)
+            if reserved_credits is None
+            else reserved_credits
+        )
         prompt = build_refine_prompt(
             payload.action,
             document.title,
@@ -343,6 +404,8 @@ class DocumentService:
             input_tokens=response.input_tokens,
             output_tokens=response.output_tokens,
             latency_ms=response.latency_ms,
+            # Deja debite a la mise en file : on journalise sans reprelever.
+            consume=reserved_credits is None,
         )
         self._sync_project_fields(project, document.document_type, response.text)
         self.db.commit()

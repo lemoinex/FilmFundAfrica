@@ -1,4 +1,4 @@
-"""Routes d'export : PDF, DOCX et archive ZIP."""
+"""Routes d'export : PDF, DOCX, archive ZIP et budget XLSX."""
 
 from __future__ import annotations
 
@@ -63,3 +63,18 @@ def export_docx(document_id: str, project: OwnedProject, db: DbSession) -> Respo
 def export_zip(project: OwnedProject, db: DbSession) -> Response:
     content = ExportService(db).project_to_zip(project)
     return _attachment(content, "application/zip", _filename(project.title, "zip"))
+
+
+@router.get("/xlsx", summary="Exporter le budget et le plan de financement en tableur")
+def export_budget_xlsx(project: OwnedProject, db: DbSession) -> Response:
+    """Classeur à trois feuilles : budget, plan de financement, calendrier.
+
+    Les totaux y sont des formules : un financeur qui corrige un prix voit le
+    total suivre, au lieu de lire un chiffre figé qui ne correspond plus.
+    """
+    content = ExportService(db).budget_to_xlsx(project)
+    return _attachment(
+        content,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        _filename(f"{project.title}_budget", "xlsx"),
+    )

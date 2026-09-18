@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 14
     password_reset_expire_minutes: int = 60
+    #: Duree de validite du lien de confirmation d'adresse (24 h par defaut).
+    email_verification_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:3000"
     #: IP des proxys de confiance, seules autorisees a definir X-Forwarded-For.
     trusted_proxy_ips: str = ""
@@ -50,12 +52,42 @@ class Settings(BaseSettings):
     rate_limit_auth_per_minute: int = 10
     rate_limit_ai_per_minute: int = 10
     rate_limit_default_per_minute: int = 120
+    #: Vide : compteurs en memoire, propres a chaque processus. Renseigne
+    #: (`redis://host:6379/0`) : compteurs partages par toutes les repliques.
+    redis_url: str = ""
+    #: Un Redis lent ne doit pas tenir la requete ouverte : au-dela, on compte
+    #: en memoire pour cet appel.
+    redis_timeout_seconds: float = 0.25
+
+    # --- Taches de generation ---
+    #: Duree SANS SIGNE DE VIE au-dela de laquelle une tache est consideree
+    #: interrompue (worker disparu) : elle echoue et ses credits sont rendus.
+    #: Le worker touche la tache a chaque passe, si bien qu'une generation
+    #: longue mais vivante n'est jamais prise pour une tache morte. Le seuil
+    #: doit rester superieur a `AI_TIMEOUT_SECONDS`, duree maximale d'une passe.
+    job_timeout_seconds: int = 900
+    #: Age a partir duquel une tache encore en attente est reprise par le
+    #: balayage, meme si le signal Redis s'est perdu.
+    job_stale_seconds: int = 60
+
+    # --- Paiements et abonnements ---
+    #: `manual` : encaissement hors ligne, valide depuis l'administration.
+    #: `mock` : prestataire simule, pour le developpement et les tests.
+    #: Brancher un prestataire reel revient a ajouter une classe et un nom ici.
+    payment_provider: Literal["manual", "mock"] = "manual"
+    #: Secret partage avec le prestataire, qui signe ses notifications. Sans
+    #: lui, aucune notification n'est acceptee : une verification qui s'ouvre
+    #: quand la configuration est incomplete ne protege rien.
+    payment_webhook_secret: str = ""
 
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"
     ai_api_key: str = ""
     ai_model: str = "claude-sonnet-4-5"
     ai_max_output_tokens: int = 8000
+    #: Nombre maximal de passes pour un scenario. Plafond de securite, pas
+    #: limite d'usage : c'est la duree demandee qui fixe le nombre de passes.
+    screenplay_max_passes: int = 40
     ai_timeout_seconds: int = 180
 
     # --- Credits IA par defaut (surchargeables en base) ---
@@ -109,6 +141,16 @@ class Settings(BaseSettings):
             problems.append("DEBUG doit valoir false en production")
         if self.ai_provider != "mock" and not self.ai_api_key:
             problems.append(f"AI_API_KEY est requis avec AI_PROVIDER={self.ai_provider}")
+        if self.payment_provider == "mock":
+            problems.append(
+                "PAYMENT_PROVIDER=mock encaisse des paiements fictifs : interdit en production"
+            )
+        if self.payment_provider != "manual" and not self.payment_webhook_secret:
+            problems.append(
+                "PAYMENT_WEBHOOK_SECRET est requis avec "
+                f"PAYMENT_PROVIDER={self.payment_provider} : sans lui, n'importe qui "
+                "pourrait s'offrir un abonnement en appelant le webhook"
+            )
 
         if problems:
             raise ValueError(

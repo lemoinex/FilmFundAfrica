@@ -66,6 +66,14 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)

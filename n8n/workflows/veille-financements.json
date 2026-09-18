@@ -1,5 +1,5 @@
 {
-  "name": "FilmFund — Veille financements (squelette Phase 6)",
+  "name": "FilmFund — Veille financements",
   "nodes": [
     {
       "parameters": {
@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extraction et nettoyage.\n// Conserve impérativement l'URL de la source : une opportunité sans source\n// ne doit jamais être écrite en base.\nreturn items.map((item) => ({\n  json: {\n    name: (item.json.title || '').trim(),\n    description: (item.json.contentSnippet || '').trim(),\n    source_url: item.json.link,\n    source_name: 'À renseigner',\n    fetched_at: new Date().toISOString(),\n  },\n}));"
+        "jsCode": "// Extraction et nettoyage.\n// L'URL de la source est obligatoire : l'API refuse tout candidat sans elle,\n// et elle sert aussi d'empreinte de déduplication d'un passage à l'autre.\nreturn items\n  .filter((item) => item.json.link)\n  .map((item) => ({\n    json: {\n      name: (item.json.title || '').trim(),\n      source_url: item.json.link,\n      source_name: 'À renseigner : nom de la source',\n      payload: {\n        description: (item.json.contentSnippet || '').trim(),\n      },\n    },\n  }));"
       },
       "id": "clean",
       "name": "Extraction + nettoyage",
@@ -35,45 +35,61 @@
     },
     {
       "parameters": {
-        "jsCode": "// Classification IA : catégorie, pays éligibles, types de projet, montants, date limite.\n// Sortie systématiquement au statut UNVERIFIED : une validation humaine reste requise.\nreturn items.map((item) => ({\n  json: { ...item.json, status: 'UNVERIFIED', is_demo: false },\n}));"
+        "jsCode": "// Classification : catégorie, pays éligibles, types de projet, montants, date limite.\n// Règle absolue : ne JAMAIS compléter un champ absent de la source. Un champ\n// vide devient « Information non fournie » côté produit ; un champ inventé\n// devient une erreur dans le dossier de financement d'un auteur.\n// Les dates illisibles sont écartées par l'API, pas devinées.\nreturn items.map((item) => ({\n  json: {\n    ...item.json,\n    payload: {\n      ...item.json.payload,\n      // organization: '...',   // à remplir si la source le dit\n      // deadline: 'AAAA-MM-JJ',\n      // category: 'FUND',\n    },\n  },\n}));"
       },
       "id": "classify",
-      "name": "Classification IA",
+      "name": "Classification",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [860, 300],
-      "notes": "Brancher ici l'appel au fournisseur IA configuré. Ne jamais laisser l'IA inventer une date limite, un montant ou une condition : champ vide si absent de la source."
-    },
-    {
-      "parameters": {},
-      "id": "review",
-      "name": "Validation humaine (à brancher)",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1080, 300],
-      "notes": "Étape obligatoire avant publication : une opportunité ne passe au statut OPEN qu'après relecture."
+      "notes": "Brancher ici l'appel au fournisseur IA si besoin. Un champ absent de la source reste absent."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://backend:8000/api/v1/admin/funding",
+        "url": "=http://backend:8000/api/v1/automation/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-API-Key", "value": "={{ $env.FILMFUND_API_KEY }}" }]
+        },
         "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.all().map((item) => item.json)) }}",
         "options": {}
       },
-      "id": "store",
-      "name": "Écriture en base (route Phase 3)",
+      "id": "submit",
+      "name": "Dépôt en file de validation",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "position": [1080, 300],
+      "notes": "Dépose des CANDIDATS. Rien n'est publié ici : la base vivante n'est atteinte qu'après validation humaine depuis /admin/veille."
+    },
+    {
+      "parameters": {},
+      "id": "review",
+      "name": "Validation humaine (dans l'application)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
       "position": [1300, 300],
-      "notes": "La route d'administration des opportunités arrive en Phase 3."
+      "notes": "Étape obligatoire, hors n8n : un administrateur relit chaque candidat depuis /admin/veille, corrige ce qui doit l'être, puis publie ou écarte."
     }
   ],
   "connections": {
-    "Chaque lundi à 04:00": { "main": [[{ "node": "Source (RSS / API / crawler)", "type": "main", "index": 0 }]] },
-    "Source (RSS / API / crawler)": { "main": [[{ "node": "Extraction + nettoyage", "type": "main", "index": 0 }]] },
-    "Extraction + nettoyage": { "main": [[{ "node": "Classification IA", "type": "main", "index": 0 }]] },
-    "Classification IA": { "main": [[{ "node": "Validation humaine (à brancher)", "type": "main", "index": 0 }]] },
-    "Validation humaine (à brancher)": { "main": [[{ "node": "Écriture en base (route Phase 3)", "type": "main", "index": 0 }]] }
+    "Chaque lundi à 04:00": {
+      "main": [[{ "node": "Source (RSS / API / crawler)", "type": "main", "index": 0 }]]
+    },
+    "Source (RSS / API / crawler)": {
+      "main": [[{ "node": "Extraction + nettoyage", "type": "main", "index": 0 }]]
+    },
+    "Extraction + nettoyage": {
+      "main": [[{ "node": "Classification", "type": "main", "index": 0 }]]
+    },
+    "Classification": {
+      "main": [[{ "node": "Dépôt en file de validation", "type": "main", "index": 0 }]]
+    },
+    "Dépôt en file de validation": {
+      "main": [[{ "node": "Validation humaine (dans l'application)", "type": "main", "index": 0 }]]
+    }
   },
   "settings": { "executionOrder": "v1" },
   "tags": [{ "name": "filmfund" }]

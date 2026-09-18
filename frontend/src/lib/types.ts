@@ -153,6 +153,175 @@ export interface GenerationResult {
   missing_information: string[];
 }
 
+export type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** Dispositif repéré par la veille, en attente de relecture humaine. */
+export interface OpportunityCandidate {
+  id: string;
+  name: string;
+  source_url: string;
+  source_name: string;
+  status: CandidateStatus;
+  payload: Record<string, unknown>;
+  review_note: string | null;
+  reviewed_at: string | null;
+  opportunity_id: string | null;
+  last_seen_at: string | null;
+  created_at: string;
+}
+
+export type PlanCode = "FREE" | "PRO_AUTHOR" | "PRODUCER";
+export type SubscriptionStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
+export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "REFUNDED";
+
+export interface Plan {
+  id: string;
+  code: PlanCode;
+  name: string;
+  description: string;
+  price_amount: number;
+  price_currency: string;
+  billing_period: string;
+  max_projects: number;
+  monthly_ai_credits: number;
+  allows_export: boolean;
+  allows_matching: boolean;
+  allows_collaboration: boolean;
+  allows_advanced_budget: boolean;
+  sort_order: number;
+}
+
+export interface SubscriptionState {
+  plan: Plan;
+  status: SubscriptionStatus;
+  started_at: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
+  /** Vrai tant que la période payée court, résiliation comprise. */
+  is_active: boolean;
+  /** Faux dès que l'abonnement est résilié. */
+  is_renewing: boolean;
+  ai_credits_remaining: number;
+}
+
+export interface Payment {
+  id: string;
+  provider: string;
+  provider_reference: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  phone_number: string | null;
+  checkout_url: string | null;
+  failure_reason: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface CheckoutResponse {
+  payment: Payment;
+  instructions: string | null;
+}
+
+export type BudgetCategory =
+  | "DEVELOPMENT"
+  | "PRE_PRODUCTION"
+  | "PRODUCTION"
+  | "POST_PRODUCTION"
+  | "DISTRIBUTION";
+
+export type FundingSourceType =
+  | "PRODUCER"
+  | "PUBLIC_FUND"
+  | "TELEVISION"
+  | "COPRODUCER"
+  | "INVESTOR"
+  | "SPONSOR"
+  | "OTHER";
+
+export interface BudgetItem {
+  id: string;
+  category: BudgetCategory;
+  label: string;
+  quantity: number;
+  unit: string | null;
+  unit_price: number;
+  /** Toujours calculé côté serveur : quantité × prix unitaire. */
+  amount: number;
+  sort_order: number;
+}
+
+export interface CategoryTotal {
+  category: BudgetCategory;
+  amount: number;
+  item_count: number;
+  share: number;
+}
+
+export interface Budget {
+  id: string;
+  project_id: string;
+  currency: string;
+  total_amount: number;
+  notes: string | null;
+  items: BudgetItem[];
+  totals_by_category: CategoryTotal[];
+  updated_at: string;
+}
+
+export interface FundingPlanLine {
+  id: string;
+  source_type: FundingSourceType;
+  source_name: string | null;
+  amount: number;
+  is_secured: boolean;
+  expected_date: string | null;
+}
+
+export interface FundingPlan {
+  currency: string;
+  total_budget: number;
+  secured_amount: number;
+  identified_amount: number;
+  sought_amount: number;
+  funded_percentage: number;
+  uncovered_amount: number;
+  lines: FundingPlanLine[];
+}
+
+export interface SchedulePhase {
+  id: string;
+  phase: BudgetCategory;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+}
+
+export type JobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+
+/**
+ * Une génération demandée. L'API répond par cette tâche plutôt que d'attendre
+ * la fin : un scénario long enchaîne plusieurs appels au fournisseur et
+ * dépasserait le délai d'une requête HTTP.
+ */
+export interface GenerationJob {
+  id: string;
+  project_id: string;
+  document_id: string | null;
+  kind: "GENERATE_DOCUMENT" | "REFINE_DOCUMENT";
+  document_type: DocumentType;
+  status: JobStatus;
+  total_passes: number;
+  completed_passes: number;
+  credits_reserved: number;
+  error_code: string | null;
+  error_message: string | null;
+  result: GenerationResult | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 export interface ScoreCriterion {
   key: string;
   label: string;
