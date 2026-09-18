@@ -39,10 +39,7 @@ def _attachment(content: bytes, media_type: str, filename: str) -> Response:
 def export_pdf(project: OwnedProject, db: DbSession) -> Response:
     documents = DocumentService(db).documents.list_for_project(project.id)
     if not documents:
-        raise AppError(
-            "Aucun document à exporter : générez d'abord au moins un document.",
-            code="nothing_to_export",
-        )
+        raise AppError("export.nothingToExport", code="nothing_to_export")
     content = ExportService(db).dossier_to_pdf(project, documents)
     return _attachment(content, "application/pdf", _filename(project.title, "pdf"))
 

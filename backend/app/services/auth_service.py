@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import AuthenticationError, NotFoundError
+from app.core.i18n import resolve_locale
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -47,7 +48,7 @@ class AuthService:
         self.email = EmailService()
 
     # ------------------------------------------------------------------
-    def register(self, payload: RegisterRequest) -> str | None:
+    def register(self, payload: RegisterRequest, locale: str | None = None) -> str | None:
         """Cree un compte non confirme et envoie le lien d'activation.
 
         La reponse est la MEME que l'adresse soit libre ou deja prise : un 409
@@ -62,6 +63,11 @@ class AuthService:
         Retourne le jeton en clair UNIQUEMENT en environnement `development`,
         comme la reinitialisation de mot de passe : le renvoyer ailleurs
         permettrait d'activer un compte ouvert avec l'adresse d'autrui.
+
+        `locale` est la langue dans laquelle la personne s'inscrit. On la
+        retient : sans cela, le profil naitrait sur la valeur par defaut de la
+        colonne, indiscernable d'un choix, et l'API repondrait en francais a
+        quelqu'un qui vient de lire une page en anglais.
         """
         email = payload.email.strip().lower()
         hashed = hash_password(payload.password)
@@ -88,6 +94,7 @@ class AuthService:
             country=payload.country,
             city=payload.city,
             profession=payload.profession,
+            preferred_locale=resolve_locale(locale),
         )
         self.users.add(user)
         self.credits.attach_default_plan(user)
@@ -122,10 +129,10 @@ class AuthService:
         """Active le compte et ouvre la session dans la foulee."""
         token = self.verifications.get_valid(hash_url_token(raw_token))
         if token is None:
-            raise AuthenticationError("Lien de confirmation invalide ou expiré.")
+            raise AuthenticationError("auth.verificationLinkInvalid")
         user = self.users.get(token.user_id)
         if user is None:
-            raise NotFoundError("Compte introuvable.")
+            raise NotFoundError("auth.accountNotFound")
 
         user.is_verified = True
         token.used_at = datetime.now(UTC)
@@ -147,7 +154,7 @@ class AuthService:
     def login(self, email: str, password: str) -> AuthResponse:
         user = self.users.get_by_email(email)
         # Message identique dans tous les cas : pas d'enumeration de comptes.
-        invalid = AuthenticationError("Adresse e-mail ou mot de passe incorrect.")
+        invalid = AuthenticationError("auth.invalidCredentials")
 
         # Le hachage est verifie meme lorsque le compte n'existe pas : sans cela,
         # l'ecart de temps de reponse revele quelles adresses sont inscrites.
@@ -157,14 +164,12 @@ class AuthService:
         if not verify_password(password, user.hashed_password):
             raise invalid
         if not user.is_active:
-            raise AuthenticationError("Ce compte est suspendu.")
+            raise AuthenticationError("auth.accountSuspended")
         if not user.is_verified:
             # Ce message n'est atteignable qu'avec le bon mot de passe : il ne
             # revele donc rien a qui ne connait pas deja le compte.
             raise AuthenticationError(
-                "Adresse non confirmée. Ouvrez le lien reçu par e-mail, "
-                "ou demandez-en un nouveau.",
-                code="email_not_verified",
+                "auth.emailNotVerified", code="email_not_verified"
             )
 
         user.last_login_at = datetime.now(UTC)
@@ -177,15 +182,13 @@ class AuthService:
     def refresh(self, refresh_token: str) -> TokenPair:
         payload = decode_token(refresh_token, expected_type="refresh")
         if payload is None:
-            raise AuthenticationError("Jeton de rafraîchissement invalide ou expiré.")
+            raise AuthenticationError("auth.refreshInvalidOrExpired")
         user = self.users.get(payload.get("sub", ""))
         if user is None or not user.is_active:
-            raise AuthenticationError("Compte introuvable ou suspendu.")
+            raise AuthenticationError("auth.accountNotFoundOrSuspended")
         if payload.get("tv") != user.token_version:
             # Le mot de passe a change depuis l'emission de ce jeton.
-            raise AuthenticationError(
-                "Session expirée : le mot de passe a été modifié. Reconnectez-vous."
-            )
+            raise AuthenticationError("auth.sessionPasswordChanged")
         return self._token_pair(user)
 
     # ------------------------------------------------------------------
@@ -223,10 +226,10 @@ class AuthService:
     def reset_password(self, raw_token: str, new_password: str) -> None:
         token = self.resets.get_valid(hash_url_token(raw_token))
         if token is None:
-            raise AuthenticationError("Lien de réinitialisation invalide ou expiré.")
+            raise AuthenticationError("auth.resetLinkInvalid")
         user = self.users.get(token.user_id)
         if user is None:
-            raise NotFoundError("Compte introuvable.")
+            raise NotFoundError("auth.accountNotFound")
 
         user.hashed_password = hash_password(new_password)
         # Invalide tous les jetons emis avant la reinitialisation : c'est la
@@ -238,7 +241,7 @@ class AuthService:
     # ------------------------------------------------------------------
     def change_password(self, user: User, current_password: str, new_password: str) -> None:
         if not verify_password(current_password, user.hashed_password):
-            raise AuthenticationError("Mot de passe actuel incorrect.")
+            raise AuthenticationError("auth.currentPasswordWrong")
         user.hashed_password = hash_password(new_password)
         user.token_version += 1
         self.db.commit()

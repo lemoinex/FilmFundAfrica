@@ -8,10 +8,10 @@
  * et oubliée en anglais fait échouer `tsc`. C'est la seule garantie qui tienne
  * dans la durée — une traduction manquante ne se voit pas à la relecture.
  *
- * Ce que ce module ne traduit pas, et il faut le savoir :
- *
- * * les **messages d'erreur de l'API**, rédigés en français côté serveur ;
- * * les **documents générés** par l'IA, dont la langue est celle du projet.
+ * Ce que ce module ne traduit pas, et il faut le savoir : les **documents
+ * générés** par l'IA, dont la langue est celle des prompts. Les messages de
+ * l'API, eux, sont traduits côté serveur (`backend/app/core/i18n.py`) : le
+ * client HTTP lui envoie la langue choisie ici en `Accept-Language`.
  *
  * La langue retenue vient, dans l'ordre : du profil de la personne connectée
  * (`preferred_locale`), du cookie `filmfund_locale`, puis du français. Le

@@ -124,10 +124,7 @@ class IngestionService:
         """Depose un candidat, ou rafraichit celui deja connu."""
         url = source_url.strip()
         if not url:
-            raise AppError(
-                "Un candidat sans URL source n'est pas recevable.",
-                code="candidate_without_source",
-            )
+            raise AppError("candidate.sourceRequired", code="candidate_without_source")
 
         digest = self.fingerprint(url)
         existing = self.db.scalar(
@@ -177,7 +174,7 @@ class IngestionService:
     def get(self, candidate_id: str) -> OpportunityCandidate:
         candidate = self.db.get(OpportunityCandidate, candidate_id)
         if candidate is None:
-            raise NotFoundError("Candidat introuvable.")
+            raise NotFoundError("funding.candidateNotFound")
         return candidate
 
     # ------------------------------------------------------------------
@@ -191,7 +188,8 @@ class IngestionService:
         """
         if candidate.status is not CandidateStatus.PENDING:
             raise AppError(
-                f"Ce candidat est déjà « {candidate.status} ».",
+                "candidate.alreadyReviewed",
+                params={"status": candidate.status},
                 code="candidate_already_reviewed",
             )
 
@@ -213,10 +211,7 @@ class IngestionService:
                 setattr(opportunity, field, value)
 
         if not opportunity.organization:
-            raise AppError(
-                "L'organisme est obligatoire : complétez-le avant de publier.",
-                code="candidate_incomplete",
-            )
+            raise AppError("candidate.organizationRequired", code="candidate_incomplete")
 
         self.db.add(opportunity)
         self.db.flush()
@@ -235,7 +230,8 @@ class IngestionService:
     ) -> OpportunityCandidate:
         if candidate.status is not CandidateStatus.PENDING:
             raise AppError(
-                f"Ce candidat est déjà « {candidate.status} ».",
+                "candidate.alreadyReviewed",
+                params={"status": candidate.status},
                 code="candidate_already_reviewed",
             )
         candidate.status = CandidateStatus.REJECTED

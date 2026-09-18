@@ -383,13 +383,22 @@ L'interface est disponible en **français** et en **anglais**. Le sélecteur fig
 l'en-tête de l'application, sur les pages d'authentification, sur la page publique, et
 dans le profil.
 
+**L'API répond dans la même langue.** Le frontend envoie la langue choisie en
+`Accept-Language` à chaque appel, et le backend s'en sert pour ses messages d'erreur, ses
+messages de succès et les libellés qu'il calcule (critères de compatibilité, critères de
+maturité). Le `code` d'erreur, lui, ne change jamais : c'est sur lui que le client se
+branche, pas sur la phrase.
+
 La langue affichée est déterminée dans cet ordre :
 
 1. la préférence enregistrée sur le profil (`preferred_locale`), qui suit le compte d'un
-   appareil à l'autre ;
+   appareil à l'autre — elle est posée **à l'inscription** d'après la langue alors utilisée,
+   et non laissée sur la valeur par défaut de la colonne ;
 2. le cookie `filmfund_locale`, propre au navigateur — c'est lui que lit le rendu serveur,
-   pour que `<html lang>` soit juste dès le premier octet envoyé ;
-3. `DEFAULT_LOCALE`, à défaut.
+   pour que `<html lang>` soit juste dès le premier octet envoyé ; c'est aussi lui que le
+   client HTTP envoie en `Accept-Language` ;
+3. `Accept-Language` du navigateur, côté API, pour un appelant sans session ;
+4. `DEFAULT_LOCALE`, à défaut.
 
 ### Ajouter une langue
 
@@ -403,13 +412,22 @@ Pour une troisième langue : ajouter `xx.ts` sur le modèle de `en.ts`, puis l'i
 Les accords et les formats de date, de nombre et de durée relative viennent d'`Intl` :
 rien à traduire de ce côté.
 
+Côté API, les catalogues sont dans `backend/app/core/i18n.py`, sur le même principe : le
+français définit les clés. Python n'offrant pas la garantie du compilateur, c'est
+`tests/test_i18n.py` qui la remplace — il compare les jeux de clés, vérifie que les
+variables `{ainsi}` sont les mêmes des deux côtés, et **relit le code source pour vérifier
+que toute clé citée existe**. Une clé mal orthographiée fait échouer les tests en nommant
+son fichier.
+
 ### Ce qui reste en français, quelle que soit la langue choisie
 
-* Les **messages d'erreur renvoyés par l'API** (`detail` des réponses HTTP) : ils sont
-  rédigés côté serveur, qui ne connaît pas encore la langue de l'appelant.
 * Les **documents générés** par l'AI Writer, ainsi que la structure annoncée par
   `GET /documents/types` : leur langue est celle des prompts, pas celle de l'interface.
-* Les **libellés des critères** de compatibilité et de maturité, calculés par le backend.
+* Les **messages de validation par champ** (`errors[].message` d'une réponse 422) : ils
+  viennent de Pydantic et sont en anglais. Les retraduire supposerait de rejouer sa logique
+  de validation.
+* Les **noms des offres** et des dispositifs de financement, qui sont des données saisies,
+  pas des libellés d'interface.
 
 ---
 
@@ -458,7 +476,7 @@ une erreur remontée se relie aux journaux JSON sans avoir à joindre son conten
 cd frontend
 npm run typecheck
 npm run build
-npm run test:e2e           # 15 parcours de bout en bout (Playwright)
+npm run test:e2e           # 16 parcours de bout en bout (Playwright)
 ```
 
 ### Intégration continue

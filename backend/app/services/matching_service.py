@@ -19,11 +19,12 @@ Principes tenus ici :
 from __future__ import annotations
 
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.i18n import Locale, translate
 from app.models.document import Document
 from app.models.enums import DocumentType, FundingStatus
 from app.models.funding import FundingOpportunity
@@ -64,8 +65,15 @@ def contains(haystack: list[str], needle: str | None) -> bool:
 
 @dataclass(slots=True)
 class _Outcome:
+    """Verdict d'un critere : un etat, et la cle du message qui l'explique.
+
+    La phrase n'est choisie qu'au rendu : un critere est evalue une fois, et
+    peut etre relu dans deux langues.
+    """
+
     state: str  # met | unmet | unknown
-    detail: str
+    key: str
+    params: dict = field(default_factory=dict)
     blocking: bool = False
     #: Part du poids obtenue quand le critere est partiellement rempli.
     #: None = tout ou rien (1.0 si `met`, 0 sinon).
@@ -82,8 +90,9 @@ class _Outcome:
 class MatchingService:
     """Calcule la compatibilité d'un projet avec un dispositif de financement."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, locale: Locale = "fr") -> None:
         self.db = db
+        self.locale = locale
         self.documents = DocumentRepository(db)
 
     # ------------------------------------------------------------------
@@ -118,15 +127,20 @@ class MatchingService:
         required_documents, missing_documents = self._document_gap(opportunity, documents)
 
         definitions: list[tuple[str, str, int, _Outcome]] = [
-            ("country", "Pays éligible", 25, self._check_country(project, opportunity)),
-            ("project_type", "Type de projet", 20, self._check_project_type(project, opportunity)),
-            ("genre", "Genre", 12, self._check_genre(project, opportunity)),
-            ("language", "Langue", 8, self._check_language(project, opportunity)),
-            ("duration", "Format et durée", 10, self._check_duration(project, opportunity)),
-            ("deadline", "Échéance", 10, self._check_deadline(opportunity)),
+            ("country", "criterion.country", 25, self._check_country(project, opportunity)),
+            (
+                "project_type",
+                "criterion.projectType",
+                20,
+                self._check_project_type(project, opportunity),
+            ),
+            ("genre", "criterion.genre", 12, self._check_genre(project, opportunity)),
+            ("language", "criterion.language", 8, self._check_language(project, opportunity)),
+            ("duration", "criterion.duration", 10, self._check_duration(project, opportunity)),
+            ("deadline", "criterion.deadline", 10, self._check_deadline(opportunity)),
             (
                 "documents",
-                "Documents exigés",
+                "criterion.documents",
                 15,
                 self._check_documents(required_documents, missing_documents),
             ),
@@ -138,7 +152,7 @@ class MatchingService:
         total_weight = 0
         eligible = True
 
-        for key, label, weight, outcome in definitions:
+        for key, label_key, weight, outcome in definitions:
             total_weight += weight
             points = outcome.points(weight)
             if outcome.state != "unknown":
@@ -150,11 +164,11 @@ class MatchingService:
             criteria.append(
                 MatchCriterion(
                     key=key,
-                    label=label,
+                    label=translate(self.locale, label_key),
                     weight=weight,
                     earned=points,
                     state=outcome.state,
-                    detail=outcome.detail,
+                    detail=translate(self.locale, outcome.key, **outcome.params),
                     blocking=outcome.blocking,
                 )
             )
@@ -182,19 +196,18 @@ class MatchingService:
     def _check_country(project: Project, opportunity: FundingOpportunity) -> _Outcome:
         eligible = csv_values(opportunity.eligible_countries)
         if not eligible:
-            return _Outcome("met", "Dispositif ouvert à tous les pays.")
+            return _Outcome("met", "match.country.allOpen")
         if not project.country:
-            return _Outcome(
-                "unknown",
-                "Pays du projet non renseigné : l'éligibilité géographique n'a pas pu être "
-                "vérifiée.",
-            )
+            return _Outcome("unknown", "match.country.unknown")
         if contains(eligible, project.country):
-            return _Outcome("met", f"{project.country} figure parmi les pays éligibles.")
+            return _Outcome("met", "match.country.met", {"country": project.country})
         return _Outcome(
             "unmet",
-            f"{project.country} ne figure pas parmi les pays éligibles "
-            f"({', '.join(eligible[:6])}{'…' if len(eligible) > 6 else ''}).",
+            "match.country.unmet",
+            {
+                "country": project.country,
+                "list": ", ".join(eligible[:6]) + ("…" if len(eligible) > 6 else ""),
+            },
             blocking=True,
         )
 
@@ -202,45 +215,41 @@ class MatchingService:
     def _check_project_type(project: Project, opportunity: FundingOpportunity) -> _Outcome:
         accepted = csv_values(opportunity.project_types)
         if not accepted:
-            return _Outcome("met", "Dispositif ouvert à tous les types de projet.")
+            return _Outcome("met", "match.type.allOpen")
         if contains(accepted, str(project.project_type)):
-            return _Outcome("met", "Le type de projet correspond au dispositif.")
-        return _Outcome(
-            "unmet",
-            "Le type de projet ne fait pas partie de ceux acceptés par ce dispositif.",
-            blocking=True,
-        )
+            return _Outcome("met", "match.type.met")
+        return _Outcome("unmet", "match.type.unmet", blocking=True)
 
     @staticmethod
     def _check_genre(project: Project, opportunity: FundingOpportunity) -> _Outcome:
         accepted = csv_values(opportunity.genres)
         if not accepted:
-            return _Outcome("met", "Aucune restriction de genre.")
+            return _Outcome("met", "match.genre.noRestriction")
         if not project.genre:
-            return _Outcome("unknown", "Genre du projet non renseigné.")
+            return _Outcome("unknown", "match.genre.unknown")
         if contains(accepted, project.genre):
-            return _Outcome("met", f"Le genre « {project.genre} » est recherché.")
+            return _Outcome("met", "match.genre.met", {"genre": project.genre})
         # Correspondance partielle : « drame social » face à « drame ».
         needle = normalise(project.genre)
         if any(normalise(item) in needle or needle in normalise(item) for item in accepted):
-            return _Outcome("met", f"Le genre « {project.genre} » est proche de la ligne éditoriale.")
+            return _Outcome("met", "match.genre.close", {"genre": project.genre})
         return _Outcome(
             "unmet",
-            f"Le genre « {project.genre} » ne correspond pas à la ligne éditoriale "
-            f"({', '.join(accepted[:5])}).",
+            "match.genre.unmet",
+            {"genre": project.genre, "list": ", ".join(accepted[:5])},
         )
 
     @staticmethod
     def _check_language(project: Project, opportunity: FundingOpportunity) -> _Outcome:
         accepted = csv_values(opportunity.languages)
         if not accepted:
-            return _Outcome("met", "Aucune restriction de langue.")
+            return _Outcome("met", "match.language.noRestriction")
         if contains(accepted, project.language):
-            return _Outcome("met", f"Le projet est en {project.language}.")
+            return _Outcome("met", "match.language.met", {"language": project.language})
         return _Outcome(
             "unmet",
-            f"Le dispositif attend un projet en {', '.join(accepted)} ; "
-            f"le vôtre est en {project.language}.",
+            "match.language.unmet",
+            {"list": ", ".join(accepted), "language": project.language},
         )
 
     @staticmethod
@@ -251,7 +260,7 @@ class MatchingService:
         en base (module Phase 4), et l'inventer contredirait la règle produit.
         """
         if project.duration is None:
-            return _Outcome("unknown", "Durée du projet non renseignée.")
+            return _Outcome("unknown", "match.duration.unknown")
 
         accepted = csv_values(opportunity.project_types)
         short_formats = {"SHORT_FILM", "WEB_SERIES"}
@@ -259,41 +268,36 @@ class MatchingService:
 
         if accepted and set(accepted).issubset(short_formats) and project.duration > 40:
             return _Outcome(
-                "unmet",
-                f"Le dispositif cible les formats courts ; le projet fait {project.duration} min.",
+                "unmet", "match.duration.tooLong", {"minutes": project.duration}
             )
         if accepted and set(accepted).issubset(long_formats) and project.duration < 50:
             return _Outcome(
-                "unmet",
-                f"Le dispositif cible les formats longs ; le projet fait {project.duration} min.",
+                "unmet", "match.duration.tooShort", {"minutes": project.duration}
             )
-        return _Outcome("met", f"La durée visée ({project.duration} min) est cohérente.")
+        return _Outcome("met", "match.duration.met", {"minutes": project.duration})
 
     @staticmethod
     def _check_deadline(opportunity: FundingOpportunity) -> _Outcome:
         if opportunity.status == FundingStatus.CLOSED:
-            return _Outcome("unmet", "Ce dispositif est clos.", blocking=True)
+            return _Outcome("unmet", "match.deadline.closed", blocking=True)
         if opportunity.deadline is None:
-            return _Outcome(
-                "unknown",
-                "Aucune date limite renseignée : vérifiez le calendrier sur le site de "
-                "l'organisme.",
-            )
+            return _Outcome("unknown", "match.deadline.unknown")
 
         days_left = (opportunity.deadline - date.today()).days
         if days_left < 0:
             return _Outcome(
                 "unmet",
-                f"La date limite est dépassée depuis le {opportunity.deadline:%d/%m/%Y}.",
+                "match.deadline.passed",
+                {"date": f"{opportunity.deadline:%d/%m/%Y}"},
                 blocking=True,
             )
         if days_left <= TIGHT_DEADLINE_DAYS:
-            return _Outcome(
-                "met",
-                f"Échéance dans {days_left} jour(s) : le délai est court pour finaliser "
-                "un dossier.",
-            )
-        return _Outcome("met", f"Échéance le {opportunity.deadline:%d/%m/%Y}, soit {days_left} jours.")
+            return _Outcome("met", "match.deadline.tight", {"days": days_left})
+        return _Outcome(
+            "met",
+            "match.deadline.met",
+            {"date": f"{opportunity.deadline:%d/%m/%Y}", "days": days_left},
+        )
 
     @staticmethod
     def _check_documents(required: list[str], missing: list[str]) -> _Outcome:
@@ -304,18 +308,19 @@ class MatchingService:
         l'auteur avance, sinon il ne lui donne aucun signal de progression.
         """
         if not required:
-            return _Outcome(
-                "unknown",
-                "Pièces à fournir non détaillées : consultez le règlement du dispositif.",
-            )
+            return _Outcome("unknown", "match.documents.unknown")
         if not missing:
-            return _Outcome("met", "Tous les documents exigés sont rédigés dans votre dossier.")
+            return _Outcome("met", "match.documents.met")
 
         written = len(required) - len(missing)
         return _Outcome(
             "unmet",
-            f"{written}/{len(required)} document(s) exigé(s) rédigé(s) — manquant(s) : "
-            f"{', '.join(missing)}.",
+            "match.documents.unmet",
+            {
+                "written": written,
+                "required": len(required),
+                "missing": ", ".join(missing),
+            },
             ratio=written / len(required),
         )
 

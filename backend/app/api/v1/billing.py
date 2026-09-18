@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, Translator
 from app.core.errors import AppError
 from app.core.rate_limit import rate_limit_auth
 from app.models.billing import SubscriptionPlan
@@ -96,14 +96,15 @@ def my_payments(db: DbSession, current_user: CurrentUser) -> list[PaymentRead]:
 
 
 @router.post("/cancel", response_model=Message, summary="Résilier mon abonnement")
-def cancel(db: DbSession, current_user: CurrentUser) -> Message:
+def cancel(db: DbSession, current_user: CurrentUser, t: Translator) -> Message:
     """Résilier ne coupe pas l'accès : la période déjà payée va à son terme."""
     subscription = SubscriptionService(db).cancel(current_user)
     until = subscription.current_period_end
     return Message(
         detail=(
-            "Abonnement résilié. Votre offre reste active jusqu'au "
-            f"{until:%d/%m/%Y}." if until else "Abonnement résilié."
+            t("billing.cancelledUntil", date=f"{until:%d/%m/%Y}")
+            if until
+            else t("billing.cancelled")
         )
     )
 
@@ -114,7 +115,11 @@ def cancel(db: DbSession, current_user: CurrentUser) -> Message:
     summary="Simuler l'issue d'un paiement (développement)",
 )
 def simulate_payment(
-    reference: str, db: DbSession, current_user: CurrentUser, succeed: bool = True
+    reference: str,
+    db: DbSession,
+    current_user: CurrentUser,
+    t: Translator,
+    succeed: bool = True,
 ) -> Message:
     """Joue la notification à la place du prestataire simulé.
 
@@ -124,8 +129,7 @@ def simulate_payment(
     """
     if not settings.is_development or settings.payment_provider != "mock":
         raise AppError(
-            "Route de simulation indisponible : elle n'existe qu'en développement "
-            "avec le prestataire simulé.",
+            "billing.simulationUnavailable",
             status_code=status.HTTP_404_NOT_FOUND,
             code="simulation_unavailable",
         )
@@ -139,7 +143,7 @@ def simulate_payment(
         failure_reason=None if succeed else "Paiement refusé (simulation).",
     )
     updated = service.apply_event(event)
-    return Message(detail=f"Paiement simulé : {updated.status}.")
+    return Message(detail=t("billing.simulated", status=updated.status))
 
 
 @router.post(
@@ -151,6 +155,7 @@ def simulate_payment(
 async def payment_webhook(
     request: Request,
     db: DbSession,
+    t: Translator,
     x_payment_signature: str | None = Header(default=None),
 ) -> Message:
     """Reçoit et applique une notification de paiement.
@@ -169,7 +174,7 @@ async def payment_webhook(
             extra={"event": "payment_webhook_rejected"},
         )
         raise AppError(
-            "Signature de notification invalide.",
+            "billing.invalidSignature",
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="invalid_payment_signature",
         )
@@ -177,8 +182,8 @@ async def payment_webhook(
     try:
         payload = json.loads(body or b"{}")
     except json.JSONDecodeError as exc:
-        raise AppError("Notification illisible.", code="invalid_payment_payload") from exc
+        raise AppError("billing.unreadableNotification", code="invalid_payment_payload") from exc
 
     event = provider.parse_event(payload)
     payment = SubscriptionService(db, provider=provider).apply_event(event)
-    return Message(detail=f"Notification traitée : paiement {payment.status}.")
+    return Message(detail=t("billing.notificationHandled", status=payment.status))

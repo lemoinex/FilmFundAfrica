@@ -73,17 +73,15 @@ class SubscriptionService:
         """Ouvre un paiement pour une offre, sans rien accorder encore."""
         plan = self.credits.get_plan(plan_code)
         if not plan.is_active:
-            raise AppError("Cette offre n'est plus proposée.", code="plan_unavailable")
+            raise AppError("billing.planUnavailable", code="plan_unavailable")
         if plan.price_amount <= 0:
-            raise AppError(
-                "L'offre gratuite ne se paie pas : elle est déjà active par défaut.",
-                code="plan_is_free",
-            )
+            raise AppError("billing.planIsFree", code="plan_is_free")
 
         current = self.credits.plan_for_user(user)
         if current.id == plan.id and self.is_renewing(user):
             raise AppError(
-                f"Vous êtes déjà abonné à l'offre « {plan.name} ».",
+                "billing.planAlreadyActive",
+                params={"plan": plan.name},
                 code="plan_already_active",
             )
 
@@ -127,7 +125,7 @@ class SubscriptionService:
             select(Payment).where(Payment.provider_reference == event.provider_reference)
         )
         if payment is None:
-            raise NotFoundError("Paiement introuvable.")
+            raise NotFoundError("billing.paymentNotFound")
 
         payment.provider_payload = event.raw
 
@@ -162,7 +160,9 @@ class SubscriptionService:
         """Valide un encaissement hors ligne, depuis l'administration."""
         if payment.status.is_final:
             raise AppError(
-                f"Ce paiement est déjà « {payment.status} ».", code="payment_already_settled"
+                "billing.paymentAlreadySettled",
+                params={"status": payment.status},
+                code="payment_already_settled",
             )
         payment.status = PaymentStatus.SUCCEEDED
         payment.paid_at = datetime.now(UTC)
@@ -209,11 +209,9 @@ class SubscriptionService:
         """Résilie : l'accès reste ouvert jusqu'à la fin de la période payée."""
         subscription = user.subscription
         if subscription is None or self.credits.plan_for_user(user).price_amount <= 0:
-            raise AppError(
-                "Aucun abonnement payant à résilier.", code="no_paid_subscription"
-            )
+            raise AppError("billing.noPaidSubscription", code="no_paid_subscription")
         if subscription.status is SubscriptionStatus.CANCELLED:
-            raise AppError("Cet abonnement est déjà résilié.", code="already_cancelled")
+            raise AppError("billing.subscriptionAlreadyCancelled", code="already_cancelled")
 
         subscription.status = SubscriptionStatus.CANCELLED
         subscription.cancelled_at = datetime.now(UTC)
@@ -268,7 +266,7 @@ class SubscriptionService:
     def get_owned_payment(self, payment_id: str, user: User) -> Payment:
         payment = self.db.get(Payment, payment_id)
         if payment is None or payment.user_id != user.id:
-            raise NotFoundError("Paiement introuvable.")
+            raise NotFoundError("billing.paymentNotFound")
         return payment
 
     def get_owned_payment_by_reference(self, reference: str, user: User) -> Payment:
@@ -276,7 +274,7 @@ class SubscriptionService:
             select(Payment).where(Payment.provider_reference == reference)
         )
         if payment is None or payment.user_id != user.id:
-            raise NotFoundError("Paiement introuvable.")
+            raise NotFoundError("billing.paymentNotFound")
         return payment
 
     def has_access(self, user: User) -> bool:

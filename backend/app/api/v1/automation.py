@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Header, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.deps import DbSession
+from app.core.deps import DbSession, Translator
 from app.core.errors import AppError
 from app.core.rate_limit import rate_limit_auth
 from app.schemas.common import Message
@@ -38,7 +38,7 @@ def require_automation_key(x_api_key: Annotated[str | None, Header()] = None) ->
     """
     if not settings.n8n_api_key:
         raise AppError(
-            "Automatisation désactivée : aucune clé d'API configurée.",
+            "automation.disabled",
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             code="automation_disabled",
         )
@@ -48,7 +48,7 @@ def require_automation_key(x_api_key: Annotated[str | None, Header()] = None) ->
             extra={"event": "automation_key_rejected"},
         )
         raise AppError(
-            "Clé d'API invalide.",
+            "automation.invalidKey",
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="invalid_api_key",
         )
@@ -142,7 +142,7 @@ def list_tasks() -> list[str]:
     dependencies=[AutomationKey],
     summary="Déclencher une tâche planifiée",
 )
-def run_task(task_name: str) -> Message:
+def run_task(task_name: str, t: Translator) -> Message:
     """Exécute une tâche de la liste fermée.
 
     Les tâches sont idempotentes : les rejouer ne produit pas de doublons.
@@ -150,10 +150,11 @@ def run_task(task_name: str) -> Message:
     task = SCHEDULED_TASKS.get(task_name)
     if task is None:
         raise AppError(
-            f"Tâche inconnue : {task_name}. Disponibles : {', '.join(sorted(SCHEDULED_TASKS))}.",
+            "automation.unknownTask",
+            params={"task": task_name, "available": ", ".join(sorted(SCHEDULED_TASKS))},
             status_code=status.HTTP_404_NOT_FOUND,
             code="unknown_task",
         )
     count = task()
     logger.info("tâche planifiée exécutée : %s", task_name, extra={"event": "task_run"})
-    return Message(detail=f"Tâche {task_name} exécutée : {count} élément(s) traité(s).")
+    return Message(detail=t("automation.taskRun", task=task_name, count=count))

@@ -245,10 +245,13 @@ def plan_segments(
         from app.core.errors import AppError
 
         raise AppError(
-            f"Durée trop longue pour une génération en une fois : {target_minutes} minutes "
-            f"demanderaient {len(raw_blocks)} passes, au-delà de la limite de {ceiling}. "
-            f"Maximum réalisable avec la configuration actuelle : "
-            f"{max_supported_minutes(max_tokens_per_call, ceiling)} minutes.",
+            "screenplay.tooLong",
+            params={
+                "minutes": target_minutes,
+                "passes": len(raw_blocks),
+                "ceiling": ceiling,
+                "maximum": max_supported_minutes(max_tokens_per_call, ceiling),
+            },
             code="screenplay_too_long",
         )
 

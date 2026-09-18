@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, NotFoundError
+from app.core.i18n import Locale
 from app.models.enums import AIOperation, FundingStatus, NotificationType
 from app.models.funding import FundingOpportunity, FundingRequirement, ProjectFundingMatch
 from app.models.project import Project
@@ -44,11 +45,17 @@ def _join(values: list | None) -> str:
 
 
 class FundingService:
-    def __init__(self, db: Session, ai_service: AIService | None = None) -> None:
+    def __init__(
+        self,
+        db: Session,
+        ai_service: AIService | None = None,
+        locale: Locale = "fr",
+    ) -> None:
         self.db = db
+        self.locale = locale
         self.opportunities = FundingRepository(db)
         self.matches = MatchRepository(db)
-        self.matching = MatchingService(db)
+        self.matching = MatchingService(db, locale=locale)
         self.credits = CreditService(db)
         self._ai_service = ai_service
 
@@ -74,7 +81,7 @@ class FundingService:
     def get(self, opportunity_id: str) -> OpportunityRead:
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
         return OpportunityRead.model_validate(opportunity)
 
     # ------------------------------------------------------------------
@@ -169,7 +176,7 @@ class FundingService:
     ) -> MatchExplanation:
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
 
         result = self.matching.score_one(project, opportunity)
         match = self.matches.get_pair(project.id, opportunity_id)
@@ -310,7 +317,7 @@ class FundingService:
     def update(self, opportunity_id: str, payload: OpportunityUpdate) -> OpportunityRead:
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
 
         updates = payload.model_dump(exclude_unset=True)
         for field, value in updates.items():
@@ -321,10 +328,7 @@ class FundingService:
             setattr(opportunity, field, value)
 
         if payload.status == FundingStatus.OPEN and not opportunity.source_url:
-            raise AppError(
-                "Impossible de publier ce dispositif comme ouvert sans son URL source.",
-                code="source_required",
-            )
+            raise AppError("funding.sourceRequiredToPublish", code="source_required")
 
         self.db.commit()
         self.db.refresh(opportunity)
@@ -334,12 +338,9 @@ class FundingService:
         """Enregistre une vérification humaine de la fiche."""
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
         if not opportunity.source_url:
-            raise AppError(
-                "Renseignez l'URL source avant de marquer ce dispositif comme vérifié.",
-                code="source_required",
-            )
+            raise AppError("funding.sourceRequiredToVerify", code="source_required")
         opportunity.status = status
         opportunity.last_verified_at = datetime.now(UTC)
         self.db.commit()
@@ -349,14 +350,14 @@ class FundingService:
     def delete(self, opportunity_id: str) -> None:
         opportunity = self.opportunities.get(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
         self.db.delete(opportunity)
         self.db.commit()
 
     def add_requirement(self, opportunity_id: str, payload) -> OpportunityRead:
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
         opportunity.requirement_items.append(FundingRequirement(**payload.model_dump()))
         self.db.commit()
         self.db.refresh(opportunity)
@@ -365,12 +366,12 @@ class FundingService:
     def delete_requirement(self, opportunity_id: str, requirement_id: str) -> OpportunityRead:
         opportunity = self.opportunities.get_with_requirements(opportunity_id)
         if opportunity is None:
-            raise NotFoundError("Dispositif de financement introuvable.")
+            raise NotFoundError("funding.opportunityNotFound")
         target = next(
             (item for item in opportunity.requirement_items if item.id == requirement_id), None
         )
         if target is None:
-            raise NotFoundError("Exigence introuvable.")
+            raise NotFoundError("funding.requirementNotFound")
         self.db.delete(target)
         self.db.commit()
         self.db.refresh(opportunity)

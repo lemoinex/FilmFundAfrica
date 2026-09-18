@@ -333,7 +333,8 @@ def get_prompt(document_type: DocumentType) -> PromptTemplate:
         return PROMPT_REGISTRY[document_type]
     except KeyError as exc:  # pragma: no cover - garde-fou
         raise AppError(
-            f"Aucun prompt n'est défini pour le document « {document_type} ».",
+            "prompt.notFound",
+            params={"document": document_type},
             code="prompt_not_found",
         ) from exc
 

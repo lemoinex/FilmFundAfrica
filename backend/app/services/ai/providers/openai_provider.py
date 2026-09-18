@@ -21,7 +21,8 @@ class OpenAIProvider(AIProvider):
         self.timeout = timeout or settings.ai_timeout_seconds
         if not self.api_key:
             raise AIProviderError(
-                "AI_API_KEY est requis lorsque AI_PROVIDER=openai.",
+                "ai.keyRequired",
+                params={"provider": "openai"},
                 code="ai_provider_not_configured",
             )
 
@@ -45,20 +46,19 @@ class OpenAIProvider(AIProvider):
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(OPENAI_API_URL, json=payload, headers=headers)
         except httpx.HTTPError as exc:
-            raise AIProviderError(f"Fournisseur IA injoignable : {exc}") from exc
+            raise AIProviderError("ai.unreachable", params={"reason": str(exc)}) from exc
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         if response.status_code >= 400:
             raise AIProviderError(
-                f"Erreur du fournisseur IA ({response.status_code}). "
-                "Vérifiez la clé API et le modèle configuré."
+                "ai.providerError", params={"status": response.status_code}
             )
 
         data = response.json()
         choices = data.get("choices") or []
         text = choices[0].get("message", {}).get("content", "") if choices else ""
         if not text.strip():
-            raise AIProviderError("Le fournisseur IA a renvoyé une réponse vide.")
+            raise AIProviderError("ai.emptyResponse")
 
         usage = data.get("usage") or {}
         return AICompletionResponse(

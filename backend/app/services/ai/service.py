@@ -38,8 +38,7 @@ def build_provider(provider_name: str | None = None) -> AIProvider:
     if name == "mock":
         return MockProvider()
     raise AIProviderError(
-        f"Fournisseur IA inconnu : « {name} ». Valeurs acceptées : anthropic, openai, mock.",
-        code="ai_provider_unknown",
+        "ai.providerUnknown", params={"name": name}, code="ai_provider_unknown"
     )
 
 

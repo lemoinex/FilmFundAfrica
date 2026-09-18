@@ -135,8 +135,8 @@ class CreditService:
         plan = self.plan_for_user(user)
         if plan.max_projects and current_project_count >= plan.max_projects:
             raise QuotaExceededError(
-                f"Votre offre « {plan.name} » est limitée à {plan.max_projects} projet(s). "
-                "Passez à une offre supérieure pour en créer davantage.",
+                "quota.projectLimit",
+                params={"plan": plan.name, "max": plan.max_projects},
                 code="project_quota_exceeded",
             )
 
@@ -150,15 +150,16 @@ class CreditService:
         cost = OPERATION_COST.get(operation, 1) * max(units, 1)
         if user.ai_credits_remaining < cost:
             plan = self.plan_for_user(user)
-            detail = (
-                f"Crédits IA insuffisants : cette génération en coûte {cost} et il vous en "
-                f"reste {user.ai_credits_remaining} (offre « {plan.name} »)."
-                if cost > 1
-                else f"Crédits IA épuisés pour l'offre « {plan.name} »."
-            )
+            # Une generation en plusieurs passes coute plus d'un credit : le
+            # message doit dire le prix, sans quoi le solde restant semble
+            # suffisant a qui en a un.
             raise QuotaExceededError(
-                f"{detail} Ils seront rechargés à la prochaine période, "
-                "ou passez à une offre supérieure.",
+                "quota.creditsInsufficient" if cost > 1 else "quota.creditsExhausted",
+                params={
+                    "plan": plan.name,
+                    "cost": cost,
+                    "remaining": user.ai_credits_remaining,
+                },
                 code="ai_credits_exhausted",
             )
         return cost

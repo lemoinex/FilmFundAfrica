@@ -7,7 +7,7 @@ from datetime import UTC
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, Translator
 from app.core.errors import NotFoundError
 from app.models.system import Notification
 from app.schemas.common import Message
@@ -54,13 +54,15 @@ def list_notifications(
     response_model=Message,
     summary="Marquer comme lue",
 )
-def mark_read(notification_id: str, db: DbSession, current_user: CurrentUser) -> Message:
+def mark_read(
+    notification_id: str, db: DbSession, current_user: CurrentUser, t: Translator
+) -> Message:
     from datetime import datetime
 
     notification = db.get(Notification, notification_id)
     if notification is None or notification.user_id != current_user.id:
-        raise NotFoundError("Notification introuvable.")
+        raise NotFoundError("notification.notFound")
     notification.is_read = True
     notification.read_at = datetime.now(UTC)
     db.commit()
-    return Message(detail="Notification marquée comme lue.")
+    return Message(detail=t("notification.markedRead"))

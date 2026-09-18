@@ -57,10 +57,7 @@ class ManualProvider(PaymentProvider):
         return False
 
     def parse_event(self, payload: dict[str, Any]) -> PaymentEvent:
-        raise PaymentProviderError(
-            "L'encaissement manuel ne reçoit pas de notification : "
-            "la validation se fait depuis l'administration."
-        )
+        raise PaymentProviderError("payment.manualNoNotification")
 
 
 class MockProvider(PaymentProvider):
@@ -85,13 +82,15 @@ class MockProvider(PaymentProvider):
     def parse_event(self, payload: dict[str, Any]) -> PaymentEvent:
         reference = str(payload.get("reference") or "").strip()
         if not reference:
-            raise PaymentProviderError("Notification sans référence de paiement.")
+            raise PaymentProviderError("payment.referenceMissing")
 
         raw_status = str(payload.get("status") or "").upper()
         try:
             status = PaymentStatus(raw_status)
         except ValueError as exc:
-            raise PaymentProviderError(f"Statut de paiement inconnu : {raw_status}") from exc
+            raise PaymentProviderError(
+                "payment.unknownStatus", params={"status": raw_status}
+            ) from exc
 
         return PaymentEvent(
             provider_reference=reference,
@@ -130,7 +129,7 @@ def get_provider(name: str | None = None) -> PaymentProvider:
     code = (name or settings.payment_provider).strip().lower()
     provider = PROVIDERS.get(code)
     if provider is None:  # pragma: no cover - verrouille par la configuration
-        raise PaymentProviderError(f"Prestataire de paiement inconnu : {code}")
+        raise PaymentProviderError("payment.unknownProvider", params={"code": code})
     return provider()
 
 

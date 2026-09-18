@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.core.deps import CurrentAdmin, DbSession
+from app.core.deps import CurrentAdmin, DbSession, Translator
 from app.core.errors import NotFoundError
 from app.models.billing import AIUsage, SubscriptionPlan
 from app.models.document import Document
@@ -57,7 +57,7 @@ def update_user(
 ) -> UserRead:
     user = db.get(User, user_id)
     if user is None:
-        raise NotFoundError("Utilisateur introuvable.")
+        raise NotFoundError("admin.userNotFound")
     for field, value in payload.model_dump(exclude_unset=True).items():
         if value is not None:
             setattr(user, field, value)
@@ -67,17 +67,19 @@ def update_user(
 
 
 @router.post("/users/{user_id}/suspend", response_model=Message, summary="Suspendre un compte")
-def suspend_user(user_id: str, db: DbSession, admin: CurrentAdmin) -> Message:
+def suspend_user(
+    user_id: str, db: DbSession, admin: CurrentAdmin, t: Translator
+) -> Message:
     user = db.get(User, user_id)
     if user is None:
-        raise NotFoundError("Utilisateur introuvable.")
+        raise NotFoundError("admin.userNotFound")
     if user.id == admin.id:
         from app.core.errors import AppError
 
-        raise AppError("Vous ne pouvez pas suspendre votre propre compte.")
+        raise AppError("admin.cannotSuspendSelf")
     user.is_active = False
     db.commit()
-    return Message(detail="Compte suspendu.")
+    return Message(detail=t("admin.accountSuspended"))
 
 
 # ---------------------------------------------------------------------------
@@ -161,10 +163,12 @@ def list_plans(db: DbSession, _: CurrentAdmin) -> list[dict]:
 
 
 @router.put("/plans/{plan_code}", summary="Modifier le prix ou les quotas d'une offre")
-def update_plan(plan_code: PlanCode, payload: dict, db: DbSession, _: CurrentAdmin) -> dict:
+def update_plan(
+    plan_code: PlanCode, payload: dict, db: DbSession, _: CurrentAdmin, t: Translator
+) -> dict:
     plan = db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.code == plan_code))
     if plan is None:
-        raise NotFoundError("Offre introuvable.")
+        raise NotFoundError("billing.planNotFound")
 
     editable = {
         "name",
@@ -184,7 +188,7 @@ def update_plan(plan_code: PlanCode, payload: dict, db: DbSession, _: CurrentAdm
             setattr(plan, field, value)
     db.commit()
     db.refresh(plan)
-    return {"detail": "Offre mise à jour.", "code": str(plan.code)}
+    return {"detail": t("billing.planUpdated"), "code": str(plan.code)}
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +220,7 @@ def validate_payment(payment_id: str, db: DbSession, admin: CurrentAdmin) -> Pay
     """
     payment = db.get(Payment, payment_id)
     if payment is None:
-        raise NotFoundError("Paiement introuvable.")
+        raise NotFoundError("billing.paymentNotFound")
     return PaymentRead.model_validate(
         SubscriptionService(db).mark_paid_manually(payment, admin)
     )
@@ -246,7 +250,11 @@ def list_candidates(
     summary="Publier un candidat après relecture",
 )
 def approve_candidate(
-    candidate_id: str, payload: CandidateApproval, db: DbSession, admin: CurrentAdmin
+    candidate_id: str,
+    payload: CandidateApproval,
+    db: DbSession,
+    admin: CurrentAdmin,
+    t: Translator,
 ) -> Message:
     """Crée le dispositif à partir du candidat relu.
 
@@ -256,7 +264,7 @@ def approve_candidate(
     service = IngestionService(db)
     candidate = service.get(candidate_id)
     opportunity = service.approve(candidate, admin, payload.model_dump(exclude_unset=True))
-    return Message(detail=f"Dispositif publié : {opportunity.name}.")
+    return Message(detail=t("funding.opportunityPublished", name=opportunity.name))
 
 
 @router.post(

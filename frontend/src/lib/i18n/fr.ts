@@ -889,6 +889,9 @@ export const fr = {
   "api.sessionExpired": "Session expirée. Reconnectez-vous.",
   "api.jobTrackingAborted": "Suivi de la génération interrompu.",
   "api.generationFailed": "La génération a échoué.",
+
+  // --- Client HTTP (suite) ---
+  "api.httpError": "Erreur {status}",
 } as const;
 
 export type MessageKey = keyof typeof fr;

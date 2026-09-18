@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 
-from app.core.deps import CurrentUser, DbSession, OwnedProject
+from app.core.deps import CurrentUser, DbSession, OwnedProject, Translator
 from app.core.rate_limit import rate_limit_ai
 from app.models.enums import DocumentType
 from app.prompts import PROMPT_REGISTRY
@@ -141,10 +141,12 @@ def refine_document(
 
 
 @router.delete("/{document_id}", response_model=Message, summary="Supprimer un document")
-def delete_document(document_id: str, project: OwnedProject, db: DbSession) -> Message:
+def delete_document(
+    document_id: str, project: OwnedProject, db: DbSession, t: Translator
+) -> Message:
     service = DocumentService(db)
     service.delete(project, service.get_owned_document(document_id, project))
-    return Message(detail="Document supprimé.")
+    return Message(detail=t("document.deleted"))
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +182,7 @@ def get_version(
     document = service.get_owned_document(document_id, project)
     version = service.versions.get_version(document.id, version_number)
     if version is None:
-        raise NotFoundError("Version introuvable.")
+        raise NotFoundError("document.versionNotFound")
     return DocumentVersionDetail.model_validate(version)
 
 

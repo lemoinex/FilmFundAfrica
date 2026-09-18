@@ -55,7 +55,7 @@ class JobService:
         """
         job = self.db.get(GenerationJob, job_id)
         if job is None or job.user_id != user.id:
-            raise NotFoundError("Tâche introuvable.")
+            raise NotFoundError("job.notFound")
         return job
 
     def list_for_project(self, project: Project, limit: int = 20) -> list[GenerationJob]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.core.deps import DbSession, OwnedProject
+from app.core.deps import DbSession, OwnedProject, Translator
 from app.core.errors import NotFoundError
 from app.models.enums import BudgetCategory
 from app.schemas.budget import (
@@ -119,7 +119,7 @@ def update_item(
     budget = service.get_or_create(project)
     item = service.get_owned_item(budget, item_id)
     if item is None:
-        raise NotFoundError("Poste budgétaire introuvable.")
+        raise NotFoundError("budget.itemNotFound")
     service.update_item(project, item, **payload.model_dump(exclude_unset=True))
     data = BudgetItemRead.model_validate(item)
     _commit(db, project, service)
@@ -127,15 +127,17 @@ def update_item(
 
 
 @router.delete("/budget/items/{item_id}", response_model=Message, summary="Supprimer un poste")
-def delete_item(item_id: str, project: OwnedProject, db: DbSession) -> Message:
+def delete_item(
+    item_id: str, project: OwnedProject, db: DbSession, t: Translator
+) -> Message:
     service = BudgetService(db)
     budget = service.get_or_create(project)
     item = service.get_owned_item(budget, item_id)
     if item is None:
-        raise NotFoundError("Poste budgétaire introuvable.")
+        raise NotFoundError("budget.itemNotFound")
     service.delete_item(project, item)
     _commit(db, project, service)
-    return Message(detail="Poste supprimé.")
+    return Message(detail=t("budget.itemDeleted"))
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +184,7 @@ def update_plan_line(
     plan = service.get_or_create_plan(project)
     line = service.get_owned_plan_line(plan, line_id)
     if line is None:
-        raise NotFoundError("Source de financement introuvable.")
+        raise NotFoundError("budget.sourceNotFound")
     service.update_plan_line(plan, line, **payload.model_dump(exclude_unset=True))
     data = FundingPlanLineRead.model_validate(line)
     _commit(db, project, service)
@@ -192,15 +194,17 @@ def update_plan_line(
 @router.delete(
     "/funding-plan/lines/{line_id}", response_model=Message, summary="Supprimer une source"
 )
-def delete_plan_line(line_id: str, project: OwnedProject, db: DbSession) -> Message:
+def delete_plan_line(
+    line_id: str, project: OwnedProject, db: DbSession, t: Translator
+) -> Message:
     service = BudgetService(db)
     plan = service.get_or_create_plan(project)
     line = service.get_owned_plan_line(plan, line_id)
     if line is None:
-        raise NotFoundError("Source de financement introuvable.")
+        raise NotFoundError("budget.sourceNotFound")
     service.delete_plan_line(line)
     _commit(db, project, service)
-    return Message(detail="Source supprimée.")
+    return Message(detail=t("budget.sourceDeleted"))
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +240,9 @@ def upsert_schedule(
 
 
 @router.delete("/schedule/{phase}", response_model=Message, summary="Retirer une phase")
-def delete_schedule(phase: BudgetCategory, project: OwnedProject, db: DbSession) -> Message:
+def delete_schedule(
+    phase: BudgetCategory, project: OwnedProject, db: DbSession, t: Translator
+) -> Message:
     BudgetService(db).delete_schedule_phase(project, phase)
     db.commit()
-    return Message(detail="Phase retirée du calendrier.")
+    return Message(detail=t("budget.phaseRemoved"))

@@ -108,7 +108,7 @@ class ProjectService:
     ) -> Character:
         character = self.characters.get(character_id)
         if character is None or character.project_id != project.id:
-            raise NotFoundError("Personnage introuvable.")
+            raise NotFoundError("character.notFound")
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(character, field, value)
         self.db.commit()
@@ -119,7 +119,7 @@ class ProjectService:
     def delete_character(self, project: Project, character_id: str) -> None:
         character = self.characters.get(character_id)
         if character is None or character.project_id != project.id:
-            raise NotFoundError("Personnage introuvable.")
+            raise NotFoundError("character.notFound")
         self.db.delete(character)
         self.db.commit()
         self.scoring.compute(project)

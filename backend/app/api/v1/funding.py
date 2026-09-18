@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.deps import CurrentUser, DbSession, OwnedProject
+from app.core.i18n import request_locale
 from app.core.rate_limit import rate_limit_ai
 from app.models.enums import FundingCategory, ProjectType
 from app.schemas.funding import (
@@ -81,13 +82,17 @@ def get_funding(opportunity_id: str, db: DbSession, _: CurrentUser) -> Opportuni
     summary="Analyser les financements compatibles",
 )
 def compute_matches(
-    project: OwnedProject, db: DbSession, current_user: CurrentUser
+    request: Request, project: OwnedProject, db: DbSession, current_user: CurrentUser
 ) -> MatchListResponse:
     """Calcule la compatibilité du projet avec tous les dispositifs ouverts.
 
     Le calcul est déterministe et ne consomme aucun crédit IA.
     """
-    return FundingService(db).compute_matches(project, notify_user=current_user)
+    # La langue est relue ici, dans le corps : les dependances ont fini de
+    # s'executer, et celle qui identifie le compte a pose sa preference.
+    return FundingService(db, locale=request_locale(request)).compute_matches(
+        project, notify_user=current_user
+    )
 
 
 @project_router.get(
@@ -95,8 +100,10 @@ def compute_matches(
     response_model=MatchListResponse,
     summary="Financements compatibles du projet",
 )
-def list_matches(project: OwnedProject, db: DbSession) -> MatchListResponse:
-    return FundingService(db).stored_matches(project)
+def list_matches(
+    request: Request, project: OwnedProject, db: DbSession
+) -> MatchListResponse:
+    return FundingService(db, locale=request_locale(request)).stored_matches(project)
 
 
 @project_router.post(

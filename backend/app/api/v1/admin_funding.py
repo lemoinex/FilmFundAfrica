@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, status
 
-from app.core.deps import CurrentAdmin, DbSession
+from app.core.deps import CurrentAdmin, DbSession, Translator
 from app.models.enums import FundingStatus
 from app.schemas.common import Message
 from app.schemas.funding import (
@@ -93,9 +93,11 @@ def verify_opportunity(
 
 
 @router.delete("/{opportunity_id}", response_model=Message, summary="Supprimer un dispositif")
-def delete_opportunity(opportunity_id: str, db: DbSession, _: CurrentAdmin) -> Message:
+def delete_opportunity(
+    opportunity_id: str, db: DbSession, _: CurrentAdmin, t: Translator
+) -> Message:
     FundingService(db).delete(opportunity_id)
-    return Message(detail="Dispositif supprimé.")
+    return Message(detail=t("funding.opportunityDeleted"))
 
 
 # ---------------------------------------------------------------------------

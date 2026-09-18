@@ -6,7 +6,7 @@
  * redirection vers la page de connexion si elle échoue.
  */
 
-import { tr } from "./i18n/translate";
+import { currentLocale, tr } from "./i18n/translate";
 import type {
   AuthResponse,
   Budget,
@@ -99,7 +99,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
   const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Accept-Language": currentLocale() },
     body: JSON.stringify({ refresh_token: refresh }),
   });
   if (!response.ok) return false;
@@ -110,7 +110,7 @@ async function refreshAccessToken(): Promise<boolean> {
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
-  let detail = `Erreur ${response.status}`;
+  let detail = tr("api.httpError", { status: response.status });
   let code: string | undefined;
   let fields: { field: string; message: string }[] | undefined;
   try {
@@ -133,6 +133,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const send = async (): Promise<Response> => {
     const finalHeaders: Record<string, string> = {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      // La langue choisie ici prime sur celle du navigateur : quelqu'un peut
+      // lire l'interface en anglais depuis un navigateur configuré en
+      // français, et l'API doit lui répondre dans la langue qu'il lit.
+      "Accept-Language": currentLocale(),
       ...((headers as Record<string, string>) ?? {}),
     };
     if (auth && tokenStore.access) {
@@ -639,7 +643,10 @@ export async function waitForJob(
 /** Télécharge un export en réutilisant le jeton d'accès courant. */
 export async function downloadExport(path: string, fallbackName: string): Promise<void> {
   const response = await fetch(`${API_URL}${path}`, {
-    headers: tokenStore.access ? { Authorization: `Bearer ${tokenStore.access}` } : {},
+    headers: {
+      "Accept-Language": currentLocale(),
+      ...(tokenStore.access ? { Authorization: `Bearer ${tokenStore.access}` } : {}),
+    },
   });
   if (!response.ok) throw await toApiError(response);
 

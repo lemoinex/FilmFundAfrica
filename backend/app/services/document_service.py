@@ -83,7 +83,7 @@ class DocumentService:
     def get_owned_document(self, document_id: str, project: Project) -> Document:
         document = self.documents.get(document_id)
         if document is None or document.project_id != project.id:
-            raise NotFoundError("Document introuvable.")
+            raise NotFoundError("document.notFound")
         return document
 
     # ------------------------------------------------------------------
@@ -112,27 +112,24 @@ class DocumentService:
         template = get_prompt(document_type)
         if template.applies_to and project.project_type not in template.applies_to:
             raise AppError(
-                f"Le document « {template.document_label} » ne s'applique pas à un projet "
-                f"de type {project.project_type}.",
+                "document.typeNotApplicable",
+                params={
+                    "document": template.document_label,
+                    "type": project.project_type,
+                },
                 code="document_type_not_applicable",
             )
 
         existing = self.documents.get_by_type(project.id, document_type)
         if existing is not None and existing.content.strip() and not payload.overwrite:
-            raise AppError(
-                "Ce document existe déjà. Activez « remplacer » pour le régénérer.",
-                code="document_exists",
-            )
+            raise AppError("document.alreadyExists", code="document_exists")
 
         return len(self._plan_segments(project, document_type, payload)) or 1
 
     @staticmethod
     def prepare_refine(document: Document) -> None:
         if not document.content.strip():
-            raise AppError(
-                "Ce document est vide : générez-le avant de le retravailler.",
-                code="document_empty",
-            )
+            raise AppError("document.empty", code="document_empty")
 
     def _plan_segments(
         self, project: Project, document_type: DocumentType, payload: GenerateRequest
@@ -466,7 +463,7 @@ class DocumentService:
     ) -> Document:
         version = self.versions.get_version(document.id, version_number)
         if version is None:
-            raise NotFoundError("Version introuvable.")
+            raise NotFoundError("document.versionNotFound")
         self._store_version(
             document,
             content=version.content,

@@ -876,4 +876,7 @@ export const en: Record<MessageKey, string> = {
   "api.sessionExpired": "Session expired. Please sign in again.",
   "api.jobTrackingAborted": "Tracking of the generation was interrupted.",
   "api.generationFailed": "The generation failed.",
+
+  // --- HTTP client (continued) ---
+  "api.httpError": "Error {status}",
 };

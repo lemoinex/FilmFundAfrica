@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 
-from app.core.deps import CurrentUser, DbSession, OwnedProject
+from app.core.deps import CurrentUser, DbSession, OwnedProject, Translator
+from app.core.i18n import request_locale
 from app.schemas.common import Message
 from app.schemas.project import (
     CharacterCreate,
@@ -58,9 +59,9 @@ def update_project(payload: ProjectUpdate, project: OwnedProject, db: DbSession)
 
 
 @router.delete("/{project_id}", response_model=Message, summary="Supprimer un projet")
-def delete_project(project: OwnedProject, db: DbSession) -> Message:
+def delete_project(project: OwnedProject, db: DbSession, t: Translator) -> Message:
     ProjectService(db).delete(project)
-    return Message(detail="Projet supprimé.")
+    return Message(detail=t("project.deleted"))
 
 
 # ---------------------------------------------------------------------------
@@ -71,8 +72,8 @@ def delete_project(project: OwnedProject, db: DbSession) -> Message:
     response_model=ReadinessScore,
     summary="Calculer le Project Readiness Score",
 )
-def project_score(project: OwnedProject, db: DbSession) -> ReadinessScore:
-    return ScoringService(db).compute(project)
+def project_score(request: Request, project: OwnedProject, db: DbSession) -> ReadinessScore:
+    return ScoringService(db, locale=request_locale(request)).compute(project)
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +118,8 @@ def update_character(
     response_model=Message,
     summary="Supprimer un personnage",
 )
-def delete_character(character_id: str, project: OwnedProject, db: DbSession) -> Message:
+def delete_character(
+    character_id: str, project: OwnedProject, db: DbSession, t: Translator
+) -> Message:
     ProjectService(db).delete_character(project, character_id)
-    return Message(detail="Personnage supprimé.")
+    return Message(detail=t("character.deleted"))

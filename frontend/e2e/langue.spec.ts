@@ -50,3 +50,28 @@ test.describe("Langue de l'interface", () => {
     await expect(page.getByRole("heading", { name: "Subscription" })).toBeVisible();
   });
 });
+
+test.describe("Messages de l'API", () => {
+  test("une erreur du serveur arrive dans la langue choisie dans l'interface", async ({
+    page,
+  }) => {
+    // Le navigateur des tests annonce l'anglais ; on choisit le français dans
+    // l'interface pour vérifier que c'est bien ce choix-là qui l'emporte.
+    await page.goto("/connexion");
+    await page.getByLabel("Changer de langue").first().selectOption("fr");
+
+    await page.getByLabel("Adresse e-mail").fill("inconnu@example.com");
+    await page.getByLabel("Mot de passe").fill("MotDePasse123");
+    await page.getByRole("button", { name: "Se connecter" }).click();
+
+    // `.first()` : Next.js ajoute son propre `role="alert"` pour annoncer les
+    // changements de route, et la recherche serait ambiguë sans cela.
+    const alert = page.getByRole("alert").first();
+    await expect(alert).toHaveText("Adresse e-mail ou mot de passe incorrect.");
+
+    await page.getByLabel("Changer de langue").first().selectOption("en");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(alert).toHaveText("Incorrect email address or password.");
+  });
+});

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.errors import AuthenticationError, NotFoundError, PermissionDeniedError
+from app.core.i18n import is_locale, request_locale, translate
 from app.core.security import decode_token
 from app.models.project import Project
 from app.models.user import User
@@ -20,33 +22,56 @@ bearer_scheme = HTTPBearer(auto_error=False)
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+def get_translator(request: Request) -> Callable[..., str]:
+    """Traduit dans la langue de l'appelant, au moment de l'appel.
+
+    La langue est relue a chaque appel, et non capturee ici : la preference du
+    compte n'est connue qu'apres `get_current_user`, et rien ne garantit
+    l'ordre dans lequel FastAPI resout deux dependances soeurs.
+    """
+
+    def _translate(key: str, **params: object) -> str:
+        return translate(request_locale(request), key, **params)
+
+    return _translate
+
+
+#: Injecte dans une route qui renvoie un message a afficher tel quel.
+Translator = Annotated[Callable[..., str], Depends(get_translator)]
+
+
 def get_current_user(
+    request: Request,
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
 ) -> User:
     if credentials is None or not credentials.credentials:
-        raise AuthenticationError("Authentification requise.")
+        raise AuthenticationError("auth.required")
 
     payload = decode_token(credentials.credentials, expected_type="access")
     if payload is None:
-        raise AuthenticationError("Jeton invalide ou expiré.")
+        raise AuthenticationError("auth.tokenInvalidOrExpired")
 
     user_id = payload.get("sub")
     if not user_id:
-        raise AuthenticationError("Jeton invalide.")
+        raise AuthenticationError("auth.tokenInvalid")
 
     user = db.scalar(
         select(User).options(selectinload(User.profile)).where(User.id == user_id)
     )
     if user is None:
-        raise AuthenticationError("Utilisateur introuvable.")
+        raise AuthenticationError("auth.userNotFound")
     if not user.is_active:
-        raise PermissionDeniedError("Ce compte est suspendu.")
+        raise PermissionDeniedError("auth.accountSuspended")
     if payload.get("tv") != user.token_version:
         # Jeton emis avant un changement de mot de passe : il n'est plus valable.
-        raise AuthenticationError(
-            "Session expirée : le mot de passe a été modifié. Reconnectez-vous."
-        )
+        raise AuthenticationError("auth.sessionPasswordChanged")
+
+    # La langue du compte l'emporte sur l'en-tete du navigateur des qu'on sait
+    # a qui l'on parle : elle suit la personne d'un appareil a l'autre.
+    preferred = user.profile.preferred_locale if user.profile else None
+    if is_locale(preferred):
+        request.state.locale = preferred
     return user
 
 
@@ -55,7 +80,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 def get_current_admin(current_user: CurrentUser) -> User:
     if not current_user.is_admin:
-        raise PermissionDeniedError("Accès réservé aux administrateurs.")
+        raise PermissionDeniedError("auth.adminOnly")
     return current_user
 
 
@@ -74,7 +99,7 @@ def get_owned_project(project_id: str, db: DbSession, current_user: CurrentUser)
         .where(Project.id == project_id)
     )
     if project is None or project.user_id != current_user.id:
-        raise NotFoundError("Projet introuvable.")
+        raise NotFoundError("project.notFound")
     return project
 
 
@@ -93,8 +118,8 @@ def require_export_access(db: DbSession, current_user: CurrentUser) -> User:
     plan = CreditService(db).plan_for_user(current_user)
     if not plan.allows_export and not current_user.is_admin:
         raise QuotaExceededError(
-            f"L'export n'est pas inclus dans l'offre « {plan.name} ». "
-            "Passez à une offre supérieure pour exporter votre dossier.",
+            "quota.exportNotIncluded",
+            params={"plan": plan.name},
             code="export_not_included",
         )
     return current_user
