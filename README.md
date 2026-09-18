@@ -1,0 +1,368 @@
+# FilmFund Africa
+
+**De l'idée au financement de votre projet audiovisuel.**
+
+Plateforme SaaS destinée aux réalisateurs, scénaristes, producteurs et professionnels de
+l'audiovisuel, avec une priorité donnée à l'Afrique francophone. Elle permet de structurer un
+projet, de générer les documents professionnels du dossier, d'en suivre la maturité et de
+l'exporter dans un format exploitable par un comité de lecture.
+
+> **État du dépôt : Phases 1 et 2 livrées et exécutables** (fondations, authentification,
+> projets, AI Writer, versioning, export). Les phases 3 à 6 (Funding Intelligence, budget,
+> monétisation, automatisation n8n) disposent de leur schéma de base de données et de leurs
+> points d'extension, mais pas encore de leur logique métier. Voir
+> [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md) pour le détail, poste par poste.
+
+---
+
+## Sommaire
+
+1. [Architecture](#1-architecture)
+2. [Installation](#2-installation)
+3. [Configuration](#3-configuration)
+4. [Variables d'environnement](#4-variables-denvironnement)
+5. [Lancement avec Docker](#5-lancement-avec-docker)
+6. [Lancement du backend](#6-lancement-du-backend)
+7. [Lancement du frontend](#7-lancement-du-frontend)
+8. [Migrations de base de données](#8-migrations-de-base-de-données)
+9. [Données de démonstration](#9-données-de-démonstration)
+10. [Configuration de l'IA](#10-configuration-de-lia)
+11. [Configuration de n8n](#11-configuration-de-n8n)
+12. [Tests](#12-tests)
+13. [Déploiement](#13-déploiement)
+14. [Règles produit non négociables](#14-règles-produit-non-négociables)
+
+---
+
+## 1. Architecture
+
+```text
+                    FILMFUND AFRICA
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+         FRONTEND                       API
+      Next.js 14 / TS               FastAPI / Python
+             │                           │
+             └─────────────┬─────────────┘
+                           │
+                       PostgreSQL
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+      AI Service       Funding DB         Users
+          │                │
+   Anthropic / OpenAI     n8n
+   / Mock                  │
+          └────────────┬───┘
+                       │
+                 Notifications
+```
+
+```text
+filmfund-africa/
+├── backend/            API FastAPI, modèles, services, prompts versionnés
+│   ├── app/
+│   │   ├── api/v1/     Routes HTTP
+│   │   ├── core/       Configuration, sécurité, base de données, erreurs, logs
+│   │   ├── models/     Tables SQLAlchemy (21 tables)
+│   │   ├── prompts/    Prompts versionnés, un module par document
+│   │   ├── repositories/  Requêtes SQL isolées
+│   │   ├── schemas/    Contrats d'entrée/sortie Pydantic
+│   │   ├── services/   Logique métier + couche d'abstraction IA
+│   │   └── workers/    Tâches planifiées appelables par n8n
+│   ├── alembic/        Migrations
+│   ├── scripts/seed.py Données de démonstration
+│   └── tests/          68 tests (pytest)
+├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
+├── database/           Initialisation PostgreSQL
+├── docs/               État du projet, décisions d'architecture
+├── n8n/                Workflows d'automatisation
+├── prompts/            → voir backend/app/prompts
+├── docker-compose.yml
+├── .env.example
+└── LICENSE
+```
+
+**Séparation des responsabilités du backend** : une route ne contient jamais de SQL ni de
+prompt. Elle valide, délègue à un service, qui passe par un repository pour la base et par
+`AIService` pour l'IA.
+
+---
+
+## 2. Installation
+
+Prérequis : **Docker + Docker Compose** (voie recommandée), ou **Python 3.11+**, **Node.js 20+**
+et **PostgreSQL 14+** pour une installation manuelle.
+
+```bash
+git clone https://github.com/lemoinex/FilmFundAfrica.git
+cd FilmFundAfrica
+cp .env.example .env
+```
+
+Éditez ensuite `.env` (voir section 4). Au minimum, changez `JWT_SECRET` et
+`POSTGRES_PASSWORD`.
+
+---
+
+## 3. Configuration
+
+Générez un secret JWT solide :
+
+```bash
+openssl rand -hex 32
+```
+
+L'application démarre sans clé d'IA : `AI_PROVIDER=mock` produit des documents structurés à
+partir de vos seules saisies, sans appel réseau. C'est le mode par défaut, utile pour tester
+l'application de bout en bout et faire tourner la suite de tests.
+
+---
+
+## 4. Variables d'environnement
+
+Toutes les variables sont documentées dans [`.env.example`](.env.example). Les principales :
+
+| Variable | Rôle | Défaut |
+| --- | --- | --- |
+| `DATABASE_URL` | Connexion PostgreSQL (compatible Supabase / Neon) | local Docker |
+| `JWT_SECRET` | Signature des jetons — **obligatoire en production** (≥ 32 caractères) | — |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée du jeton d'accès | `60` |
+| `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
+| `AI_API_KEY` | Clé du fournisseur choisi | vide |
+| `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
+| `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote le découpage des scénarios | `8000` |
+| `AI_CREDITS_FREE/PRO/PRODUCER` | Quotas mensuels par offre | `1` / `300` / `500` |
+| `RATE_LIMIT_AUTH_PER_MINUTE` | Limitation sur les routes d'authentification | `10` |
+| `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
+| `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
+| `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
+| `NEXT_PUBLIC_API_URL` | URL de l'API vue par le navigateur | `http://localhost:8000` |
+
+**Aucune clé API réelle ne doit être commitée.** `.env` est ignoré par git.
+
+---
+
+## 5. Lancement avec Docker
+
+```bash
+docker compose up --build
+```
+
+| Service | URL |
+| --- | --- |
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Documentation OpenAPI | http://localhost:8000/docs |
+| n8n | http://localhost:5678 |
+| PostgreSQL | `localhost:5432` |
+
+Le service `backend` applique les migrations Alembic au démarrage.
+
+Pour créer les données de démonstration :
+
+```bash
+docker compose exec backend python -m scripts.seed
+```
+
+---
+
+## 6. Lancement du backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate   # Windows : .venv\Scripts\activate
+pip install -r requirements-dev.txt
+cp ../.env.example .env        # puis ajustez DATABASE_URL
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+L'API écoute sur `http://localhost:8000`. La documentation OpenAPI est générée
+automatiquement sur `/docs` (Swagger) et `/redoc`.
+
+Pour un essai sans PostgreSQL, `DATABASE_URL=sqlite:///./dev.db` fonctionne (usage local
+uniquement).
+
+---
+
+## 7. Lancement du frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Interface sur `http://localhost:3000`. `NEXT_PUBLIC_API_URL` doit pointer vers l'API.
+
+Commandes utiles : `npm run build`, `npm run typecheck`, `npm run lint`.
+
+---
+
+## 8. Migrations de base de données
+
+```bash
+cd backend
+alembic upgrade head                                   # appliquer
+alembic revision --autogenerate -m "description"       # créer après modification des modèles
+alembic downgrade -1                                   # revenir d'une version
+```
+
+Les modèles SQLAlchemy sont la source de vérité du schéma ; Alembic en dérive les migrations.
+
+---
+
+## 9. Données de démonstration
+
+```bash
+cd backend
+python -m scripts.seed           # crée les données si absentes
+python -m scripts.seed --reset   # les supprime puis les recrée
+```
+
+| Compte | Identifiants | Offre |
+| --- | --- | --- |
+| Auteur | `auteur.demo@filmfundafrica.test` / `Demo2026!` | Pro Auteur |
+| Producteur | `producteur.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
+| Admin | `admin.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
+
+Le seed crée 3 projets et 3 opportunités **fictives**, marquées `is_demo=true`, au statut
+`UNVERIFIED`, et portant la mention `DEMO DATA — NOT REAL` dans leur description. L'interface
+les affiche avec ce marquage. Elles ne doivent jamais être présentées comme de véritables
+dispositifs de financement.
+
+---
+
+## 10. Configuration de l'IA
+
+Le code métier n'appelle jamais un fournisseur directement :
+
+```text
+AIService
+   └── AIProvider
+        ├── AnthropicProvider   (API Messages)
+        ├── OpenAIProvider      (Chat Completions)
+        └── MockProvider        (déterministe, hors ligne)
+```
+
+Pour activer une génération réelle :
+
+```bash
+AI_PROVIDER=anthropic
+AI_API_KEY=sk-...
+AI_MODEL=claude-sonnet-4-5
+```
+
+**Prompts versionnés** — un module par document dans `backend/app/prompts/`, chacun portant un
+numéro de version enregistré dans `document_versions` et `ai_usage`. Aucun prompt n'est écrit
+dans une route API. Chaque prompt reçoit le contexte structuré du projet **et** les documents
+dont il dépend : la note de réalisation voit la note d'intention et le synopsis, le scénario
+voit le traitement.
+
+**Scénarios longs** — un long métrage de 110 pages représente environ 21 000 mots, bien au-delà
+de ce qu'un appel unique produit. `screenplay_service.py` découpe donc l'écriture en passes
+successives suivant la structure en trois actes, chaque passe recevant la fin de la précédente
+pour la continuité (personnages, lieux, numérotation des séquences). Chaque passe consomme un
+crédit, et l'interface annonce le coût avant de lancer la génération.
+
+La durée réalisable dépend de `AI_MAX_OUTPUT_TOKENS` : avec la valeur par défaut (8000), un
+scénario va jusqu'à **138 minutes**. Au-delà, l'API refuse explicitement plutôt que de renvoyer
+un scénario tronqué, et l'interface n'offre que les durées réellement productibles — elle
+interroge `GET /api/v1/documents/screenplay-capacity` au lieu de dupliquer la règle.
+
+**Crédits IA** — l'usage n'est jamais illimité. Les quotas, les prix et les fonctionnalités
+incluses (dont l'export) sont stockés en base et modifiables depuis l'administration
+(`PUT /api/v1/admin/plans/{code}`), jamais codés en dur.
+
+---
+
+## 11. Configuration de n8n
+
+n8n est démarré par Docker Compose sur `http://localhost:5678` et atteint l'API sur
+`http://backend:8000`. Les workflows d'exemple sont dans `n8n/workflows/`.
+
+Les tâches planifiées exposées par le backend (`backend/app/workers/tasks.py`) sont
+idempotentes et appelables en ligne de commande ou depuis n8n :
+
+```bash
+python -c "from app.workers.tasks import notify_upcoming_deadlines; print(notify_upcoming_deadlines())"
+python -c "from app.workers.tasks import reset_monthly_credits; print(reset_monthly_credits())"
+```
+
+---
+
+## 12. Tests
+
+```bash
+cd frontend
+npm run typecheck
+npm run build
+```
+
+```bash
+cd backend
+pytest                    # 68 tests
+ruff check .              # lint
+```
+
+Couverture : inscription, connexion, rafraîchissement et réinitialisation de mot de passe,
+**révocation des sessions au changement de mot de passe**, non-énumération à la connexion,
+refus de démarrage avec une configuration de production non sécurisée, **non-contournement de
+la limitation de débit par `X-Forwarded-For`**, CRUD projets, **isolation stricte des données
+entre utilisateurs**, quotas de projets et de crédits, **export réservé aux offres qui
+l'incluent**, génération IA, cohérence inter-documents, découpage des scénarios longs,
+versioning et restauration, exports PDF/DOCX/ZIP, contrôle d'accès administrateur.
+
+---
+
+## 13. Déploiement
+
+L'application est conçue pour un hébergement conteneurisé :
+
+1. Provisionner PostgreSQL (Supabase, Neon ou instance gérée) et renseigner `DATABASE_URL`.
+2. Définir `ENVIRONMENT=production`, `DEBUG=false`, un `JWT_SECRET` fort et `CORS_ORIGINS`
+   avec le domaine réel du frontend. **L'application refuse de démarrer** si le secret est
+   absent, trop court ou resté à sa valeur de développement, si `DEBUG` est actif, ou si un
+   fournisseur d'IA est configuré sans clé.
+3. Construire et publier les images `backend/` et `frontend/`.
+4. Appliquer les migrations : `alembic upgrade head`.
+5. Servir le frontend derrière HTTPS, avec `NEXT_PUBLIC_API_URL` pointant sur l'API publique.
+
+Derrière un proxy inverse, renseignez `TRUSTED_PROXY_IPS` avec son adresse : sans cela
+l'en-tête `X-Forwarded-For` est ignoré (et la limitation de débit s'applique à l'IP du proxy).
+
+**À faire avant une mise en production réelle** : la limitation de débit est en mémoire
+(mono-instance) — la basculer sur Redis pour plusieurs répliques ; brancher Sentry et un
+stockage d'objets si les utilisateurs téléversent des fichiers.
+
+---
+
+## 14. Règles produit non négociables
+
+Ces règles sont implémentées, testées, et ne doivent pas être contournées :
+
+- **L'IA n'invente rien.** Ni personnage, ni événement, ni lieu réel, ni financement, ni
+  condition de candidature. Une information absente produit « Information non fournie. » et
+  apparaît dans la section « Informations à compléter » du document.
+- **Aucune opportunité n'est présentée comme active sans sa source** (`source_url`,
+  `source_name`) et sa date de dernière vérification (`last_verified_at`).
+- **Le score de compatibilité est un indicateur d'aide à la décision**, jamais une garantie de
+  financement. Le score de maturité mesure l'avancement du dossier, pas sa qualité artistique.
+- **Les données de démonstration sont marquées comme telles** et ne sont jamais présentées
+  comme réelles.
+- **Un utilisateur n'accède jamais aux projets d'un autre.** L'API renvoie 404 (et non 403) pour
+  ne pas divulguer l'existence d'une ressource.
+- **Changer ou réinitialiser son mot de passe révoque toutes les sessions ouvertes**, jetons de
+  rafraîchissement compris : la réinitialisation remédie réellement à un compte compromis.
+- **Le jeton de réinitialisation n'est jamais renvoyé par l'API** en dehors de l'environnement
+  `development`.
+- **Aucun secret dans le dépôt.** Toutes les clés passent par des variables d'environnement, et
+  la configuration de production est validée au démarrage.
+
+---
+
+## Licence
+
+MIT — voir [LICENSE](LICENSE).

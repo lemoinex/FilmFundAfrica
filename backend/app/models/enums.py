@@ -1,0 +1,120 @@
+"""Enumerations metier partagees entre modeles, schemas et prompts."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class UserType(StrEnum):
+    AUTHOR = "AUTHOR"
+    DIRECTOR = "DIRECTOR"
+    PRODUCER = "PRODUCER"
+    INSTITUTION = "INSTITUTION"
+    ADMIN = "ADMIN"
+
+
+class ProjectType(StrEnum):
+    DOCUMENTARY = "DOCUMENTARY"
+    FEATURE_FILM = "FEATURE_FILM"
+    SHORT_FILM = "SHORT_FILM"
+    TV_SERIES = "TV_SERIES"
+    WEB_SERIES = "WEB_SERIES"
+    ANIMATION = "ANIMATION"
+
+
+class ProjectStatus(StrEnum):
+    IDEA = "IDEA"
+    DEVELOPMENT = "DEVELOPMENT"
+    WRITING = "WRITING"
+    PRE_PRODUCTION = "PRE_PRODUCTION"
+    PRODUCTION = "PRODUCTION"
+    POST_PRODUCTION = "POST_PRODUCTION"
+    COMPLETED = "COMPLETED"
+
+
+class DocumentType(StrEnum):
+    LOGLINE = "LOGLINE"
+    SHORT_SYNOPSIS = "SHORT_SYNOPSIS"
+    LONG_SYNOPSIS = "LONG_SYNOPSIS"
+    INTENT_NOTE = "INTENT_NOTE"
+    DIRECTING_NOTE = "DIRECTING_NOTE"
+    TREATMENT = "TREATMENT"
+    CHARACTER_SHEET = "CHARACTER_SHEET"
+    ORAL_PITCH = "ORAL_PITCH"
+    WRITTEN_PITCH = "WRITTEN_PITCH"
+    SERIES_BIBLE = "SERIES_BIBLE"
+    SCREENPLAY = "SCREENPLAY"
+
+
+#: Sous-ensemble des documents generables par l'IA a ce stade du MVP.
+GENERATABLE_DOCUMENTS: frozenset[DocumentType] = frozenset(DocumentType)
+
+
+class DocumentStatus(StrEnum):
+    DRAFT = "DRAFT"
+    IN_REVIEW = "IN_REVIEW"
+    FINAL = "FINAL"
+
+
+class FundingCategory(StrEnum):
+    FUND = "FUND"
+    GRANT = "GRANT"
+    RESIDENCY = "RESIDENCY"
+    FESTIVAL = "FESTIVAL"
+    LAB = "LAB"
+    WORKSHOP = "WORKSHOP"
+    COPRODUCTION = "COPRODUCTION"
+    BURSARY = "BURSARY"
+    PITCHING_FORUM = "PITCHING_FORUM"
+
+
+class FundingStatus(StrEnum):
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+    UPCOMING = "UPCOMING"
+    UNVERIFIED = "UNVERIFIED"
+
+
+class PlanCode(StrEnum):
+    FREE = "FREE"
+    PRO_AUTHOR = "PRO_AUTHOR"
+    PRODUCER = "PRODUCER"
+
+
+class SubscriptionStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"
+
+
+class NotificationType(StrEnum):
+    NEW_OPPORTUNITY = "NEW_OPPORTUNITY"
+    DEADLINE_SOON = "DEADLINE_SOON"
+    INCOMPLETE_FILE = "INCOMPLETE_FILE"
+    MATCH_FOUND = "MATCH_FOUND"
+    SYSTEM = "SYSTEM"
+
+
+class BudgetCategory(StrEnum):
+    DEVELOPMENT = "DEVELOPMENT"
+    PRE_PRODUCTION = "PRE_PRODUCTION"
+    PRODUCTION = "PRODUCTION"
+    POST_PRODUCTION = "POST_PRODUCTION"
+    DISTRIBUTION = "DISTRIBUTION"
+
+
+class FundingSourceType(StrEnum):
+    PRODUCER = "PRODUCER"
+    PUBLIC_FUND = "PUBLIC_FUND"
+    TELEVISION = "TELEVISION"
+    COPRODUCER = "COPRODUCER"
+    INVESTOR = "INVESTOR"
+    SPONSOR = "SPONSOR"
+    OTHER = "OTHER"
+
+
+class AIOperation(StrEnum):
+    GENERATE_DOCUMENT = "GENERATE_DOCUMENT"
+    IMPROVE_DOCUMENT = "IMPROVE_DOCUMENT"
+    SCORE_PROJECT = "SCORE_PROJECT"
+    MATCH_FUNDING = "MATCH_FUNDING"

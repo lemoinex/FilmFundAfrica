@@ -1,0 +1,68 @@
+{
+  "name": "FilmFund — Alertes échéances",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 6 * * *" }]
+        }
+      },
+      "id": "schedule",
+      "name": "Chaque jour à 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://backend:8000/health",
+        "options": {}
+      },
+      "id": "healthcheck",
+      "name": "API disponible ?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "gate",
+      "name": "Statut OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd /app && python -c \"from app.workers.tasks import notify_upcoming_deadlines, notify_incomplete_projects; print(notify_upcoming_deadlines(), notify_incomplete_projects())\""
+      },
+      "id": "run-tasks",
+      "name": "Notifications (échéances + dossiers incomplets)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [920, 240],
+      "notes": "Nécessite que n8n puisse exécuter des commandes dans le conteneur backend. En production, préférer une route API protégée ou un cron applicatif."
+    }
+  ],
+  "connections": {
+    "Chaque jour à 06:00": { "main": [[{ "node": "API disponible ?", "type": "main", "index": 0 }]] },
+    "API disponible ?": { "main": [[{ "node": "Statut OK", "type": "main", "index": 0 }]] },
+    "Statut OK": {
+      "main": [[{ "node": "Notifications (échéances + dossiers incomplets)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "filmfund" }]
+}

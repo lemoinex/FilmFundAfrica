@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-950 text-slatey-100 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    @apply bg-brass-400/30 text-brass-50;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brass-400/70 ring-offset-2 ring-offset-ink-950;
+  }
+
+  input,
+  textarea,
+  select {
+    @apply bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 text-slatey-100
+           placeholder:text-slatey-500 transition-colors;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply border-brass-500;
+  }
+
+  textarea {
+    @apply leading-relaxed;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm
+           font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brass-400 text-ink-950 hover:bg-brass-300 active:bg-brass-500;
+  }
+
+  .btn-secondary {
+    @apply btn border border-ink-600 bg-ink-800 text-slatey-100 hover:border-ink-500 hover:bg-ink-700;
+  }
+
+  .btn-ghost {
+    @apply btn text-slatey-300 hover:bg-ink-800 hover:text-slatey-100;
+  }
+
+  .btn-danger {
+    @apply btn border border-signal-danger/40 text-signal-danger hover:bg-signal-danger/10;
+  }
+
+  .card {
+    @apply rounded-xl border border-ink-700 bg-ink-900 shadow-card;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slatey-200;
+  }
+
+  .hint {
+    @apply mt-1.5 text-xs text-slatey-400;
+  }
+
+  .field {
+    @apply w-full;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-brass-300;
+  }
+
+  /* Rendu Markdown des documents générés. */
+  .prose-doc {
+    @apply text-[15px] leading-[1.75] text-slatey-200;
+  }
+  .prose-doc h1 {
+    @apply mb-4 mt-8 font-display text-2xl font-semibold text-slatey-100 first:mt-0;
+  }
+  .prose-doc h2 {
+    @apply mb-3 mt-7 border-b border-ink-700 pb-1.5 font-display text-xl font-semibold text-slatey-100;
+  }
+  .prose-doc h3 {
+    @apply mb-2 mt-5 text-base font-semibold text-brass-200;
+  }
+  .prose-doc h4 {
+    @apply mb-2 mt-4 text-sm font-semibold uppercase tracking-wide text-slatey-300;
+  }
+  .prose-doc p {
+    @apply mb-3.5;
+  }
+  .prose-doc ul {
+    @apply mb-3.5 list-disc space-y-1.5 pl-5 marker:text-brass-400;
+  }
+  .prose-doc ol {
+    @apply mb-3.5 list-decimal space-y-1.5 pl-5 marker:text-brass-400;
+  }
+  .prose-doc blockquote {
+    @apply my-4 rounded-r border-l-2 border-brass-500 bg-ink-800/60 py-2.5 pl-4 pr-3 text-sm text-slatey-300;
+  }
+  .prose-doc strong {
+    @apply font-semibold text-slatey-100;
+  }
+  .prose-doc em {
+    @apply italic text-slatey-300;
+  }
+  .prose-doc hr {
+    @apply my-6 border-ink-700;
+  }
+}
+
+@layer utilities {
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-800;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r
+           from-transparent via-ink-700/60 to-transparent;
+    content: "";
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "FilmFund — Veille financements (squelette Phase 6)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 4 * * 1" }] }
+      },
+      "id": "schedule",
+      "name": "Chaque lundi à 04:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://exemple-source-a-remplacer.org/appels.rss",
+        "options": {}
+      },
+      "id": "source",
+      "name": "Source (RSS / API / crawler)",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [420, 300],
+      "notes": "À remplacer par les sources réelles : fonds nationaux, institutions régionales, festivals, laboratoires."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraction et nettoyage.\n// Conserve impérativement l'URL de la source : une opportunité sans source\n// ne doit jamais être écrite en base.\nreturn items.map((item) => ({\n  json: {\n    name: (item.json.title || '').trim(),\n    description: (item.json.contentSnippet || '').trim(),\n    source_url: item.json.link,\n    source_name: 'À renseigner',\n    fetched_at: new Date().toISOString(),\n  },\n}));"
+      },
+      "id": "clean",
+      "name": "Extraction + nettoyage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classification IA : catégorie, pays éligibles, types de projet, montants, date limite.\n// Sortie systématiquement au statut UNVERIFIED : une validation humaine reste requise.\nreturn items.map((item) => ({\n  json: { ...item.json, status: 'UNVERIFIED', is_demo: false },\n}));"
+      },
+      "id": "classify",
+      "name": "Classification IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300],
+      "notes": "Brancher ici l'appel au fournisseur IA configuré. Ne jamais laisser l'IA inventer une date limite, un montant ou une condition : champ vide si absent de la source."
+    },
+    {
+      "parameters": {},
+      "id": "review",
+      "name": "Validation humaine (à brancher)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1080, 300],
+      "notes": "Étape obligatoire avant publication : une opportunité ne passe au statut OPEN qu'après relecture."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://backend:8000/api/v1/admin/funding",
+        "sendBody": true,
+        "options": {}
+      },
+      "id": "store",
+      "name": "Écriture en base (route Phase 3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300],
+      "notes": "La route d'administration des opportunités arrive en Phase 3."
+    }
+  ],
+  "connections": {
+    "Chaque lundi à 04:00": { "main": [[{ "node": "Source (RSS / API / crawler)", "type": "main", "index": 0 }]] },
+    "Source (RSS / API / crawler)": { "main": [[{ "node": "Extraction + nettoyage", "type": "main", "index": 0 }]] },
+    "Extraction + nettoyage": { "main": [[{ "node": "Classification IA", "type": "main", "index": 0 }]] },
+    "Classification IA": { "main": [[{ "node": "Validation humaine (à brancher)", "type": "main", "index": 0 }]] },
+    "Validation humaine (à brancher)": { "main": [[{ "node": "Écriture en base (route Phase 3)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "filmfund" }]
+}
