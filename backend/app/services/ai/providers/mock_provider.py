@@ -39,7 +39,10 @@ class MockProvider(AIProvider):
         except json.JSONDecodeError:
             context = {}
 
-        title = context.get("title") or "Projet sans titre"
+        # `PromptContext.to_dict()` indexe par libelle affichable (« Titre »),
+        # pas par nom d'attribut : chercher "title" renvoyait toujours le repli,
+        # et tout document produit en mode `mock` s'intitulait « sans titre ».
+        title = context.get("Titre") or context.get("title") or "Projet sans titre"
         document_label = request.metadata.get("document_label", "Document")
 
         parts: list[str] = [f"# {document_label} — {title}", "", BANNER, ""]

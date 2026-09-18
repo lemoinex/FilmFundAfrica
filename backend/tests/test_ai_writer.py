@@ -373,6 +373,19 @@ def test_missing_information_is_extracted():
     assert AIService.extract_missing_information("## Synopsis\n\nUn récit.") == []
 
 
+def test_mock_provider_titles_the_document_with_the_real_project(
+    client, auth_headers, project
+):
+    """Le contexte est indexé par libellé (« Titre ») et non par attribut.
+
+    Chercher la mauvaise clé faisait intituler « Projet sans titre » tous les
+    documents produits par le fournisseur par défaut.
+    """
+    content = job_result(_generate(client, auth_headers, project["id"]))["document"]["content"]
+    assert project["title"] in content.splitlines()[0]
+    assert "Projet sans titre" not in content
+
+
 def test_mock_provider_never_invents_content(client, auth_headers, project):
     content = job_result(_generate(client, auth_headers, project["id"]))["document"]["content"]
     assert "MODE `mock`" in content

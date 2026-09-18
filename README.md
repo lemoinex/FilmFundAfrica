@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          181 tests (pytest)
+│   └── tests/          182 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -373,15 +373,23 @@ python -c "from app.workers.tasks import reset_monthly_credits; print(reset_mont
 cd frontend
 npm run typecheck
 npm run build
+npm run test:e2e           # 12 parcours de bout en bout (Playwright)
 ```
+
+Les tests de bout en bout démarrent eux-mêmes une API jetable (SQLite neuve,
+`AI_PROVIDER=mock`) et le frontend : il n'y a rien à lancer avant. Ils supposent seulement
+que les dépendances Python du backend sont installées ; `E2E_PYTHON` permet de désigner
+l'interpréteur à utiliser (`E2E_PYTHON=backend/.venv/bin/python npm run test:e2e`). Le
+navigateur s'installe une fois avec `npx playwright install chromium`, ou `PLAYWRIGHT_CHROMIUM_PATH`
+pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 181 tests
+pytest                    # 182 tests
 ruff check .              # lint
 ```
 
-Couverture : inscription en deux temps et **non-énumération des comptes à l'inscription**,
+Couverture, côté API : inscription en deux temps et **non-énumération des comptes à l'inscription**,
 connexion, rafraîchissement et réinitialisation de mot de passe,
 **révocation des sessions au changement de mot de passe**, non-énumération à la connexion,
 refus de démarrage avec une configuration de production non sécurisée, **non-contournement de
@@ -393,6 +401,11 @@ exports PDF/DOCX/ZIP/XLSX, **budget et plan de financement** (trame par type de 
 totaux recalculés, couverture acquise contre espérée), contrôle d'accès administrateur,
 **limitation de débit partagée entre répliques**, **génération asynchrone** (réserve des
 crédits, remboursement en cas d'échec, avancement par passe, reprise des tâches perdues).
+
+Couverture, côté navigateur : inscription → confirmation d'adresse → connexion, non-énumération
+visible à l'écran, création de projet, génération d'un document et ouverture dans l'éditeur,
+limites d'offre (projets, crédits, export), installation de la trame de budget, chiffrage d'un
+poste et couverture du plan de financement.
 
 ---
 

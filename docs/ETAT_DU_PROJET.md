@@ -194,6 +194,11 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 - Next.js 14 (App Router), TypeScript strict, Tailwind. 19 routes, build de production
   vérifié, `tsc --noEmit` sans erreur.
+- **12 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
+  neuve : inscription → confirmation d'adresse → connexion, non-énumération visible à l'écran,
+  création de projet, génération d'un document puis ouverture dans l'éditeur, limites d'offre
+  (projets, crédits, export), trame de budget et couverture du plan de financement. Ils
+  démarrent eux-mêmes les deux serveurs : `npm run test:e2e`.
 - Landing page complète en dix sections (problème, solution, AI Writer, Funding Intelligence,
   matching, budget, pour qui, tarifs, FAQ, CTA final).
 - Direction artistique sobre : encre profonde, accent laiton, typographie display pour les
@@ -202,7 +207,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **181 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **182 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -238,25 +243,25 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 1. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-2. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
-   aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
-   dette à combler.
-3. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
+2. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
    une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
    entre deux passes, non implémenté.
-4. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
+3. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
    désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
    seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc
    obligatoire dès qu'on quitte le poste de développement, où le jeton reste renvoyé par l'API.
-5. **Budget : aucun repère de prix** — la trame donne les postes, l'auteur cherche les tarifs
+4. **Budget : aucun repère de prix** — la trame donne les postes, l'auteur cherche les tarifs
    ailleurs. Une base de coûts indicative par pays rendrait le chiffrage plus rapide, mais
    suppose des données vérifiées que le produit n'a pas : proposer des montants inventés serait
    pire que ne rien proposer. Le drapeau d'offre `allows_advanced_budget` reste inutilisé — le
    module est ouvert à tous, seul l'export XLSX suit la règle d'offre commune aux exports.
-6. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
+5. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
    désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
    registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
    de dix heures demandera toujours une relecture d'ensemble.
+6. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
+   dans une seule taille de fenêtre. Firefox, WebKit et l'affichage mobile ne sont pas testés ;
+   les ajouter ne demande qu'une ligne de configuration, mais allonge d'autant chaque exécution.
 7. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
@@ -297,12 +302,11 @@ Installation manuelle : sections 6 et 7 du README.
 1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
-2. **Tests frontend** : Playwright sur inscription → projet → génération → export.
-3. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
+2. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
    (mobile money notamment), gestion du cycle d'abonnement.
-4. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
+3. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
    classification → validation humaine → base), notifications par e-mail. Il alimentera la base
    de financements que l'administration remplit aujourd'hui à la main.
-5. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
+4. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
-6. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.
+5. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

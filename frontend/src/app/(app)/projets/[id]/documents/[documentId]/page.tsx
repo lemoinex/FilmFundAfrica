@@ -269,6 +269,7 @@ export default function DocumentEditorPage() {
       <div className="card p-6 sm:p-8">
         {mode === "edit" ? (
           <textarea
+            aria-label="Contenu du document"
             className="field min-h-[60vh] w-full resize-y font-mono text-[13.5px] leading-relaxed"
             value={content}
             onChange={(event) => {

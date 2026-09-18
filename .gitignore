@@ -41,3 +41,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Tests de bout en bout (Playwright)
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/blob-report/
+/backend/.e2e.db
