@@ -258,7 +258,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   langue. Accords, dates, nombres et durées relatives viennent d'`Intl`, pas du catalogue.
   Sélecteur de langue dans l'en-tête, sur les pages d'authentification, sur la page publique
   et dans le profil.
-- **16 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
+- **17 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
   neuve : inscription → confirmation d'adresse → connexion, non-énumération visible à l'écran,
   création de projet, génération d'un document puis ouverture dans l'éditeur, limites d'offre
   (projets, crédits, export), trame de budget et couverture du plan de financement, bascule de
@@ -287,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **271 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **289 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -388,8 +388,9 @@ Installation manuelle : sections 6 et 7 du README.
 1. **Déployer l'application.** Le schéma est en place sur le PostgreSQL managé
    (Supabase, projet `FilmFundAfrica`, migrations jusqu'à `0006`), mais **rien ne s'y
    connecte encore** : il n'existe aucun déploiement. Il manque un hôte pour l'API et le
-   worker — Vercel ne convient qu'au frontend Next.js, pas à un processus long — et
-   `DATABASE_URL` dans son environnement. Voir la section 15 du README.
+   worker, et `DATABASE_URL` dans son environnement. Vercel Services héberge le frontend
+   **et** l'API (voir `deploy/VERCEL.md`) ; ce qu'il n'héberge pas, c'est le worker, un
+   processus long qui ne sert aucune requête. Voir la section 15 du README.
 2. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
@@ -406,9 +407,11 @@ Installation manuelle : sections 6 et 7 du README.
    testé.
 6. **Produit analytics** : le point d'extension est le même que celui de Sentry
    (`app/core/logging.py` et `app/core/observability.py`), mais aucun outil n'y est branché.
-7. **Générer les documents dans la langue du projet.** Interface et API sont bilingues,
-   mais les prompts de l'AI Writer sont écrits en français : un projet anglophone reçoit
-   une interface anglaise et des documents français. C'est le dernier endroit où la langue
-   ne suit pas. Le chantier n'est pas une traduction de chaînes mais une réécriture des
-   onze prompts, avec la relecture d'un professionnel du secteur pour chaque langue — les
-   attentes d'un comité de lecture ne se traduisent pas mot à mot.
+7. **Faire relire les prompts de génération dans chaque langue.** La plomberie est en
+   place : l'AI Writer propose une langue de document, le serveur la transmet au modèle et
+   la retient sur le document, si bien que le retravail repart dans la bonne — « corriger »
+   n'applique plus la typographie française à un texte anglais. Ce qui reste est éditorial
+   et non technique : les onze prompts sont rédigés en français et visent les attentes d'un
+   comité de lecture francophone. Le modèle produit bien de l'anglais, mais un portage
+   sérieux demande de les réécrire et de les faire relire par un professionnel du secteur
+   pour chaque langue — les attentes d'un comité ne se traduisent pas mot à mot.

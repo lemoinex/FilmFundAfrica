@@ -75,7 +75,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          230 tests (pytest)
+│   └── tests/          289 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -400,6 +400,33 @@ La langue affichée est déterminée dans cet ordre :
 3. `Accept-Language` du navigateur, côté API, pour un appelant sans session ;
 4. `DEFAULT_LOCALE`, à défaut.
 
+### La langue des documents générés est un autre réglage
+
+Trois notions de langue coexistent, et les confondre produirait un document dans la
+mauvaise langue :
+
+| Réglage | Ce qu'il désigne | Où |
+| --- | --- | --- |
+| `preferred_locale` | la langue de l'**interface**, par compte | profil |
+| `projects.language` | la langue de l'**œuvre** — un film peut être en wolof | fiche projet |
+| `documents.language` | la langue du **dossier**, celle du texte généré | AI Writer |
+
+Un long métrage en wolof se présente en français à un fonds francophone : la langue du
+dossier ne se déduit donc ni de celle de l'œuvre, ni de celle de l'interface. L'AI Writer
+propose la langue de l'interface — c'est le meilleur indice disponible — et laisse la
+changer à chaque génération.
+
+Le document **retient** la langue dans laquelle il a été rédigé. C'est ce qui permet au
+retravail (« améliorer », « raccourcir », « corriger ») de repartir dans la bonne :
+auparavant il repartait toujours sur le français, et « corriger » appliquait la
+typographie française — espaces insécables, guillemets `« »` — à un texte anglais.
+
+Ce qui reste à faire : les onze prompts de génération sont rédigés en français et visent
+les attentes d'un comité de lecture francophone. Le modèle **produit** bien de l'anglais,
+mais un portage sérieux demande de réécrire ces prompts et de les faire relire par un
+professionnel du secteur pour chaque langue — les attentes d'un comité ne se traduisent
+pas mot à mot.
+
 ### Ajouter une langue
 
 Les catalogues sont dans `frontend/src/lib/i18n/` : `fr.ts` est la langue de référence et
@@ -476,7 +503,7 @@ une erreur remontée se relie aux journaux JSON sans avoir à joindre son conten
 cd frontend
 npm run typecheck
 npm run build
-npm run test:e2e           # 16 parcours de bout en bout (Playwright)
+npm run test:e2e           # 17 parcours de bout en bout (Playwright)
 ```
 
 ### Intégration continue
@@ -503,7 +530,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 230 tests
+pytest                    # 289 tests
 ruff check .              # lint
 ```
 

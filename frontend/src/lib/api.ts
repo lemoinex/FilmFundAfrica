@@ -300,7 +300,10 @@ export const documentApi = {
   ) =>
     request<GenerationJob>(
       `/api/v1/projects/${projectId}/documents/${documentType}/generate`,
-      { method: "POST", body: { language: "fr", overwrite: true, ...payload } },
+      // Pas de langue imposée ici : un « fr » codé en dur rendait le choix de
+      // l'appelant inopérant et produisait des documents français pour un
+      // dossier anglais. Sans valeur, le serveur applique sa propre défaut.
+      { method: "POST", body: { overwrite: true, ...payload } },
     ),
 
   save: (

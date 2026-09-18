@@ -123,6 +123,8 @@ export interface ProjectDocument {
   status: DocumentStatus;
   current_version: number;
   word_count: number;
+  /** Langue de rédaction du document, indépendante de celle de l'interface. */
+  language: string;
   created_at: string;
   updated_at: string;
 }

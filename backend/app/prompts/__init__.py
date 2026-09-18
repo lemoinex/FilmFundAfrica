@@ -16,6 +16,7 @@ from app.prompts import (  # noqa: F401  (imports a effet de bord : enregistreme
     treatment,
 )
 from app.prompts.base import (
+    LANGUAGE_LABELS,
     PROMPT_REGISTRY,
     PromptContext,
     PromptTemplate,
@@ -27,6 +28,7 @@ from app.prompts.funding_match import build_funding_match_prompt
 from app.prompts.scoring import build_analysis_prompt
 
 __all__ = [
+    "LANGUAGE_LABELS",
     "PROMPT_REGISTRY",
     "PromptContext",
     "PromptTemplate",

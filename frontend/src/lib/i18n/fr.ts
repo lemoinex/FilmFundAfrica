@@ -268,7 +268,7 @@ export const fr = {
   "profile.saved": "Profil enregistré.",
   "profile.saveFailed": "Enregistrement impossible.",
   "profile.languageHint":
-    "La langue choisie suit votre compte d'un appareil à l'autre. Elle ne change pas la langue des documents générés.",
+    "La langue choisie suit votre compte d'un appareil à l'autre. Elle sert de langue proposée par défaut pour les documents générés, que vous pouvez changer à chaque génération.",
 
   // --- Offres ---
   "plan.FREE": "Gratuit",
@@ -508,6 +508,9 @@ export const fr = {
     "Soit ~{pages} pages. Un scénario long est écrit en {count} passes successives, chacune reprenant la continuité de la précédente — et coûtant 1 crédit.",
   "writer.maxMinutes":
     " Durée maximale avec la configuration actuelle du serveur : {minutes} minutes.",
+  "writer.documentLanguage": "Langue du document",
+  "writer.documentLanguageHint":
+    "Celle du dossier, pas celle du film : un long métrage en wolof se présente en français à un fonds francophone.",
   "writer.instructions": "Consignes complémentaires (facultatif)",
   "writer.instructionsPlaceholder": "Ton, angle à privilégier, contrainte d'un fonds précis…",
   "writer.generate": "Générer",

@@ -41,6 +41,11 @@ class Document(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     word_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Langue dans laquelle le document est redige, et non celle du projet : un
+    # film en wolof se presente a un fonds francophone en francais. Sans elle,
+    # un retravail repartirait sur la langue par defaut et corrigerait un texte
+    # anglais selon la typographie francaise.
+    language: Mapped[str] = mapped_column(String(2), default="fr", nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="documents")
     versions: Mapped[list[DocumentVersion]] = relationship(

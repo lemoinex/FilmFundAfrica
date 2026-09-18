@@ -339,31 +339,76 @@ def get_prompt(document_type: DocumentType) -> PromptTemplate:
         ) from exc
 
 
-REFINE_INSTRUCTIONS: dict[str, str] = {
-    "IMPROVE": (
-        "Améliore ce document : précision du vocabulaire, clarté des enjeux, force des "
-        "formulations, rythme des paragraphes. Conserve strictement la structure, les faits, "
-        "les noms de personnages et la longueur approximative. N'ajoute aucun élément "
-        "narratif ou factuel absent du texte d'origine."
-    ),
-    "SHORTEN": (
-        "Raccourcis ce document d'environ 30 % en conservant l'intégralité de la structure "
-        "et toutes les informations essentielles. Supprime les redites et les formulations "
-        "creuses, jamais un élément d'information."
-    ),
-    "EXPAND": (
-        "Développe ce document d'environ 40 % en approfondissant ce qui est déjà présent : "
-        "conséquences, nuances, précisions de mise en scène. N'invente aucun personnage, "
-        "événement, lieu réel ni financement qui ne figure pas déjà dans le texte ou le "
-        "contexte du projet ; écris « Information non fournie. » si un développement exigerait "
-        "une information absente."
-    ),
-    "CORRECT": (
-        "Corrige ce document : orthographe, grammaire, conjugaison, typographie française "
-        "(espaces insécables, guillemets « »), cohérence des noms propres et des temps. "
-        "Ne modifie ni le fond, ni la structure, ni le style."
-    ),
+#: Libelle de langue injecte dans « Tu écris en ... », par code de langue.
+LANGUAGE_LABELS: dict[str, str] = {"fr": "français", "en": "anglais"}
+
+DEFAULT_DOCUMENT_LANGUAGE = "fr"
+
+#: Consignes de retravail, par langue du document.
+#:
+#: Seule « CORRECT » differe vraiment d'une langue a l'autre : la typographie
+#: n'est pas la meme, et appliquer les regles francaises a un texte anglais
+#: abimerait ce qu'elle est censee corriger. Les trois autres sont traduites
+#: par coherence — le modele suit mieux une consigne ecrite dans la langue
+#: qu'il doit produire.
+REFINE_INSTRUCTIONS: dict[str, dict[str, str]] = {
+    "fr": {
+        "IMPROVE": (
+            "Améliore ce document : précision du vocabulaire, clarté des enjeux, force des "
+            "formulations, rythme des paragraphes. Conserve strictement la structure, les "
+            "faits, les noms de personnages et la longueur approximative. N'ajoute aucun "
+            "élément narratif ou factuel absent du texte d'origine."
+        ),
+        "SHORTEN": (
+            "Raccourcis ce document d'environ 30 % en conservant l'intégralité de la "
+            "structure et toutes les informations essentielles. Supprime les redites et les "
+            "formulations creuses, jamais un élément d'information."
+        ),
+        "EXPAND": (
+            "Développe ce document d'environ 40 % en approfondissant ce qui est déjà "
+            "présent : conséquences, nuances, précisions de mise en scène. N'invente aucun "
+            "personnage, événement, lieu réel ni financement qui ne figure pas déjà dans le "
+            "texte ou le contexte du projet ; écris « Information non fournie. » si un "
+            "développement exigerait une information absente."
+        ),
+        "CORRECT": (
+            "Corrige ce document : orthographe, grammaire, conjugaison, typographie "
+            "française (espaces insécables, guillemets « »), cohérence des noms propres et "
+            "des temps. Ne modifie ni le fond, ni la structure, ni le style."
+        ),
+    },
+    "en": {
+        "IMPROVE": (
+            "Improve this document: sharpen the vocabulary, clarify what is at stake, "
+            "strengthen the phrasing, vary the rhythm of the paragraphs. Keep the structure, "
+            "the facts, the character names and the approximate length exactly as they are. "
+            "Add no narrative or factual element absent from the original text."
+        ),
+        "SHORTEN": (
+            "Shorten this document by about 30% while keeping the whole structure and every "
+            "essential piece of information. Cut repetitions and hollow phrasing, never a "
+            "piece of information."
+        ),
+        "EXPAND": (
+            "Expand this document by about 40% by deepening what is already there: "
+            "consequences, nuances, staging detail. Invent no character, event, real place "
+            "or funding scheme that is not already in the text or in the project context; "
+            "write “Information not provided.” where expanding would require "
+            "information that is missing."
+        ),
+        "CORRECT": (
+            "Correct this document: spelling, grammar, tenses, English typography (curly "
+            "quotes, no space before punctuation), consistency of proper nouns. Change "
+            "neither the substance, nor the structure, nor the style."
+        ),
+    },
 }
+
+
+def refine_instruction(action: str, locale: str) -> str:
+    """Consigne de retravail, avec repli sur la langue et l'action par défaut."""
+    catalogue = REFINE_INSTRUCTIONS.get(locale, REFINE_INSTRUCTIONS[DEFAULT_DOCUMENT_LANGUAGE])
+    return catalogue.get(action, catalogue["IMPROVE"])
 
 
 def build_refine_prompt(
@@ -372,11 +417,17 @@ def build_refine_prompt(
     content: str,
     context: PromptContext,
     *,
-    language: str = "français",
+    locale: str = DEFAULT_DOCUMENT_LANGUAGE,
     instructions: str | None = None,
 ) -> RenderedPrompt:
-    """Prompt de retravail d'un document existant (boutons de l'éditeur)."""
-    action_instruction = REFINE_INSTRUCTIONS.get(action, REFINE_INSTRUCTIONS["IMPROVE"])
+    """Prompt de retravail d'un document existant (boutons de l'éditeur).
+
+    `locale` est la langue du document retravaillé, relue sur lui : la deviner
+    à partir du projet ou du compte produirait une correction typographique
+    dans la mauvaise langue.
+    """
+    action_instruction = refine_instruction(action, locale)
+    language = LANGUAGE_LABELS.get(locale, LANGUAGE_LABELS[DEFAULT_DOCUMENT_LANGUAGE])
     system_prompt = BASE_SYSTEM_PROMPT.format(
         missing_rule=MISSING_VALUE_RULE,
         language=language,
@@ -410,7 +461,7 @@ def build_refine_prompt(
         user_prompt="\n".join(blocks),
         outline=[],
         prompt_name=f"refine_{action.lower()}",
-        prompt_version="1.0.0",
+        prompt_version="1.1.0",
         document_label=document_label,
         max_output_tokens=max(2000, min(int(len(content.split()) * 3.2), 32000)),
         temperature=0.4,

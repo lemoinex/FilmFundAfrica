@@ -20,7 +20,7 @@ from app.models.document import Document, DocumentVersion
 from app.models.enums import AIOperation, DocumentStatus, DocumentType
 from app.models.project import Project
 from app.models.user import User
-from app.prompts import PromptContext, build_refine_prompt, get_prompt
+from app.prompts import LANGUAGE_LABELS, PromptContext, build_refine_prompt, get_prompt
 from app.repositories.document import DocumentRepository, DocumentVersionRepository
 from app.schemas.document import (
     DocumentRead,
@@ -41,8 +41,6 @@ from app.services.screenplay_service import (
 )
 
 logger = logging.getLogger("filmfund.documents")
-
-LANGUAGE_LABELS = {"fr": "français", "en": "anglais"}
 
 ORIGIN_BY_ACTION = {
     "IMPROVE": "AI_IMPROVE",
@@ -164,7 +162,8 @@ class DocumentService:
         passes = self.prepare_generation(project, document_type, payload)
         segments = self._plan_segments(project, document_type, payload)
 
-        language = LANGUAGE_LABELS.get(payload.language or "fr", "français")
+        locale = payload.language or "fr"
+        language = LANGUAGE_LABELS.get(locale, LANGUAGE_LABELS["fr"])
         context = self.build_context(project, document_type)
 
         cost = (
@@ -215,6 +214,7 @@ class DocumentService:
             origin="AI_GENERATE",
             prompt_version=prompt_version,
             ai_model=telemetry.model,
+            language=locale,
         )
 
         consumed = self.credits.record_usage(
@@ -375,6 +375,7 @@ class DocumentService:
             document.title,
             document.content,
             self.build_context(project, document.document_type),
+            locale=document.language,
             instructions=payload.instructions,
         )
 
@@ -495,6 +496,7 @@ class DocumentService:
         origin: str,
         prompt_version: str | None = None,
         ai_model: str | None = None,
+        language: str | None = None,
     ) -> Document:
         document = self.documents.get_by_type(project.id, document_type)
         if document is None:
@@ -508,6 +510,12 @@ class DocumentService:
             )
             self.documents.add(document)
             self.db.flush()
+
+        if language is not None:
+            # Une regeneration dans une autre langue remplace le contenu : la
+            # langue retenue doit suivre, sinon le retravail suivant repartirait
+            # sur celle de la premiere generation.
+            document.language = language
 
         self._store_version(
             document,

@@ -8,6 +8,7 @@ import { Alert, Badge, SectionHeading, SkeletonCard, Spinner } from "@/component
 import { ApiError, documentApi, projectApi, waitForJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n";
+import { LOCALE_NAMES, LOCALES, type Locale } from "@/lib/i18n/locale";
 import { DURATION_PRESETS } from "@/lib/labels";
 import type {
   DocumentSummary,
@@ -35,7 +36,7 @@ const RECOMMENDED_ORDER: DocumentType[] = [
 ];
 
 export default function AiWriterPage() {
-  const { t, tn, formatRelative } = useI18n();
+  const { t, tn, formatRelative, locale } = useI18n();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { setCredits, user } = useAuth();
@@ -47,6 +48,10 @@ export default function AiWriterPage() {
   const [selected, setSelected] = useState<DocumentType>("SHORT_SYNOPSIS");
   const [duration, setDuration] = useState<string>("");
   const [instructions, setInstructions] = useState("");
+  // Pre-remplie avec la langue de l'interface, qui est le meilleur indice
+  // dont on dispose — mais un auteur francophone peut monter un dossier en
+  // anglais, donc elle reste modifiable a chaque generation.
+  const [docLanguage, setDocLanguage] = useState<Locale>(locale);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState<GenerationJob | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
@@ -119,6 +124,7 @@ export default function AiWriterPage() {
       // La génération est une tâche : l'API l'accepte, le serveur l'exécute,
       // et l'on suit son avancement au lieu de tenir une requête ouverte.
       const job = await documentApi.generate(id, selected, {
+        language: docLanguage,
         target_duration_minutes: isScreenplay && duration ? Number(duration) : null,
         additional_instructions: instructions.trim() || null,
         overwrite: true,
@@ -269,6 +275,28 @@ export default function AiWriterPage() {
                 </p>
               </div>
             ) : null}
+
+            <div className="mt-5">
+              <span className="label">{t("writer.documentLanguage")}</span>
+              <div className="flex flex-wrap gap-2">
+                {LOCALES.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setDocLanguage(code)}
+                    aria-pressed={docLanguage === code}
+                    className={
+                      docLanguage === code
+                        ? "btn-primary px-3 py-1.5 text-xs"
+                        : "btn-secondary px-3 py-1.5 text-xs"
+                    }
+                  >
+                    {LOCALE_NAMES[code]}
+                  </button>
+                ))}
+              </div>
+              <p className="hint">{t("writer.documentLanguageHint")}</p>
+            </div>
 
             <div className="mt-5">
               <label className="label" htmlFor="instructions">

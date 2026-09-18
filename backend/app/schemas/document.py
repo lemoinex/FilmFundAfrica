@@ -22,6 +22,9 @@ class DocumentRead(ORMModel):
     status: DocumentStatus
     current_version: int
     word_count: int
+    # Langue de rédaction : l'éditeur la réaffiche pour que l'auteur sache dans
+    # quelle langue « corriger » va travailler.
+    language: str
     created_at: datetime
     updated_at: datetime
 
@@ -34,6 +37,7 @@ class DocumentSummary(ORMModel):
     status: DocumentStatus
     current_version: int
     word_count: int
+    language: str
     updated_at: datetime
 
 

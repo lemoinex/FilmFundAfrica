@@ -264,7 +264,7 @@ export const en: Record<MessageKey, string> = {
   "profile.saved": "Profile saved.",
   "profile.saveFailed": "Could not save.",
   "profile.languageHint":
-    "The language you choose follows your account from one device to the next. It does not change the language of generated documents.",
+    "The language you choose follows your account from one device to the next. It is the language offered by default for generated documents, and you can change it at each generation.",
 
   // --- Plans ---
   "plan.FREE": "Free",
@@ -499,6 +499,9 @@ export const en: Record<MessageKey, string> = {
   "writer.passesHint_other":
     "That is ~{pages} pages. A long screenplay is written in {count} successive passes, each picking up the continuity of the one before — and each costing 1 credit.",
   "writer.maxMinutes": " Maximum length with the server's current settings: {minutes} minutes.",
+  "writer.documentLanguage": "Document language",
+  "writer.documentLanguageHint":
+    "The language of the application pack, not of the film: a feature in Wolof is pitched in French to a francophone fund.",
   "writer.instructions": "Additional instructions (optional)",
   "writer.instructionsPlaceholder": "Tone, angle to favour, a specific fund's requirement…",
   "writer.generate": "Generate",
