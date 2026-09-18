@@ -586,8 +586,9 @@ Quatre services : l'API, le worker de génération, le frontend et Redis.
   éphémère).
 * **[Vercel](deploy/VERCEL.md)** — `vercel.json` déclare le frontend et l'API comme deux
   services d'un même domaine, ce qui supprime toute question de CORS. Mais **Vercel
-  n'héberge pas le worker** : sans lui, l'API génère pendant la requête, et un scénario
-  long dépasse le plafond de durée. Le fichier détaille les trois façons de s'en sortir.
+  n'héberge pas le worker** : sans lui, l'API génère pendant la requête, et un long métrage
+  demande jusqu'à huit passes — vingt-quatre minutes de requête ouverte dans le pire des
+  cas. Le fichier détaille le calcul et les trois façons de s'en sortir.
 
 L'application est conçue pour un hébergement conteneurisé :
 

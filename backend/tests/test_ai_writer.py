@@ -392,3 +392,17 @@ def test_mock_provider_never_invents_content(client, auth_headers, project):
     assert "Information non fournie." in content
     # Le seul personnage present est celui saisi par l'utilisateur.
     assert "Fatou Sow" in content
+
+
+@pytest.mark.parametrize(
+    ("minutes", "passes"),
+    [(17, 1), (26, 3), (30, 3), (52, 4), (90, 7), (120, 8)],
+)
+def test_documented_pass_counts_stay_true(minutes, passes):
+    """`deploy/VERCEL.md` chiffre l'attente d'une generation pendant la requete.
+
+    Ces nombres viennent du decoupage reel, pas d'une estimation : les figer ici
+    evite qu'un ajustement du budget de sortie ou de la repartition par acte ne
+    rende le guide de deploiement faux sans que rien ne le signale.
+    """
+    assert len(plan_segments(minutes, max_tokens_per_call=8000)) == passes

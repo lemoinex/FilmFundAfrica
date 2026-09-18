@@ -42,20 +42,39 @@ inter-origines : le frontend appelle l'API sur son propre domaine, et CORS ne se
 **Vercel n'héberge pas le worker.** C'est un processus long qui ne sert aucune requête
 HTTP ; rien dans le modèle de Vercel ne lui correspond. Sans lui et sans `REDIS_URL`,
 l'application bascule sur son mode de repli documenté : **l'API génère elle-même, pendant
-la requête**. Ce mode existe et fonctionne — mais il est alors borné par `maxDuration`.
+la requête**. Ce mode existe et fonctionne — mais la requête reste alors ouverte le temps
+de toute la génération.
 
-Conséquence concrète, par type de document :
+Combien de temps, exactement ? Le découpage est déterministe : `plan_segments` répartit
+les pages par acte, une page par minute, et `AI_MAX_OUTPUT_TOKENS` (8000) fixe ce qu'une
+passe peut écrire — 17 pages. Chaque passe est bornée par `AI_TIMEOUT_SECONDS` (180 s).
+Les nombres ci-dessous sortent de ce calcul, pas d'une estimation :
 
-| Document | Passes | Tient dans une requête ? |
+| Document | Passes | Pire cas |
 | --- | --- | --- |
-| Logline, synopsis, notes, pitch, bible | 1 | oui |
-| Scénario court (10 à 30 min) | 1 à 3 | oui |
-| Scénario long (90 à 120 min) | 8 à 12, jusqu'à 180 s chacune | **non** — dépasse le plafond |
+| Logline, synopsis, notes, pitch, bible | 1 | 180 s |
+| Scénario jusqu'à 17 min | 1 | 180 s |
+| Scénario 26 ou 30 min | 3 | 540 s |
+| Scénario 52 min | 4 | 720 s |
+| Scénario 90 min | 7 | 1 260 s — 21 min |
+| Scénario 120 min | 8 | 1 440 s — 24 min |
+
+C'est un pire cas : il suppose que chaque appel va au bout de son délai de garde. Le
+plafond `maxDuration` de Vercel dépend du plan, et je n'ai pas pu le vérifier depuis ici —
+la documentation en ligne n'est pas joignable dans cet environnement. Ses propres exemples
+vont jusqu'à `1800`, ce qui logerait un long métrage ; **à confirmer sur le plan retenu
+avant de s'y fier.**
+
+Mais le plafond n'est pas le seul argument, ni le meilleur. Tenir une requête HTTP ouverte
+vingt minutes est fragile quel qu'en soit le plafond : une coupure réseau, un onglet fermé,
+un redéploiement, et le travail est perdu sans reprise possible — le client n'a aucun moyen
+de suivre l'avancement ni de récupérer les passes déjà écrites. La file existe pour ça.
 
 Le scénario long est l'argument principal du produit. Trois façons de s'en sortir :
 
-1. **Tout sur Vercel, sans scénario long.** Acceptable pour une mise en ligne rapide ou une
-   démonstration, pas pour la promesse commerciale.
+1. **Tout sur Vercel, en assumant la génération pendant la requête.** Il faut alors relever
+   `maxDuration` pour l'API et vérifier que le plan le permet. Tient pour une démonstration
+   ou les documents courts ; sur un long métrage, l'utilisateur attend sans filet.
 2. **Frontend et API sur Vercel, worker et Redis ailleurs** (voir `deploy/railway/`). Les
    deux partagent `DATABASE_URL` et `REDIS_URL` ; l'API dépose la tâche, le worker
    l'exécute, et la requête HTTP ne reste pas ouverte. C'est le découpage pour lequel
