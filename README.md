@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          139 tests (pytest)
+│   └── tests/          152 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -377,7 +377,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 139 tests
+pytest                    # 152 tests
 ruff check .              # lint
 ```
 
@@ -388,7 +388,8 @@ refus de démarrage avec une configuration de production non sécurisée, **non-
 la limitation de débit par `X-Forwarded-For`**, CRUD projets, **isolation stricte des données
 entre utilisateurs**, quotas de projets et de crédits, **export réservé aux offres qui
 l'incluent**, génération IA, cohérence inter-documents, découpage des scénarios longs,
-versioning et restauration, exports PDF/DOCX/ZIP, contrôle d'accès administrateur,
+versioning et restauration, **continuité entre les passes d'un scénario long**,
+exports PDF/DOCX/ZIP, contrôle d'accès administrateur,
 **limitation de débit partagée entre répliques**, **génération asynchrone** (réserve des
 crédits, remboursement en cas d'échec, avancement par passe, reprise des tâches perdues).
 

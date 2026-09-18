@@ -96,6 +96,13 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   cours — le délai se comptant depuis le **dernier signe de vie** et non depuis le démarrage,
   une génération longue mais vivante n'est jamais prise pour une tâche morte. Sans `REDIS_URL` ou sans worker, l'API génère elle-même : `GET /health` dit lequel
   des deux modes est actif.
+- **Continuité tenue sur toute la longueur** : chaque passe reçoit non seulement la fin de la
+  précédente, mais les faits établis par **toutes** celles d'avant — personnages apparus (avec
+  leur nombre de répliques), lieux utilisés, segments déjà écrits. Ces faits sont extraits du
+  texte produit par lecture du format standard (en-têtes de séquence, noms en majuscules) :
+  aucun appel supplémentaire au fournisseur, donc aucun crédit. Un texte hors format ne produit
+  simplement rien plutôt qu'un fait faux. Le rappel est borné (~900 caractères à la 40ᵉ passe,
+  quelle que soit la longueur) : il ne prend pas la place du texte à écrire.
 - **Scénarios longs en plusieurs passes** : un scénario dépassant ce qu'un appel unique peut
   produire est découpé selon la structure en trois actes ; chaque passe reçoit la fin de la
   précédente pour la continuité des personnages, des lieux et de la numérotation des séquences.
@@ -174,16 +181,16 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **139 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **152 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression. Les quatre limites connues les plus lourdes — limitation de débit
+  des tests de non-régression. Les cinq limites connues les plus lourdes — limitation de débit
   non partagée entre répliques, génération tenue dans la requête HTTP, durée de scénario
-  plafonnée par le budget de sortie du fournisseur, et énumération de comptes à
-  l'inscription — sont corrigées. Le test d'intégration sur un vrai serveur
+  plafonnée par le budget de sortie du fournisseur, énumération de comptes à l'inscription,
+  et perte de continuité d'une passe à l'autre — sont corrigées. Le test d'intégration sur un vrai serveur
   Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
@@ -217,14 +224,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 3. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
    une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
    entre deux passes, non implémenté.
-4. **Continuité d'un très long scénario** — chaque passe ne voit que la fin de la précédente
-   (3500 caractères). Sur quarante passes, la dérive de style et de détails secondaires
-   s'accumule mécaniquement. Le découpage suit la structure dramatique, ce qui limite la
-   casse, mais un scénario de dix heures demandera une relecture d'ensemble.
-5. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
+4. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
    désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
    seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc
    obligatoire dès qu'on quitte le poste de développement, où le jeton reste renvoyé par l'API.
+5. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
+   désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
+   registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
+   de dix heures demandera toujours une relecture d'ensemble.
 6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.

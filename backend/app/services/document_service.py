@@ -34,6 +34,7 @@ from app.services.credit_service import CreditService
 from app.services.scoring_service import ScoringService
 from app.services.screenplay_service import (
     SCREENPLAY_MAX_TOKENS_PER_CALL,
+    ScreenplayState,
     assemble,
     build_segment_prompt,
     plan_segments,
@@ -292,6 +293,9 @@ class DocumentService:
         """Écrit le scénario segment par segment, avec continuité entre les passes."""
         parts: list[str] = []
         telemetry = _Telemetry(provider=self.ai.provider.name, model=self.ai.model)
+        # Les faits etablis par TOUTES les passes precedentes, pas seulement la
+        # derniere : un personnage du premier acte doit rester connu au dernier.
+        state = ScreenplayState()
 
         for segment in segments:
             prompt = build_segment_prompt(
@@ -302,11 +306,13 @@ class DocumentService:
                 target_minutes=target_minutes,
                 previous_text=parts[-1] if parts else "",
                 user_instructions=instructions,
+                state=state,
             )
             response = self._run_or_log_failure(
                 prompt, user, project, DocumentType.SCREENPLAY, AIOperation.GENERATE_DOCUMENT
             )
             parts.append(response.text)
+            state.absorb(response.text, segment.label)
 
             # Chaque passe réussie est journalisée immédiatement : si une passe
             # ultérieure échoue, les appels déjà facturés par le fournisseur
