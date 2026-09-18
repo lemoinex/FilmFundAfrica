@@ -250,9 +250,9 @@ python -m scripts.seed --reset   # les supprime puis les recrée
 
 | Compte | Identifiants | Offre |
 | --- | --- | --- |
-| Auteur | `auteur.demo@filmfundafrica.test` / `Demo2026!` | Pro Auteur |
-| Producteur | `producteur.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
-| Admin | `admin.demo@filmfundafrica.test` / `Demo2026!` | Producteur |
+| Auteur | `auteur.demo@example.com` / `Demo2026!` | Pro Auteur |
+| Producteur | `producteur.demo@example.com` / `Demo2026!` | Producteur |
+| Admin | `admin.demo@example.com` / `Demo2026!` | Producteur |
 
 ### Créer un compte administrateur
 

@@ -39,11 +39,14 @@ from app.services.document_service import DocumentService
 from app.services.scoring_service import ScoringService
 
 DEMO_MARKER = "DEMO DATA — NOT REAL"
+#: `example.com` et non un domaine en `.test` : les TLD a usage special sont
+#: refuses par la validation d'adresse, et un compte de demonstration cree
+#: directement en base ne pourrait alors pas se connecter par l'interface.
 DEMO_PASSWORD = "Demo2026!"
 
 DEMO_USERS = [
     {
-        "email": "auteur.demo@filmfundafrica.test",
+        "email": "auteur.demo@example.com",
         "user_type": UserType.AUTHOR,
         "first_name": "Aïcha",
         "last_name": "Ndiaye",
@@ -53,7 +56,7 @@ DEMO_USERS = [
         "plan": PlanCode.PRO_AUTHOR,
     },
     {
-        "email": "producteur.demo@filmfundafrica.test",
+        "email": "producteur.demo@example.com",
         "user_type": UserType.PRODUCER,
         "first_name": "Emmanuel",
         "last_name": "Mbarga",
@@ -65,7 +68,7 @@ DEMO_USERS = [
 ]
 
 ADMIN_USER = {
-    "email": "admin.demo@filmfundafrica.test",
+    "email": "admin.demo@example.com",
     "user_type": UserType.ADMIN,
     "first_name": "Admin",
     "last_name": "FilmFund",
