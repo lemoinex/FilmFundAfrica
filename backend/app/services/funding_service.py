@@ -16,7 +16,6 @@ from app.core.i18n import Locale
 from app.models.enums import AIOperation, FundingStatus, NotificationType
 from app.models.funding import FundingOpportunity, FundingRequirement, ProjectFundingMatch
 from app.models.project import Project
-from app.models.system import Notification
 from app.models.user import User
 from app.prompts import PromptContext, build_funding_match_prompt
 from app.repositories.funding import FundingRepository, MatchRepository
@@ -33,6 +32,7 @@ from app.schemas.funding import (
 from app.services.ai.service import AIService
 from app.services.credit_service import CreditService
 from app.services.matching_service import MatchingService
+from app.services.notification_service import build_notification
 
 logger = logging.getLogger("filmfund.funding")
 
@@ -155,15 +155,16 @@ class FundingService:
             return
         link = f"/projets/{project.id}/financements"
         self.db.add(
-            Notification(
+            build_notification(
                 user_id=user.id,
                 notification_type=NotificationType.MATCH_FOUND,
-                title=f"{len(strong)} financement(s) compatible(s) avec « {project.title} »",
-                body=(
-                    f"L'analyse a identifié {len(strong)} dispositif(s) dont la compatibilité "
-                    f"dépasse {threshold} %. Le score est un indicateur d'aide à la décision, "
-                    "pas une garantie de financement."
-                ),
+                title_key="notification.matchFound.title",
+                body_key="notification.matchFound.body",
+                params={
+                    "count": len(strong),
+                    "project": project.title,
+                    "threshold": threshold,
+                },
                 link=link,
             )
         )

@@ -317,3 +317,84 @@ def test_les_criteres_de_compatibilite_suivent_la_langue(client, make_user, db_s
     assert criteria["country"]["label"] == "Eligible country"
     assert criteria["country"]["detail"] == "Sénégal is not among the eligible countries (Mali)."
     assert criteria["country"]["state"] == "unmet"
+
+
+# --- Notifications --------------------------------------------------------
+
+
+def test_une_notification_est_relue_dans_la_langue_du_lecteur(client, make_user, db_session):
+    """Écrite une fois, relue peut-être dans une autre langue."""
+    from app.models.enums import NotificationType
+    from app.services.notification_service import build_notification
+
+    headers, data = make_user()
+    db_session.add(
+        build_notification(
+            user_id=data["user"]["id"],
+            notification_type=NotificationType.INCOMPLETE_FILE,
+            title_key="notification.incompleteFile.title",
+            body_key="notification.incompleteFile.body",
+            params={"project": "Taxi 237", "score": 42},
+        )
+    )
+    db_session.commit()
+
+    fr = client.get("/api/v1/notifications", headers=headers).json()[0]
+    assert fr["title"] == "Votre dossier est incomplet"
+    assert "Le projet « Taxi 237 » atteint 42/100." in fr["body"]
+
+    client.put("/api/v1/users/me/profile", json={"preferred_locale": "en"}, headers=headers)
+    en = client.get("/api/v1/notifications", headers=headers).json()[0]
+    assert en["title"] == "Your package is incomplete"
+    assert "The “Taxi 237” project scores 42/100." in en["body"]
+
+    # Le tableau de bord lit les mêmes notifications, par un autre chemin.
+    tableau = client.get("/api/v1/dashboard", headers=headers).json()
+    assert tableau["notifications"][0]["title"] == "Your package is incomplete"
+
+
+def test_une_notification_sans_cle_garde_son_texte(client, make_user, db_session):
+    """Celles écrites avant cette mécanique n'ont que leur texte : on le rend.
+
+    Mieux vaut une phrase dans la mauvaise langue qu'une notification vide.
+    """
+    from app.models.enums import NotificationType
+    from app.models.system import Notification
+
+    headers, data = make_user()
+    db_session.add(
+        Notification(
+            user_id=data["user"]["id"],
+            notification_type=NotificationType.SYSTEM,
+            title="Ancienne notification",
+            body="Écrite avant l'internationalisation.",
+        )
+    )
+    db_session.commit()
+
+    client.put("/api/v1/users/me/profile", json={"preferred_locale": "en"}, headers=headers)
+    lue = client.get("/api/v1/notifications", headers=headers).json()[0]
+
+    assert lue["title"] == "Ancienne notification"
+    assert lue["body"] == "Écrite avant l'internationalisation."
+
+
+def test_le_texte_stocke_reste_en_langue_de_reference(db_session):
+    """`title` sert de cache et à la déduplication : il doit rester rempli."""
+    from app.services.notification_service import build_notification
+
+    notification = build_notification(
+        user_id="peu-importe",
+        title_key="notification.deadlineSoon.title",
+        body_key="notification.deadlineSoon.body",
+        params={
+            "days": 7,
+            "opportunity": "Fonds A",
+            "organization": "Organisme A",
+            "date": "01/12/2026",
+            "project": "Le Fleuve",
+        },
+    )
+
+    assert notification.title == "Échéance dans 7 jours — Fonds A"
+    assert "Fonds A" in notification.body

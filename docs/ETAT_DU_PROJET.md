@@ -249,7 +249,10 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   critères de maturité) ; le `code` d'erreur, lui, ne change jamais, c'est sur lui que le
   client se branche. Côté serveur, ce que le compilateur garantit à l'interface est tenu
   par `tests/test_i18n.py`, qui compare les jeux de clés, vérifie les variables des deux
-  côtés, et relit le code source pour refuser une clé qui n'existe pas. La langue vient du profil
+  côtés, et relit le code source pour refuser une clé qui n'existe pas. Les **notifications**
+  stockent leur clé et leurs paramètres plutôt que leur phrase : écrites une fois, elles sont
+  relues dans la langue de qui les ouvre. Celles écrites avant cette mécanique gardent leur
+  texte — mieux vaut une phrase dans la mauvaise langue qu'une notification vide. La langue vient du profil
   (`preferred_locale`), puis d'un cookie relu par le rendu serveur — `<html lang>` est donc
   juste dès le premier octet, et l'interface ne s'affiche jamais brièvement dans la mauvaise
   langue. Accords, dates, nombres et durées relatives viennent d'`Intl`, pas du catalogue.
@@ -284,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **268 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **271 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de

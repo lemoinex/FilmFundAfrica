@@ -4,28 +4,33 @@ from __future__ import annotations
 
 from datetime import UTC
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DbSession, Translator
 from app.core.errors import NotFoundError
+from app.core.i18n import request_locale
 from app.models.system import Notification
 from app.schemas.common import Message
 from app.schemas.dashboard import DashboardResponse, NotificationRead
 from app.services.dashboard_service import DashboardService
+from app.services.notification_service import render_notification
 
 router = APIRouter(tags=["Tableau de bord"])
 
 
 @router.get("/dashboard", response_model=DashboardResponse, summary="Tableau de bord")
-def dashboard(db: DbSession, current_user: CurrentUser) -> DashboardResponse:
-    return DashboardService(db).build(current_user)
+def dashboard(
+    request: Request, db: DbSession, current_user: CurrentUser
+) -> DashboardResponse:
+    return DashboardService(db, locale=request_locale(request)).build(current_user)
 
 
 @router.get(
     "/notifications", response_model=list[NotificationRead], summary="Mes notifications"
 )
 def list_notifications(
+    request: Request,
     db: DbSession,
     current_user: CurrentUser,
     unread_only: bool = Query(default=False),
@@ -35,18 +40,23 @@ def list_notifications(
     if unread_only:
         stmt = stmt.where(Notification.is_read.is_(False))
     stmt = stmt.order_by(Notification.created_at.desc()).limit(limit)
-    return [
-        NotificationRead(
-            id=item.id,
-            title=item.title,
-            body=item.body,
-            notification_type=str(item.notification_type),
-            link=item.link,
-            is_read=item.is_read,
-            created_at=item.created_at,
+
+    locale = request_locale(request)
+    result = []
+    for item in db.scalars(stmt):
+        title, body = render_notification(item, locale)
+        result.append(
+            NotificationRead(
+                id=item.id,
+                title=title,
+                body=body,
+                notification_type=str(item.notification_type),
+                link=item.link,
+                is_read=item.is_read,
+                created_at=item.created_at,
+            )
         )
-        for item in db.scalars(stmt)
-    ]
+    return result
 
 
 @router.post(

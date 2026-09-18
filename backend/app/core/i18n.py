@@ -319,6 +319,28 @@ FR: dict[str, str] = {
     "score.market.defined": "Positionnement défini.",
     "score.dossier.detail": "{present}/{total} documents clés rédigés.",
     "score.dossier.improvement": "Il manque {count} document(s) clé(s) au dossier.",
+    # --- Notifications ---
+    "notification.matchFound.title": "{count} financement(s) compatible(s) avec « {project} »",
+    "notification.matchFound.body": (
+        "L'analyse a identifié {count} dispositif(s) dont la compatibilité dépasse "
+        "{threshold} %. Le score est un indicateur d'aide à la décision, pas une "
+        "garantie de financement."
+    ),
+    "notification.deadlineSoon.title": "Échéance dans {days} jours — {opportunity}",
+    "notification.deadlineSoon.body": (
+        "La date limite de « {opportunity} » ({organization}) est fixée au {date} pour "
+        "votre projet « {project} »."
+    ),
+    "notification.incompleteFile.title": "Votre dossier est incomplet",
+    "notification.incompleteFile.body": (
+        "Le projet « {project} » atteint {score}/100. Complétez-le pour améliorer vos "
+        "chances auprès des financeurs."
+    ),
+    "notification.welcome.title": "Bienvenue sur FilmFund Africa",
+    "notification.welcome.body": (
+        "Votre espace de démonstration est prêt. Les opportunités affichées sont "
+        "fictives et marquées « DEMO DATA — NOT REAL »."
+    ),
 }
 
 EN: dict[str, str] = {
@@ -583,6 +605,27 @@ EN: dict[str, str] = {
     "score.market.defined": "Positioning defined.",
     "score.dossier.detail": "{present}/{total} key documents written.",
     "score.dossier.improvement": "{count} key document(s) still missing from the package.",
+    # --- Notifications ---
+    "notification.matchFound.title": "{count} matching funding scheme(s) for “{project}”",
+    "notification.matchFound.body": (
+        "The analysis found {count} scheme(s) scoring above {threshold}%. The score is "
+        "a decision aid, not a guarantee of funding."
+    ),
+    "notification.deadlineSoon.title": "Deadline in {days} days — {opportunity}",
+    "notification.deadlineSoon.body": (
+        "The deadline for “{opportunity}” ({organization}) is {date}, for your project "
+        "“{project}”."
+    ),
+    "notification.incompleteFile.title": "Your package is incomplete",
+    "notification.incompleteFile.body": (
+        "The “{project}” project scores {score}/100. Complete it to improve your "
+        "chances with funders."
+    ),
+    "notification.welcome.title": "Welcome to FilmFund Africa",
+    "notification.welcome.body": (
+        "Your demonstration space is ready. The opportunities shown are fictional and "
+        "marked “DEMO DATA — NOT REAL”."
+    ),
 }
 
 CATALOGS: dict[Locale, dict[str, str]] = {"fr": FR, "en": EN}

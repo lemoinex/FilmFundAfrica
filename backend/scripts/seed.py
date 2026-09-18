@@ -32,10 +32,10 @@ from app.models.enums import (
 )
 from app.models.funding import FundingOpportunity, FundingRequirement
 from app.models.project import Character, Project
-from app.models.system import Notification
 from app.models.user import Profile, User
 from app.services.credit_service import CreditService
 from app.services.document_service import DocumentService
+from app.services.notification_service import build_notification
 from app.services.scoring_service import ScoringService
 
 DEMO_MARKER = "DEMO DATA — NOT REAL"
@@ -409,14 +409,11 @@ def seed(reset: bool = False, force: bool = False) -> None:
         db.commit()
 
         db.add(
-            Notification(
+            build_notification(
                 user_id=users[0].id,
                 notification_type=NotificationType.SYSTEM,
-                title="Bienvenue sur FilmFund Africa",
-                body=(
-                    "Votre espace de démonstration est prêt. Les opportunités affichées "
-                    "sont fictives et marquées « DEMO DATA — NOT REAL »."
-                ),
+                title_key="notification.welcome.title",
+                body_key="notification.welcome.body",
                 link="/tableau-de-bord",
             )
         )

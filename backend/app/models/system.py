@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,8 +27,17 @@ class Notification(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=NotificationType.SYSTEM,
         nullable=False,
     )
+    #: Texte rendu au moment de l'ecriture. C'est un cache, pas la source :
+    #: il sert aux notifications anterieures a l'internationalisation, et a la
+    #: deduplication, qui compare des titres. Les nouvelles notifications
+    #: portent en plus leur cle et leurs parametres, et c'est de ceux-la que
+    #: le texte est reconstruit, dans la langue de qui lit.
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    title_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    body_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    #: Variables des deux messages. Vide pour une notification sans cle.
+    params: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     link: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -18,6 +18,7 @@ from app.models.funding import FundingOpportunity, ProjectFundingMatch
 from app.models.project import Project
 from app.models.system import Notification
 from app.models.user import User
+from app.services.notification_service import build_notification
 
 logger = logging.getLogger("filmfund.workers")
 
@@ -55,16 +56,18 @@ def notify_upcoming_deadlines(days: int = DEADLINE_ALERT_DAYS) -> int:
             if already is not None:
                 continue
             db.add(
-                Notification(
+                build_notification(
                     user_id=user_id,
                     notification_type=NotificationType.DEADLINE_SOON,
-                    title=f"Deadline dans {days} jours — {opportunity.name}",
-                    body=(
-                        f"La date limite de « {opportunity.name} » "
-                        f"({opportunity.organization}) est fixée au "
-                        f"{opportunity.deadline:%d/%m/%Y} pour votre projet "
-                        f"« {project_title} »."
-                    ),
+                    title_key="notification.deadlineSoon.title",
+                    body_key="notification.deadlineSoon.body",
+                    params={
+                        "days": days,
+                        "opportunity": opportunity.name,
+                        "organization": opportunity.organization,
+                        "date": f"{opportunity.deadline:%d/%m/%Y}",
+                        "project": project_title,
+                    },
                     link=link,
                 )
             )
@@ -97,15 +100,15 @@ def notify_incomplete_projects(threshold: int = 50) -> int:
             if already is not None:
                 continue
             db.add(
-                Notification(
+                build_notification(
                     user_id=project.user_id,
                     notification_type=NotificationType.INCOMPLETE_FILE,
-                    title="Votre dossier est incomplet",
-                    body=(
-                        f"Le projet « {project.title} » atteint "
-                        f"{project.readiness_score}/100. Complétez-le pour améliorer "
-                        "vos chances auprès des financeurs."
-                    ),
+                    title_key="notification.incompleteFile.title",
+                    body_key="notification.incompleteFile.body",
+                    params={
+                        "project": project.title,
+                        "score": project.readiness_score,
+                    },
                     link=link,
                 )
             )

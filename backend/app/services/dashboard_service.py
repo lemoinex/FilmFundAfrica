@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.i18n import Locale
 from app.models.enums import FundingStatus, NotificationType
 from app.models.funding import FundingOpportunity, ProjectFundingMatch
 from app.models.project import Project
@@ -26,14 +27,16 @@ from app.schemas.dashboard import (
     NotificationRead,
     RecommendedOpportunity,
 )
+from app.services.notification_service import render_notification
 from app.services.project_service import ProjectService
 
 DEADLINE_WINDOW_DAYS = 45
 
 
 class DashboardService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, locale: Locale = "fr") -> None:
         self.db = db
+        self.locale = locale
         self.projects = ProjectService(db)
         self.documents = DocumentRepository(db)
 
@@ -147,18 +150,21 @@ class DashboardService:
             .order_by(Notification.created_at.desc())
             .limit(limit)
         )
-        return [
-            NotificationRead(
-                id=item.id,
-                title=item.title,
-                body=item.body,
-                notification_type=str(item.notification_type),
-                link=item.link,
-                is_read=item.is_read,
-                created_at=item.created_at,
+        result: list[NotificationRead] = []
+        for item in rows:
+            title, body = render_notification(item, self.locale)
+            result.append(
+                NotificationRead(
+                    id=item.id,
+                    title=title,
+                    body=body,
+                    notification_type=str(item.notification_type),
+                    link=item.link,
+                    is_read=item.is_read,
+                    created_at=item.created_at,
+                )
             )
-            for item in rows
-        ]
+        return result
 
     # ------------------------------------------------------------------
     def create_notification(
