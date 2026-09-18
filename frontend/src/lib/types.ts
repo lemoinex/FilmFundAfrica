@@ -178,6 +178,133 @@ export interface DocumentTypeInfo {
   depends_on: DocumentType[];
 }
 
+/* ------------------------------------------------------------------ */
+/* Funding Intelligence                                                */
+/* ------------------------------------------------------------------ */
+export type FundingCategory =
+  | "FUND"
+  | "GRANT"
+  | "RESIDENCY"
+  | "FESTIVAL"
+  | "LAB"
+  | "WORKSHOP"
+  | "COPRODUCTION"
+  | "BURSARY"
+  | "PITCHING_FORUM";
+
+export type FundingStatus = "OPEN" | "CLOSED" | "UPCOMING" | "UNVERIFIED";
+
+export type MatchState = "met" | "unmet" | "unknown";
+
+export interface FundingRequirement {
+  id: string;
+  opportunity_id: string;
+  label: string;
+  description?: string | null;
+  is_mandatory: boolean;
+  required_document_type?: DocumentType | null;
+}
+
+export interface OpportunitySummary {
+  id: string;
+  name: string;
+  organization: string;
+  category: FundingCategory;
+  country?: string | null;
+  amount_label?: string | null;
+  deadline?: string | null;
+  days_left?: number | null;
+  status: FundingStatus;
+  is_demo: boolean;
+  /** Traçabilité : jamais affichée sans ces deux informations. */
+  source_name?: string | null;
+  source_url?: string | null;
+  last_verified_at?: string | null;
+}
+
+export interface Opportunity {
+  id: string;
+  name: string;
+  organization: string;
+  description: string;
+  website?: string | null;
+  country?: string | null;
+  eligible_countries: string[];
+  project_types: string[];
+  genres: string[];
+  languages: string[];
+  category: FundingCategory;
+  minimum_budget?: number | null;
+  maximum_budget?: number | null;
+  currency: string;
+  deadline?: string | null;
+  opening_date?: string | null;
+  application_url?: string | null;
+  requirements: string;
+  status: FundingStatus;
+  source_name?: string | null;
+  source_url?: string | null;
+  last_verified_at?: string | null;
+  is_demo: boolean;
+  created_at: string;
+  updated_at: string;
+  requirement_items: FundingRequirement[];
+}
+
+export interface OpportunityPage {
+  items: OpportunitySummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  facets: Record<string, string[]>;
+}
+
+export interface MatchCriterion {
+  key: string;
+  label: string;
+  weight: number;
+  earned: number;
+  state: MatchState;
+  detail: string;
+  blocking: boolean;
+}
+
+export interface MatchResult {
+  opportunity: OpportunitySummary;
+  compatibility: number;
+  eligible: boolean;
+  assessed_ratio: number;
+  criteria: MatchCriterion[];
+  met_conditions: string[];
+  missing_conditions: string[];
+  unknown_conditions: string[];
+  required_documents: string[];
+  missing_documents: string[];
+  computed_at: string;
+  has_explanation: boolean;
+}
+
+export interface MatchListResponse {
+  project_id: string;
+  project_title: string;
+  total: number;
+  results: MatchResult[];
+  computed_at: string;
+  disclaimer: string;
+}
+
+export interface MatchExplanation {
+  opportunity_id: string;
+  compatibility: number;
+  explanation: string;
+  credits_consumed: number;
+  credits_remaining: number;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  disclaimer: string;
+}
+
 export interface ScreenplayCapacity {
   pages_per_pass: number;
   max_passes: number;

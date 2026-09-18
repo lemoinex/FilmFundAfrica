@@ -7,8 +7,8 @@ l'audiovisuel, avec une priorité donnée à l'Afrique francophone. Elle permet 
 projet, de générer les documents professionnels du dossier, d'en suivre la maturité et de
 l'exporter dans un format exploitable par un comité de lecture.
 
-> **État du dépôt : Phases 1 et 2 livrées et exécutables** (fondations, authentification,
-> projets, AI Writer, versioning, export). Les phases 3 à 6 (Funding Intelligence, budget,
+> **État du dépôt : Phases 1, 2 et 3 livrées et exécutables** (fondations, authentification,
+> projets, AI Writer, versioning, export, Funding Intelligence). Les phases 4 à 6 (budget,
 > monétisation, automatisation n8n) disposent de leur schéma de base de données et de leurs
 > points d'extension, mais pas encore de leur logique métier. Voir
 > [`docs/ETAT_DU_PROJET.md`](docs/ETAT_DU_PROJET.md) pour le détail, poste par poste.
@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Tâches planifiées appelables par n8n
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          68 tests (pytest)
+│   └── tests/          94 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -272,6 +272,42 @@ scénario va jusqu'à **138 minutes**. Au-delà, l'API refuse explicitement plut
 un scénario tronqué, et l'interface n'offre que les durées réellement productibles — elle
 interroge `GET /api/v1/documents/screenplay-capacity` au lieu de dupliquer la règle.
 
+---
+
+## Funding Intelligence
+
+**Score de compatibilité déterministe.** Le rapprochement projet / dispositif est calculé par
+des règles, pas par l'IA : il est donc reproductible, explicable ligne à ligne, instantané et
+**gratuit**. Sept critères pondérés, pour 100 points au total : pays éligible (25, bloquant),
+type de projet (20, bloquant), genre (12), langue (8), format et durée (10), échéance (10,
+bloquante si dépassée), documents exigés (15, à crédit partiel).
+
+**Une information absente n'est jamais interprétée.** Un critère que les données du projet ne
+permettent pas d'évaluer est marqué « à vérifier », retiré du dénominateur, et n'est compté ni
+pour ni contre le projet. En contrepartie, la réponse expose `assessed_ratio` : la part de la
+grille réellement évaluée. Un projet sans pays ni genre ni durée obtient donc « score calculé
+sur 53 % de la grille », et non un score flatteur bâti sur des suppositions.
+
+**Un critère bloquant non rempli rend la candidature inéligible**, mais le dispositif reste
+affiché avec la raison, plutôt que d'être masqué silencieusement.
+
+**L'IA n'intervient que sur demande.** Le bouton « Analyser avec l'IA » rédige l'explication
+détaillée du rapprochement et consomme 1 crédit ; une explication déjà produite est réaffichée
+sans nouveau débit. L'IA ne recalcule jamais le score et ne peut inventer aucune condition
+d'éligibilité : elle ne reçoit que les faits présents en base.
+
+**Traçabilité.** Un dispositif ne peut pas être créé sans `source_name` et `source_url`, ni
+publié comme ouvert sans URL source. Chaque vérification humaine horodate `last_verified_at`,
+affiché à l'utilisateur sous chaque opportunité.
+
+**Alimentation de la base.** La saisie se fait depuis l'espace d'administration
+(`/admin/financements`, réservé au rôle `ADMIN`) ou par l'API. Le pipeline de veille automatisée
+reste à construire en Phase 6 ; son squelette n8n est dans `n8n/workflows/`.
+
+---
+
+## 10 bis. Crédits IA
+
 **Crédits IA** — l'usage n'est jamais illimité. Les quotas, les prix et les fonctionnalités
 incluses (dont l'export) sont stockés en base et modifiables depuis l'administration
 (`PUT /api/v1/admin/plans/{code}`), jamais codés en dur.
@@ -303,7 +339,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 68 tests
+pytest                    # 94 tests
 ruff check .              # lint
 ```
 
@@ -347,7 +383,10 @@ Ces règles sont implémentées, testées, et ne doivent pas être contournées 
   condition de candidature. Une information absente produit « Information non fournie. » et
   apparaît dans la section « Informations à compléter » du document.
 - **Aucune opportunité n'est présentée comme active sans sa source** (`source_url`,
-  `source_name`) et sa date de dernière vérification (`last_verified_at`).
+  `source_name`) et sa date de dernière vérification (`last_verified_at`). L'API refuse la
+  création d'un dispositif sans source, et sa publication comme ouvert sans URL source.
+- **Le score de compatibilité ne devine rien.** Un critère non évaluable est signalé comme tel
+  et retiré du calcul ; il n'est jamais remplacé par une hypothèse.
 - **Le score de compatibilité est un indicateur d'aide à la décision**, jamais une garantie de
   financement. Le score de maturité mesure l'avancement du dossier, pas sa qualité artistique.
 - **Les données de démonstration sont marquées comme telles** et ne sont jamais présentées

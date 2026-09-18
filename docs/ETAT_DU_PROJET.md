@@ -1,7 +1,8 @@
 # État du projet — rapport de livraison
 
-Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation) + Phase 2
-(AI Writer)**, plus l'export qui figure parmi les fonctionnalités indispensables du MVP.
+Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation), Phase 2
+(AI Writer) et Phase 3 (Funding Intelligence)**, plus l'export qui figure parmi les
+fonctionnalités indispensables du MVP.
 
 Ce document dit ce qui fonctionne réellement, ce qui est partiel et ce qui n'est pas commencé.
 Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
@@ -95,17 +96,44 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - **ZIP** : archive du projet (fiche projet, chaque document en `.docx` et en `.md`, dossier
   complet en PDF).
 
+### Funding Intelligence
+
+- Base des dispositifs : fonds, subventions, résidences, festivals, laboratoires, ateliers,
+  coproductions, bourses, forums de pitch.
+- **Recherche filtrée** : plein texte, pays, type de projet, genre, langue, type de dispositif,
+  montant, fenêtre d'échéance, tri. Un dispositif dont un critère n'est pas renseigné reste
+  visible — l'absence d'information n'est pas une exclusion. Les échéances dépassées sont
+  masquées par défaut, consultables à la demande. Les facettes sont calculées depuis la base.
+- **Matching déterministe** : sept critères pondérés pour 100 points (pays 25, type 20, genre 12,
+  langue 8, format et durée 10, échéance 10, documents exigés 15). Reproductible, explicable
+  critère par critère, instantané et **gratuit**.
+- **Critères bloquants** : pays non éligible, type de projet non accepté, échéance dépassée.
+  Le dispositif reste affiché avec la raison plutôt que d'être masqué.
+- **Crédit partiel sur les documents exigés** : le score progresse à mesure que l'auteur rédige
+  les pièces demandées, ce qui en fait un signal d'avancement et pas seulement un verdict.
+- **Aucune donnée devinée** : un critère non évaluable est marqué « à vérifier », retiré du
+  dénominateur, et la réponse expose `assessed_ratio` — la part de la grille réellement évaluée.
+- **Explication IA à la demande** : 1 crédit, réutilisée sans nouveau débit si déjà produite.
+  L'IA ne recalcule pas le score et ne reçoit que les faits présents en base.
+- **Traçabilité imposée par l'API** : création impossible sans `source_name` et `source_url`,
+  publication comme ouvert impossible sans URL source, horodatage de chaque vérification.
+- Écran de recherche avec filtres, fiche détaillée d'un dispositif, écran des financements
+  compatibles d'un projet (conditions remplies / non remplies / à vérifier, documents manquants
+  avec lien vers l'AI Writer), et **espace d'administration** réservé au rôle `ADMIN`.
+- Notification automatique lorsqu'un projet dépasse 70 % de compatibilité avec un dispositif.
+
 ### Tableau de bord et administration
 
 - Statistiques (projets, documents générés, opportunités compatibles, échéances), cartes projet
   avec score de maturité, notifications.
 - Administration : liste et modification des utilisateurs, suspension de compte, statistiques
   projets **anonymisées**, consommation IA (appels, jetons, crédits, latence, échecs), gestion
-  des offres et de leurs prix.
+  des offres et de leurs prix, **CRUD complet des dispositifs de financement et de leurs pièces
+  exigées**.
 
 ### Interface
 
-- Next.js 14 (App Router), TypeScript strict, Tailwind. 14 routes, build de production
+- Next.js 14 (App Router), TypeScript strict, Tailwind. 17 routes, build de production
   vérifié, `tsc --noEmit` sans erreur.
 - Landing page complète en dix sections (problème, solution, AI Writer, Funding Intelligence,
   matching, budget, pour qui, tarifs, FAQ, CTA final).
@@ -115,7 +143,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **68 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **94 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -124,7 +152,10 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   des tests de non-régression.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
-  dépassement de quota.
+  dépassement de quota ; puis saisie admin d'un dispositif → recherche filtrée → matching
+  gratuit → progression du score au fil des documents rédigés (85 % → 93 % → 100 %) →
+  explication IA facturée une seule fois → inéligibilité motivée → projet incomplet évalué sur
+  53 % de la grille sans rien deviner.
 
 ---
 
@@ -132,7 +163,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 | Fonctionnalité | Ce qui existe | Ce qui manque |
 | --- | --- | --- |
-| **Funding Intelligence** | Tables `funding_opportunities`, `funding_requirements`, `project_funding_matches` ; catégories ; champs de traçabilité (`source_url`, `source_name`, `last_verified_at`) ; prompt d'explication de matching versionné ; 3 opportunités de démonstration marquées | Routes de recherche et de filtrage, algorithme de scoring, écran de résultats. L'écran « Financements » annonce explicitement que le module arrive en Phase 3 plutôt que d'afficher des données fictives comme réelles |
+| **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration | La base est vide au démarrage : elle s'alimente par saisie administrateur. Le pipeline de veille automatisée (collecte, classification, validation) reste en Phase 6 |
 | **Budget et plan de financement** | Tables `budgets`, `budget_items`, `funding_plans`, `funding_plan_lines`, `production_schedules` ; catégories de postes ; calculs de financement acquis/recherché/pourcentage sur le modèle ; le critère « Budget » du score les lit déjà | Générateur de budget, API, interface |
 | **Notifications** | Table, API de lecture et de marquage, affichage au tableau de bord, tâches de détection d'échéances et de dossiers incomplets | Envoi effectif des e-mails (le service SMTP existe et journalise à défaut), déclenchement planifié |
 | **Abonnements** | Trois offres en base avec prix et quotas configurables depuis l'administration, quotas appliqués | Aucun paiement : changer d'offre se fait aujourd'hui par l'administration |
@@ -195,9 +226,9 @@ Installation manuelle : sections 6 et 7 du README.
 
 ## NEXT STEPS
 
-1. **Phase 3 — Funding Intelligence** : alimenter la base d'opportunités (avec sources
-   vérifiables), implémenter recherche, filtres et scoring de compatibilité déterministe, puis
-   brancher le prompt d'explication déjà écrit.
+1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
+   désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
+   d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
 2. **Phase 4 — Budget** : générateur de budget par type de projet, plan de financement,
    calendrier de production, export XLSX.
 3. **Passer la génération en asynchrone** : Redis + worker, avec suivi de progression par passe
@@ -206,7 +237,8 @@ Installation manuelle : sections 6 et 7 du README.
 5. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
    (mobile money notamment), gestion du cycle d'abonnement.
 6. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
-   classification → validation humaine → base), notifications par e-mail.
+   classification → validation humaine → base), notifications par e-mail. Il alimentera la base
+   de financements que l'administration remplit aujourd'hui à la main.
 7. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
 8. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

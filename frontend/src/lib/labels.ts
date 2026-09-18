@@ -1,6 +1,8 @@
 import type {
   DocumentStatus,
   DocumentType,
+  FundingCategory,
+  FundingStatus,
   ProjectStatus,
   ProjectType,
   UserType,
@@ -61,6 +63,25 @@ export const ORIGIN_LABELS: Record<string, string> = {
   AI_EXPAND: "IA — développement",
   AI_CORRECT: "IA — correction",
   RESTORE: "Restauration",
+};
+
+export const FUNDING_CATEGORY_LABELS: Record<FundingCategory, string> = {
+  FUND: "Fonds",
+  GRANT: "Subvention",
+  RESIDENCY: "Résidence",
+  FESTIVAL: "Festival",
+  LAB: "Laboratoire",
+  WORKSHOP: "Atelier",
+  COPRODUCTION: "Coproduction",
+  BURSARY: "Bourse",
+  PITCHING_FORUM: "Forum de pitch",
+};
+
+export const FUNDING_STATUS_LABELS: Record<FundingStatus, string> = {
+  OPEN: "Ouvert",
+  CLOSED: "Clos",
+  UPCOMING: "À venir",
+  UNVERIFIED: "Non vérifié",
 };
 
 /** Durées cibles proposées pour un scénario (1 page ≈ 1 minute). */

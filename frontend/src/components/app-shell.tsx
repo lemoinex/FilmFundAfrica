@@ -15,12 +15,18 @@ const NAVIGATION = [
   { href: "/profil", label: "Profil", icon: "user" },
 ] as const;
 
+//: Visible uniquement pour le rôle ADMIN ; l'API le vérifie de son côté.
+const ADMIN_NAVIGATION = [
+  { href: "/admin/financements", label: "Administration", icon: "shield" },
+] as const;
+
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
     folder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
     target: "M12 3v3m0 12v3M3 12h3m12 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
     user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0",
+    shield: "M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6l7-3z",
   };
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
@@ -53,7 +59,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="space-y-1 p-3">
-          {NAVIGATION.map((item) => {
+          {[
+            ...NAVIGATION,
+            ...(user?.user_type === "ADMIN" ? ADMIN_NAVIGATION : []),
+          ].map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link

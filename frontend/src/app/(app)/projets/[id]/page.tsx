@@ -130,6 +130,9 @@ export default function ProjectDetailPage() {
           <Link href={`/projets/${id}/ai-writer`} className="btn-primary">
             Ouvrir l&apos;AI Writer
           </Link>
+          <Link href={`/projets/${id}/financements`} className="btn-secondary">
+            Financements compatibles
+          </Link>
           <button
             type="button"
             className="btn-secondary"

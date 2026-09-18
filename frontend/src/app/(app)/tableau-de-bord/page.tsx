@@ -66,7 +66,7 @@ export default function DashboardPage() {
         <StatTile
           label="Opportunités compatibles"
           value={data.stats.compatible_opportunities}
-          hint="Module Phase 3"
+          href="/financements"
         />
         <StatTile
           label="Échéances prochaines"
@@ -149,8 +149,8 @@ export default function DashboardPage() {
 
         {data.recommended_opportunities.length === 0 ? (
           <div className="card p-6 text-sm text-slatey-400">
-            Aucune recommandation pour l&apos;instant. Le module Funding Intelligence, qui
-            alimente cette section, arrive en Phase 3.
+            Aucune recommandation pour l&apos;instant. Ouvrez un projet puis lancez
+            l&apos;analyse des financements compatibles — le calcul est gratuit.
           </div>
         ) : (
           <div className="space-y-2.5">

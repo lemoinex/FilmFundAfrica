@@ -15,7 +15,11 @@ import type {
   DocumentTypeInfo,
   DocumentVersion,
   GenerationResult,
+  MatchExplanation,
+  MatchListResponse,
   NotificationItem,
+  Opportunity,
+  OpportunityPage,
   Project,
   ProjectDocument,
   ProjectSummary,
@@ -296,6 +300,95 @@ export const documentApi = {
       `/api/v1/projects/${projectId}/documents/${documentId}/versions/${versionNumber}/restore`,
       { method: "POST" },
     ),
+};
+
+/* ------------------------------------------------------------------ */
+/* Funding Intelligence                                                */
+/* ------------------------------------------------------------------ */
+export interface FundingSearchParams extends Record<string, unknown> {
+  query?: string;
+  country?: string;
+  project_type?: string;
+  genre?: string;
+  language?: string;
+  category?: string;
+  min_amount?: number;
+  max_amount?: number;
+  deadline_before?: string;
+  include_closed?: boolean;
+  sort?: string;
+  page?: number;
+  page_size?: number;
+}
+
+function toQueryString(params: Record<string, unknown>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const encoded = search.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
+export const fundingApi = {
+  search: (params: FundingSearchParams = {}) =>
+    request<OpportunityPage>(`/api/v1/funding${toQueryString(params)}`),
+
+  get: (id: string) => request<Opportunity>(`/api/v1/funding/${id}`),
+
+  /** Calcul déterministe : gratuit, aucun crédit consommé. */
+  computeMatches: (projectId: string) =>
+    request<MatchListResponse>(`/api/v1/projects/${projectId}/match-funding`, {
+      method: "POST",
+    }),
+
+  matches: (projectId: string) =>
+    request<MatchListResponse>(`/api/v1/projects/${projectId}/matches`),
+
+  /** Explication rédigée par l'IA : consomme 1 crédit à la première demande. */
+  explain: (projectId: string, opportunityId: string, refresh = false) =>
+    request<MatchExplanation>(
+      `/api/v1/projects/${projectId}/matches/${opportunityId}/explain${refresh ? "?refresh=true" : ""}`,
+      { method: "POST" },
+    ),
+};
+
+/* ------------------------------------------------------------------ */
+/* Administration des dispositifs                                      */
+/* ------------------------------------------------------------------ */
+export const adminFundingApi = {
+  list: (query?: string, page = 1) =>
+    request<OpportunityPage>(
+      `/api/v1/admin/funding${toQueryString({ query, page, page_size: 50 })}`,
+    ),
+
+  get: (id: string) => request<Opportunity>(`/api/v1/admin/funding/${id}`),
+
+  create: (payload: Record<string, unknown>) =>
+    request<Opportunity>("/api/v1/admin/funding", { method: "POST", body: payload }),
+
+  update: (id: string, payload: Record<string, unknown>) =>
+    request<Opportunity>(`/api/v1/admin/funding/${id}`, { method: "PUT", body: payload }),
+
+  verify: (id: string, status: string) =>
+    request<Opportunity>(`/api/v1/admin/funding/${id}/verify?new_status=${status}`, {
+      method: "POST",
+    }),
+
+  remove: (id: string) =>
+    request<{ detail: string }>(`/api/v1/admin/funding/${id}`, { method: "DELETE" }),
+
+  addRequirement: (id: string, payload: Record<string, unknown>) =>
+    request<Opportunity>(`/api/v1/admin/funding/${id}/requirements`, {
+      method: "POST",
+      body: payload,
+    }),
+
+  removeRequirement: (id: string, requirementId: string) =>
+    request<Opportunity>(`/api/v1/admin/funding/${id}/requirements/${requirementId}`, {
+      method: "DELETE",
+    }),
 };
 
 /* ------------------------------------------------------------------ */
