@@ -65,15 +65,15 @@ filmfund-africa/
 │   ├── app/
 │   │   ├── api/v1/     Routes HTTP
 │   │   ├── core/       Configuration, sécurité, base de données, erreurs, logs
-│   │   ├── models/     Tables SQLAlchemy (21 tables)
+│   │   ├── models/     Tables SQLAlchemy (22 tables)
 │   │   ├── prompts/    Prompts versionnés, un module par document
 │   │   ├── repositories/  Requêtes SQL isolées
 │   │   ├── schemas/    Contrats d'entrée/sortie Pydantic
 │   │   ├── services/   Logique métier + couche d'abstraction IA
-│   │   └── workers/    Tâches planifiées appelables par n8n
+│   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          109 tests (pytest)
+│   └── tests/          124 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -137,6 +137,8 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `RATE_LIMIT_AUTH_PER_MINUTE` | Limitation sur les routes d'authentification | `10` |
 | `REDIS_URL` | Compteurs de limitation partagés entre répliques ; vide = compteurs en mémoire | vide |
 | `REDIS_TIMEOUT_SECONDS` | Délai au-delà duquel l'appel à Redis est abandonné | `0.25` |
+| `JOB_TIMEOUT_SECONDS` | Durée au-delà de laquelle une génération en cours est déclarée interrompue | `900` |
+| `JOB_STALE_SECONDS` | Âge à partir duquel une tâche en attente est reprise par le balayage | `60` |
 | `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
 | `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
@@ -180,6 +182,16 @@ cp ../.env.example .env        # puis ajustez DATABASE_URL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+Avec `REDIS_URL`, lancez le worker de génération dans un second terminal :
+
+```bash
+python -m app.workers.runner
+```
+
+Sans lui, l'API exécute les générations elle-même : c'est fonctionnel, mais un scénario long
+tient alors la requête HTTP ouverte plusieurs minutes. `GET /health` indique lequel des deux
+modes est actif (`"generation": "worker"` ou `"inline-no-worker"`).
 
 L'API écoute sur `http://localhost:8000`. La documentation OpenAPI est générée
 automatiquement sur `/docs` (Swagger) et `/redoc`.
@@ -363,7 +375,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 109 tests
+pytest                    # 124 tests
 ruff check .              # lint
 ```
 
@@ -373,7 +385,9 @@ refus de démarrage avec une configuration de production non sécurisée, **non-
 la limitation de débit par `X-Forwarded-For`**, CRUD projets, **isolation stricte des données
 entre utilisateurs**, quotas de projets et de crédits, **export réservé aux offres qui
 l'incluent**, génération IA, cohérence inter-documents, découpage des scénarios longs,
-versioning et restauration, exports PDF/DOCX/ZIP, contrôle d'accès administrateur.
+versioning et restauration, exports PDF/DOCX/ZIP, contrôle d'accès administrateur,
+**limitation de débit partagée entre répliques**, **génération asynchrone** (réserve des
+crédits, remboursement en cas d'échec, avancement par passe, reprise des tâches perdues).
 
 ---
 
@@ -399,6 +413,11 @@ réalité trente tentatives de connexion par minute. Avec lui, la limite vaut po
 déploiement entier. Si Redis devient injoignable, l'API continue de répondre en comptant en
 mémoire (limite dégradée, jamais d'indisponibilité) et `GET /health` renvoie
 `"rate_limit": "redis-unreachable"` avec un statut `degraded` — à surveiller.
+
+**Déployez le worker de génération** (`python -m app.workers.runner`) à côté de l'API : c'est
+lui qui écrit les documents. Sans worker, l'API s'en charge, et un scénario long tient la
+requête ouverte jusqu'à l'expiration du proxy. Le worker est sans état : plusieurs instances
+peuvent tourner en parallèle, chaque tâche n'étant exécutée que par une seule d'entre elles.
 
 **À faire avant une mise en production réelle** : brancher Sentry et un stockage d'objets si
 les utilisateurs téléversent des fichiers.

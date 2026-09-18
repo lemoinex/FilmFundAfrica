@@ -25,17 +25,9 @@ from fastapi import Request
 
 from app.core.config import settings
 from app.core.errors import AppError
+from app.core.redis import RedisError, build_client
 
 logger = logging.getLogger("filmfund.rate_limit")
-
-try:  # pragma: no cover - depend de l'environnement d'installation
-    from redis import Redis
-    from redis.exceptions import RedisError
-except ModuleNotFoundError:  # pragma: no cover
-    Redis = None
-
-    class RedisError(Exception):
-        """Repli si le paquet `redis` n'est pas installe."""
 
 
 #: Delai minimal entre deux avertissements « Redis injoignable ».
@@ -204,26 +196,16 @@ class RedisBackend:
 
 
 def build_backend() -> RateLimitBackend:
-    """Choisit le stockage des compteurs d'apres la configuration."""
+    """Choisit le stockage des compteurs d'apres la configuration.
+
+    Un Redis lent ne doit pas bloquer l'API : le client est construit avec un
+    delai court, et on prefere compter en memoire plutot que tenir la requete
+    ouverte.
+    """
     memory = MemoryBackend()
-    url = settings.redis_url.strip()
-    if not url:
+    client = build_client()
+    if client is None:
         return memory
-    if Redis is None:  # pragma: no cover - installation incomplete
-        logger.warning(
-            "REDIS_URL est défini mais le paquet `redis` n'est pas installé : "
-            "la limitation de débit reste propre à cette instance."
-        )
-        return memory
-    client = Redis.from_url(
-        url,
-        # Un Redis lent ne doit pas bloquer l'API : on preferera compter en
-        # memoire plutot que de tenir la requete ouverte.
-        socket_connect_timeout=settings.redis_timeout_seconds,
-        socket_timeout=settings.redis_timeout_seconds,
-        retry_on_timeout=False,
-        decode_responses=True,
-    )
     return RedisBackend(client, memory)
 
 

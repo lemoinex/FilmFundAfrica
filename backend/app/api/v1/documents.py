@@ -16,10 +16,11 @@ from app.schemas.document import (
     DocumentVersionDetail,
     DocumentVersionRead,
     GenerateRequest,
-    GenerationResult,
     RefineRequest,
 )
+from app.schemas.job import GenerationJobRead
 from app.services.document_service import DocumentService
+from app.services.job_service import JobService
 
 router = APIRouter(prefix="/projects/{project_id}/documents", tags=["AI Writer"])
 catalog_router = APIRouter(prefix="/documents", tags=["AI Writer"])
@@ -79,10 +80,10 @@ def list_documents(project: OwnedProject, db: DbSession) -> list[DocumentSummary
 
 @router.post(
     "/{document_type}/generate",
-    response_model=GenerationResult,
-    status_code=status.HTTP_201_CREATED,
+    response_model=GenerationJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(rate_limit_ai)],
-    summary="Générer un document avec l'IA",
+    summary="Lancer la génération d'un document",
 )
 def generate_document(
     document_type: DocumentType,
@@ -90,8 +91,19 @@ def generate_document(
     project: OwnedProject,
     db: DbSession,
     current_user: CurrentUser,
-) -> GenerationResult:
-    return DocumentService(db).generate(current_user, project, document_type, payload)
+) -> GenerationJobRead:
+    """Accepte la demande et renvoie la tâche qui l'exécute.
+
+    Un scénario long enchaîne plusieurs appels au fournisseur : le tenir dans
+    la requête HTTP la ferait expirer. Le frontend suit l'avancement sur
+    `GET /jobs/{id}`.
+
+    Sans worker disponible, la tâche est exécutée immédiatement : la réponse
+    est alors déjà `SUCCEEDED` et porte son résultat. La forme de la réponse
+    ne change pas — seul le temps d'attente change.
+    """
+    job = JobService(db).enqueue_generate(current_user, project, document_type, payload)
+    return GenerationJobRead.model_validate(job)
 
 
 @router.get("/{document_id}", response_model=DocumentRead, summary="Lire un document")
@@ -111,7 +123,8 @@ def save_document(
 
 @router.post(
     "/{document_id}/refine",
-    response_model=GenerationResult,
+    response_model=GenerationJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(rate_limit_ai)],
     summary="Améliorer, raccourcir, développer ou corriger",
 )
@@ -121,10 +134,10 @@ def refine_document(
     project: OwnedProject,
     db: DbSession,
     current_user: CurrentUser,
-) -> GenerationResult:
-    service = DocumentService(db)
-    document = service.get_owned_document(document_id, project)
-    return service.refine(current_user, project, document, payload)
+) -> GenerationJobRead:
+    document = DocumentService(db).get_owned_document(document_id, project)
+    job = JobService(db).enqueue_refine(current_user, project, document, payload)
+    return GenerationJobRead.model_validate(job)
 
 
 @router.delete("/{document_id}", response_model=Message, summary="Supprimer un document")

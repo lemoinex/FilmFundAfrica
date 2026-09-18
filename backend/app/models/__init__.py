@@ -19,6 +19,7 @@ from app.models.funding import (
     FundingRequirement,
     ProjectFundingMatch,
 )
+from app.models.jobs import GenerationJob
 from app.models.project import Character, Project
 from app.models.system import AppSetting, AuditLog, Notification
 from app.models.user import PasswordResetToken, Profile, User
@@ -46,4 +47,5 @@ __all__ = [
     "Notification",
     "AuditLog",
     "AppSetting",
+    "GenerationJob",
 ]

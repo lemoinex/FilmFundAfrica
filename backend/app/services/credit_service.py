@@ -164,6 +164,28 @@ class CreditService:
         return cost
 
     # ------------------------------------------------------------------
+    def reserve(self, user: User, operation: AIOperation, units: int = 1) -> int:
+        """Debite les credits avant l'execution, et renvoie le montant retenu.
+
+        Une generation mise en file n'a pas encore consomme quoi que ce soit
+        quand la suivante est demandee : sans cette reserve, un compte a un
+        credit pourrait empiler autant de taches qu'il le souhaite.
+        """
+        cost = self.check_credits(user, operation, units=units)
+        user.ai_credits_remaining = max(user.ai_credits_remaining - cost, 0)
+        return cost
+
+    def refund(self, user: User, amount: int) -> None:
+        """Rend une reserve dont la generation n'a rien produit."""
+        if amount <= 0:
+            return
+        user.ai_credits_remaining += amount
+        logger.info(
+            "crédits rendus après échec",
+            extra={"event": "ai_credits_refunded"},
+        )
+
+    # ------------------------------------------------------------------
     def record_usage(
         self,
         user: User,

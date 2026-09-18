@@ -118,3 +118,28 @@ class AIOperation(StrEnum):
     IMPROVE_DOCUMENT = "IMPROVE_DOCUMENT"
     SCORE_PROJECT = "SCORE_PROJECT"
     MATCH_FUNDING = "MATCH_FUNDING"
+
+
+class JobKind(StrEnum):
+    """Nature d'une tache de generation."""
+
+    GENERATE_DOCUMENT = "GENERATE_DOCUMENT"
+    REFINE_DOCUMENT = "REFINE_DOCUMENT"
+
+
+class JobStatus(StrEnum):
+    """Cycle de vie d'une tache de generation.
+
+    `QUEUED` -> `RUNNING` -> `SUCCEEDED` ou `FAILED`. Une tache ne repasse
+    jamais a un etat anterieur : le frontend peut arreter de l'interroger des
+    qu'elle est dans un etat terminal.
+    """
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+    @property
+    def is_final(self) -> bool:
+        return self in (JobStatus.SUCCEEDED, JobStatus.FAILED)

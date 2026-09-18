@@ -12,6 +12,7 @@ from app.services.screenplay_service import (
     last_scene_number,
     plan_segments,
 )
+from tests.conftest import job_result
 
 
 def _generate(client, headers, project_id, document_type="SHORT_SYNOPSIS", **payload):
@@ -40,8 +41,7 @@ def test_document_types_endpoint_lists_prompts(client, auth_headers):
 
 def test_generate_creates_document_and_first_version(client, auth_headers, project):
     response = _generate(client, auth_headers, project["id"])
-    assert response.status_code == 201, response.text
-    result = response.json()
+    result = job_result(response)
 
     assert result["document"]["document_type"] == "SHORT_SYNOPSIS"
     assert result["document"]["current_version"] == 1
@@ -59,8 +59,8 @@ def test_generate_creates_document_and_first_version(client, auth_headers, proje
 
 
 def test_regenerating_adds_a_version_without_duplicating_document(client, auth_headers, project):
-    first = _generate(client, auth_headers, project["id"]).json()
-    second = _generate(client, auth_headers, project["id"]).json()
+    first = job_result(_generate(client, auth_headers, project["id"]))
+    second = job_result(_generate(client, auth_headers, project["id"]))
 
     assert first["document"]["id"] == second["document"]["id"]
     assert second["document"]["current_version"] == 2
@@ -78,7 +78,7 @@ def test_overwrite_false_protects_existing_content(client, auth_headers, project
 
 
 def test_manual_save_then_restore_previous_version(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     original = document["content"]
 
     saved = client.put(
@@ -99,7 +99,7 @@ def test_manual_save_then_restore_previous_version(client, auth_headers, project
 
 
 def test_saving_identical_content_does_not_create_a_version(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     response = client.put(
         f"/api/v1/projects/{project['id']}/documents/{document['id']}",
         json={"content": document["content"]},
@@ -110,14 +110,13 @@ def test_saving_identical_content_does_not_create_a_version(client, auth_headers
 
 @pytest.mark.parametrize("action", ["IMPROVE", "SHORTEN", "EXPAND", "CORRECT"])
 def test_refine_actions(client, auth_headers, project, action):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     response = client.post(
         f"/api/v1/projects/{project['id']}/documents/{document['id']}/refine",
         json={"action": action},
         headers=auth_headers,
     )
-    assert response.status_code == 200
-    assert response.json()["document"]["current_version"] == 2
+    assert job_result(response)["document"]["current_version"] == 2
 
 
 def test_generation_consumes_credits_and_stops_at_zero(client, make_user):
@@ -129,8 +128,7 @@ def test_generation_consumes_credits_and_stops_at_zero(client, make_user):
     ).json()["id"]
 
     first = _generate(client, headers, project_id)
-    assert first.status_code == 201
-    assert first.json()["credits_remaining"] == 0
+    assert job_result(first)["credits_remaining"] == 0
 
     second = _generate(client, headers, project_id)
     assert second.status_code == 402
@@ -247,8 +245,7 @@ def test_long_screenplay_generation_costs_one_credit_per_pass(client, make_user)
         json={"language": "fr", "target_duration_minutes": 110},
         headers=headers,
     )
-    assert response.status_code == 201, response.text
-    result = response.json()
+    result = job_result(response)
     assert result["passes"] > 1
     assert result["credits_consumed"] == result["passes"]
 
@@ -269,11 +266,12 @@ def test_screenplay_target_is_independent_of_project_duration(client, make_user)
         json={"language": "fr", "target_duration_minutes": capacity["max_minutes"]},
         headers=headers,
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "SUCCEEDED", response.text
 
 
 def test_restoring_a_version_resyncs_project_fields(client, auth_headers, project):
-    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    document = job_result(_generate(client, auth_headers, project["id"]))["document"]
     original = document["content"].strip()
 
     client.put(
@@ -329,7 +327,7 @@ def test_missing_information_is_extracted():
 
 
 def test_mock_provider_never_invents_content(client, auth_headers, project):
-    content = _generate(client, auth_headers, project["id"]).json()["document"]["content"]
+    content = job_result(_generate(client, auth_headers, project["id"]))["document"]["content"]
     assert "MODE `mock`" in content
     assert "Information non fournie." in content
     # Le seul personnage present est celui saisi par l'utilisateur.

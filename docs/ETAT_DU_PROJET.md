@@ -13,9 +13,9 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Fondations
 
-- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à cinq services (frontend, backend,
-  postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
-- Schéma PostgreSQL complet : **21 tables**, contraintes d'intégrité, index, migration Alembic
+- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à six services (frontend, backend,
+  worker, postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
+- Schéma PostgreSQL complet : **22 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
 - Configuration centralisée et typée (`pydantic-settings`), aucun secret en dur.
@@ -78,6 +78,15 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - **Cohérence inter-documents** : chaque prompt reçoit le contexte structuré du projet et le
   contenu des documents dont il dépend. La note de réalisation voit la note d'intention et le
   synopsis ; le scénario voit le traitement et les personnages.
+- **Génération hors requête HTTP** : une demande est acceptée en quelques millisecondes et
+  exécutée par un worker. Mesuré sur un scénario de 110 pages (8 passes, fournisseur à 1,5 s
+  par appel) : réponse en **10 ms** pour une génération de **12,2 s**, avec l'avancement
+  visible passe après passe. Les crédits sont **réservés à la mise en file** — sans quoi on
+  pourrait empiler des générations au-delà de son quota — et **rendus si la tâche échoue**. La
+  base est la source de vérité : une file Redis perdue ne perd aucune tâche, un balayage les
+  reprend, et une tâche dont le worker a disparu échoue proprement plutôt que de rester en
+  cours. Sans `REDIS_URL` ou sans worker, l'API génère elle-même : `GET /health` dit lequel
+  des deux modes est actif.
 - **Scénarios longs en plusieurs passes** : un scénario dépassant ce qu'un appel unique peut
   produire est découpé selon la structure en trois actes ; chaque passe reçoit la fin de la
   précédente pour la continuité des personnages, des lieux et de la numérotation des séquences.
@@ -150,14 +159,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **109 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **124 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression. La limitation de débit non partagée entre répliques, longtemps
-  documentée comme une limite connue, l'est aussi. Le test d'intégration sur un vrai serveur
+  des tests de non-régression. Les deux limites connues les plus lourdes — limitation de débit
+  non partagée entre répliques, et génération tenue dans la requête HTTP — sont corrigées. Le test d'intégration sur un vrai serveur
   Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
@@ -182,24 +191,24 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ## KNOWN ISSUES
 
-1. **Génération synchrone** — un scénario de 110 pages enchaîne plusieurs appels au fournisseur
-   et peut dépasser plusieurs minutes, en tenant la requête HTTP ouverte. Une file de tâches
-   (Redis + worker) est le prolongement naturel ; l'architecture y est préparée.
-2. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
+1. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-3. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
+2. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
    (8000), le découpage couvre jusqu'à 138 minutes. Au-delà, l'API refuse explicitement
    (`screenplay_too_long`) plutôt que de facturer un scénario tronqué, et l'interface n'affiche
    que les durées réellement productibles, obtenues auprès du serveur. Augmenter
    `AI_MAX_OUTPUT_TOKENS` relève la limite.
-4. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
+3. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
    aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
    dette à combler.
-5. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
+4. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
    permet à un tiers de tester si une adresse est inscrite. La connexion, elle, ne révèle rien
    (message et temps de réponse identiques). Le supprimer suppose de basculer sur une
    inscription en deux temps avec confirmation par e-mail.
+5. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
+   une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
+   entre deux passes, non implémenté.
 6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
@@ -213,7 +222,8 @@ Voir [`.env.example`](../.env.example) et la section 4 du [README](../README.md)
 Indispensables en production : `DATABASE_URL`, `JWT_SECRET` (fort et unique), `CORS_ORIGINS`
 (domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`. Avec
 plusieurs répliques, `REDIS_URL` s'ajoute à cette liste : sans lui, la limitation de débit
-annoncée est multipliée par le nombre de répliques.
+annoncée est multipliée par le nombre de répliques, et les générations s'exécutent dans la
+requête HTTP. Le worker (`python -m app.workers.runner`) se déploie à côté de l'API.
 
 ---
 
@@ -240,14 +250,12 @@ Installation manuelle : sections 6 et 7 du README.
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
 2. **Phase 4 — Budget** : générateur de budget par type de projet, plan de financement,
    calendrier de production, export XLSX.
-3. **Passer la génération en asynchrone** : worker adossé au Redis désormais provisionné, avec
-   suivi de progression par passe pour les scénarios longs.
-4. **Tests frontend** : Playwright sur inscription → projet → génération → export.
-5. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
+3. **Tests frontend** : Playwright sur inscription → projet → génération → export.
+4. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
    (mobile money notamment), gestion du cycle d'abonnement.
-6. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
+5. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
    classification → validation humaine → base), notifications par e-mail. Il alimentera la base
    de financements que l'administration remplit aujourd'hui à la main.
-7. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
+6. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
-8. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.
+7. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

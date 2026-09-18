@@ -67,6 +67,20 @@ def db_session() -> Generator:
         yield session
 
 
+def job_result(response) -> dict:
+    """Résultat d'une génération, à partir de la réponse qui l'a lancée.
+
+    Le lancement répond 202 avec une tâche. Aucun worker n'est configuré en
+    test (`REDIS_URL` vide) : l'API exécute la tâche elle-même, elle est donc
+    déjà terminée quand la réponse arrive.
+    """
+    assert response.status_code == 202, response.text
+    job = response.json()
+    assert job["status"] == "SUCCEEDED", job
+    assert job["result"] is not None, job
+    return job["result"]
+
+
 def register_payload(email: str = "user@example.com", **overrides) -> dict:
     payload = {
         "email": email,

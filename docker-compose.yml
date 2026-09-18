@@ -61,6 +61,33 @@ services:
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: filmfund-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-filmfund}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-filmfund}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend-storage:/app/storage
+    # Les migrations sont appliquees par le backend : le worker attend
+    # simplement que la table des taches existe.
+    command: python -m app.workers.runner
+    # L'image porte une sonde HTTP pour l'API ; le worker ne sert aucune
+    # requete et serait declare malade a tort.
+    healthcheck:
+      disable: true
+
   frontend:
     build:
       context: ./frontend

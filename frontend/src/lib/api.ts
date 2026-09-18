@@ -14,6 +14,7 @@ import type {
   DocumentType,
   DocumentTypeInfo,
   DocumentVersion,
+  GenerationJob,
   GenerationResult,
   MatchExplanation,
   MatchListResponse,
@@ -259,7 +260,7 @@ export const documentApi = {
       overwrite?: boolean;
     } = {},
   ) =>
-    request<GenerationResult>(
+    request<GenerationJob>(
       `/api/v1/projects/${projectId}/documents/${documentType}/generate`,
       { method: "POST", body: { language: "fr", overwrite: true, ...payload } },
     ),
@@ -275,7 +276,7 @@ export const documentApi = {
     }),
 
   refine: (projectId: string, documentId: string, action: RefineAction, instructions?: string) =>
-    request<GenerationResult>(
+    request<GenerationJob>(
       `/api/v1/projects/${projectId}/documents/${documentId}/refine`,
       { method: "POST", body: { action, instructions: instructions ?? null } },
     ),
@@ -400,6 +401,54 @@ export const dashboardApi = {
   markRead: (id: string) =>
     request<{ detail: string }>(`/api/v1/notifications/${id}/read`, { method: "POST" }),
 };
+
+export const jobApi = {
+  get: (jobId: string) => request<GenerationJob>(`/api/v1/jobs/${jobId}`),
+
+  listForProject: (projectId: string) =>
+    request<GenerationJob[]>(`/api/v1/projects/${projectId}/jobs`),
+};
+
+/** Première attente avant d'interroger une tâche, en millisecondes. */
+const JOB_POLL_START_MS = 1000;
+/** Plafond de l'attente : au-delà, l'écran paraîtrait figé. */
+const JOB_POLL_MAX_MS = 5000;
+
+/**
+ * Suit une génération jusqu'à son état terminal et renvoie son résultat.
+ *
+ * L'attente entre deux interrogations s'allonge progressivement : une logline
+ * est prête en quelques secondes, un scénario de 110 pages demande plusieurs
+ * minutes — inutile d'interroger le serveur toutes les secondes pendant tout
+ * ce temps.
+ */
+export async function waitForJob(
+  job: GenerationJob,
+  options: { onProgress?: (job: GenerationJob) => void; signal?: AbortSignal } = {},
+): Promise<GenerationResult> {
+  let current = job;
+  let delay = JOB_POLL_START_MS;
+  options.onProgress?.(current);
+
+  while (current.status === "QUEUED" || current.status === "RUNNING") {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay = Math.min(Math.round(delay * 1.4), JOB_POLL_MAX_MS);
+    if (options.signal?.aborted) {
+      throw new ApiError("Suivi de la génération interrompu.", 0, "job_tracking_aborted");
+    }
+    current = await jobApi.get(current.id);
+    options.onProgress?.(current);
+  }
+
+  if (current.status === "FAILED" || current.result === null) {
+    throw new ApiError(
+      current.error_message ?? "La génération a échoué.",
+      500,
+      current.error_code ?? "job_failed",
+    );
+  }
+  return current.result;
+}
 
 /** Télécharge un export en réutilisant le jeton d'accès courant. */
 export async function downloadExport(path: string, fallbackName: string): Promise<void> {

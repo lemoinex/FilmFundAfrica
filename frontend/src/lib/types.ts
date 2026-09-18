@@ -153,6 +153,31 @@ export interface GenerationResult {
   missing_information: string[];
 }
 
+export type JobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+
+/**
+ * Une génération demandée. L'API répond par cette tâche plutôt que d'attendre
+ * la fin : un scénario long enchaîne plusieurs appels au fournisseur et
+ * dépasserait le délai d'une requête HTTP.
+ */
+export interface GenerationJob {
+  id: string;
+  project_id: string;
+  document_id: string | null;
+  kind: "GENERATE_DOCUMENT" | "REFINE_DOCUMENT";
+  document_type: DocumentType;
+  status: JobStatus;
+  total_passes: number;
+  completed_passes: number;
+  credits_reserved: number;
+  error_code: string | null;
+  error_message: string | null;
+  result: GenerationResult | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 export interface ScoreCriterion {
   key: string;
   label: string;

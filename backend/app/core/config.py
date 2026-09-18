@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     #: en memoire pour cet appel.
     redis_timeout_seconds: float = 0.25
 
+    # --- Taches de generation ---
+    #: Au-dela, une tache restee `RUNNING` est consideree comme interrompue
+    #: (worker disparu) : elle echoue et ses credits sont rendus.
+    job_timeout_seconds: int = 900
+    #: Age a partir duquel une tache encore en attente est reprise par le
+    #: balayage, meme si le signal Redis s'est perdu.
+    job_stale_seconds: int = 60
+
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"
     ai_api_key: str = ""
