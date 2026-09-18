@@ -529,6 +529,55 @@ poste et couverture du plan de financement.
 
 ## 15. Déploiement
 
+### Base de données : Supabase
+
+Supabase ne sert ici que de **PostgreSQL géré**. Ni le SDK, ni Supabase Auth, ni l'API REST
+ne sont utilisés : le backend parle PostgreSQL directement, et l'authentification comme
+l'isolation des données sont faites par l'API. Brancher une autre instance PostgreSQL ne
+demanderait que de changer `DATABASE_URL`.
+
+```bash
+# Connexion applicative — mode « session pooler », port 5432
+DATABASE_URL="postgresql://postgres.<ref>:<mot-de-passe>@<hôte-pooler>:5432/postgres"
+```
+
+Trois pièges, dans l'ordre où on les rencontre :
+
+1. **L'hôte direct `db.<ref>.supabase.co` ne répond qu'en IPv6.** Un serveur ou un
+   conteneur sans IPv6 n'a aucune route vers lui : le pooler, lui, a une adresse IPv4.
+   Son nom d'hôte exact figure dans le tableau de bord, bouton *Connect*.
+2. **Prenez le pooler en mode « session » (5432), pas « transaction » (6543).** psycopg
+   utilise des requêtes préparées, que le mode transaction ne gère pas — il faudrait
+   ajouter `?prepare_threshold=0`. Surtout, Alembic pose des verrous de session pendant une
+   migration : les faire passer par le mode transaction expose à des migrations à moitié
+   appliquées.
+3. **Encodez les caractères spéciaux du mot de passe.** Dans une URL, `@` s'écrit `%40`,
+   `#` s'écrit `%23`, `/` s'écrit `%2F`. Un mot de passe contenant un `@` non encodé coupe
+   l'URL en deux et produit une erreur d'hôte introuvable, pas une erreur de mot de passe —
+   l'origine du problème est alors peu lisible.
+
+Le préfixe `postgresql://` est accepté tel quel : la configuration le convertit en
+`postgresql+psycopg://`.
+
+Ensuite :
+
+```bash
+alembic upgrade head     # applique ce qui manque, ne rejoue rien
+```
+
+Les **offres d'abonnement se créent d'elles-mêmes** au premier besoin
+(`CreditService.ensure_plans`) : une base neuve n'a aucune donnée de référence à charger à
+la main. `python -m scripts.seed` n'est utile que pour un jeu de démonstration.
+
+> **L'API REST de Supabase expose le schéma `public`.** Elle n'est d'aucune utilité pour
+> cette application, et tant qu'elle est ouverte sans RLS, la clé `anon` — publique par
+> nature — donne accès en lecture et en écriture à toutes les tables, `users` et
+> `payments` compris. Retirez `public` des schémas exposés (*Project Settings → API*), ou
+> activez RLS sans politique sur chaque table : le rôle `postgres`, qu'utilise le backend,
+> n'y est pas soumis.
+
+### Hébergement
+
 L'application est conçue pour un hébergement conteneurisé :
 
 1. Provisionner PostgreSQL (Supabase, Neon ou instance gérée) et renseigner `DATABASE_URL`.

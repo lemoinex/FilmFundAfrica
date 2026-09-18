@@ -385,23 +385,28 @@ Installation manuelle : sections 6 et 7 du README.
 
 ## NEXT STEPS
 
-1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
+1. **Déployer l'application.** Le schéma est en place sur le PostgreSQL managé
+   (Supabase, projet `FilmFundAfrica`, migrations jusqu'à `0006`), mais **rien ne s'y
+   connecte encore** : il n'existe aucun déploiement. Il manque un hôte pour l'API et le
+   worker — Vercel ne convient qu'au frontend Next.js, pas à un processus long — et
+   `DATABASE_URL` dans son environnement. Voir la section 15 du README.
+2. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
-2. **Brancher un prestataire de paiement réel** : le cycle d'abonnement est complet et la
+3. **Brancher un prestataire de paiement réel** : le cycle d'abonnement est complet et la
    couche prestataire est en place, mais aucun prestataire réel n'y est branché — cela demande
    un compte, des clés et la documentation exacte de son API. Écrire cette intégration « de
    mémoire » produirait un code qui compile et qui échoue en production.
-3. **Brancher la veille sur des sources réelles** : le pipeline et la file de validation
+4. **Brancher la veille sur des sources réelles** : le pipeline et la file de validation
    fonctionnent, mais le nœud « source » des workflows pointe encore sur une URL d'exemple.
    C'est un travail éditorial : choisir les portails à suivre, puis relire ce qu'ils remontent.
-4. **Créer le projet Sentry et renseigner les DSN.** Le branchement est fait des deux côtés,
+5. **Créer le projet Sentry et renseigner les DSN.** Le branchement est fait des deux côtés,
    mais il ne s'active qu'avec un DSN : il faut un compte et un projet Sentry, que personne
    ici ne peut inventer. Sans DSN, rien ne part — c'est le comportement par défaut, et il est
    testé.
-5. **Produit analytics** : le point d'extension est le même que celui de Sentry
+6. **Produit analytics** : le point d'extension est le même que celui de Sentry
    (`app/core/logging.py` et `app/core/observability.py`), mais aucun outil n'y est branché.
-6. **Générer les documents dans la langue du projet.** Interface et API sont bilingues,
+7. **Générer les documents dans la langue du projet.** Interface et API sont bilingues,
    mais les prompts de l'AI Writer sont écrits en français : un projet anglophone reçoit
    une interface anglaise et des documents français. C'est le dernier endroit où la langue
    ne suit pas. Le chantier n'est pas une traduction de chaînes mais une réécriture des
