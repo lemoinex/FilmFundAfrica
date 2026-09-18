@@ -153,6 +153,59 @@ export interface GenerationResult {
   missing_information: string[];
 }
 
+export type PlanCode = "FREE" | "PRO_AUTHOR" | "PRODUCER";
+export type SubscriptionStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
+export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "REFUNDED";
+
+export interface Plan {
+  id: string;
+  code: PlanCode;
+  name: string;
+  description: string;
+  price_amount: number;
+  price_currency: string;
+  billing_period: string;
+  max_projects: number;
+  monthly_ai_credits: number;
+  allows_export: boolean;
+  allows_matching: boolean;
+  allows_collaboration: boolean;
+  allows_advanced_budget: boolean;
+  sort_order: number;
+}
+
+export interface SubscriptionState {
+  plan: Plan;
+  status: SubscriptionStatus;
+  started_at: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
+  /** Vrai tant que la période payée court, résiliation comprise. */
+  is_active: boolean;
+  /** Faux dès que l'abonnement est résilié. */
+  is_renewing: boolean;
+  ai_credits_remaining: number;
+}
+
+export interface Payment {
+  id: string;
+  provider: string;
+  provider_reference: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  phone_number: string | null;
+  checkout_url: string | null;
+  failure_reason: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface CheckoutResponse {
+  payment: Payment;
+  instructions: string | null;
+}
+
 export type BudgetCategory =
   | "DEVELOPMENT"
   | "PRE_PRODUCTION"

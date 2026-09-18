@@ -21,6 +21,10 @@ os.environ.update(
         "RATE_LIMIT_AUTH_PER_MINUTE": "1000",
         "RATE_LIMIT_AI_PER_MINUTE": "1000",
         "SMTP_HOST": "",
+        # Prestataire simulé : la chaîne de paiement s'exerce en entier, y
+        # compris le rejet d'une notification mal signée, sans compte nulle part.
+        "PAYMENT_PROVIDER": "mock",
+        "PAYMENT_WEBHOOK_SECRET": "test-webhook-secret",
     }
 )
 

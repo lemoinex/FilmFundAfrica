@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          182 tests (pytest)
+│   └── tests/          208 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -130,6 +130,8 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `JWT_SECRET` | Signature des jetons — **obligatoire en production** (≥ 32 caractères) | — |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée du jeton d'accès | `60` |
 | `EMAIL_VERIFICATION_EXPIRE_MINUTES` | Durée du lien de confirmation d'adresse | `1440` |
+| `PAYMENT_PROVIDER` | `manual` (encaissement hors ligne) ou `mock` (simulé, développement) | `manual` |
+| `PAYMENT_WEBHOOK_SECRET` | Secret signant les notifications du prestataire | vide |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
 | `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
@@ -385,7 +387,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 182 tests
+pytest                    # 208 tests
 ruff check .              # lint
 ```
 

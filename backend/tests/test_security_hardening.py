@@ -22,6 +22,9 @@ def _production_settings(**overrides) -> Settings:
         "debug": False,
         "jwt_secret": "a" * 64,
         "ai_provider": "mock",
+        # Les tests tournent avec PAYMENT_PROVIDER=mock, que la production
+        # refuse : on repart d'une configuration d'encaissement légitime.
+        "payment_provider": "manual",
         "_env_file": None,
     }
     base.update(overrides)

@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     #: balayage, meme si le signal Redis s'est perdu.
     job_stale_seconds: int = 60
 
+    # --- Paiements et abonnements ---
+    #: `manual` : encaissement hors ligne, valide depuis l'administration.
+    #: `mock` : prestataire simule, pour le developpement et les tests.
+    #: Brancher un prestataire reel revient a ajouter une classe et un nom ici.
+    payment_provider: Literal["manual", "mock"] = "manual"
+    #: Secret partage avec le prestataire, qui signe ses notifications. Sans
+    #: lui, aucune notification n'est acceptee : une verification qui s'ouvre
+    #: quand la configuration est incomplete ne protege rien.
+    payment_webhook_secret: str = ""
+
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"
     ai_api_key: str = ""
@@ -131,6 +141,16 @@ class Settings(BaseSettings):
             problems.append("DEBUG doit valoir false en production")
         if self.ai_provider != "mock" and not self.ai_api_key:
             problems.append(f"AI_API_KEY est requis avec AI_PROVIDER={self.ai_provider}")
+        if self.payment_provider == "mock":
+            problems.append(
+                "PAYMENT_PROVIDER=mock encaisse des paiements fictifs : interdit en production"
+            )
+        if self.payment_provider != "manual" and not self.payment_webhook_secret:
+            problems.append(
+                "PAYMENT_WEBHOOK_SECRET est requis avec "
+                f"PAYMENT_PROVIDER={self.payment_provider} : sans lui, n'importe qui "
+                "pourrait s'offrir un abonnement en appelant le webhook"
+            )
 
         if problems:
             raise ValueError(

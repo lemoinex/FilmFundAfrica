@@ -1,7 +1,7 @@
 # État du projet — rapport de livraison
 
 Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation), Phase 2
-(AI Writer), Phase 3 (Funding Intelligence) et Phase 4 (Budget)**, plus l'export qui figure
+(AI Writer), Phase 3 (Funding Intelligence), Phase 4 (Budget) et Phase 5 (Abonnements)**, plus l'export qui figure
 parmi les fonctionnalités indispensables du MVP.
 
 Ce document dit ce qui fonctionne réellement, ce qui est partiel et ce qui n'est pas commencé.
@@ -15,7 +15,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 - Monorepo `backend/` + `frontend/`, `docker-compose.yml` à six services (frontend, backend,
   worker, postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
-- Schéma PostgreSQL complet : **23 tables**, contraintes d'intégrité, index, migration Alembic
+- Schéma PostgreSQL complet : **24 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
 - Configuration centralisée et typée (`pydantic-settings`), aucun secret en dur.
@@ -181,6 +181,26 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - Le critère « Budget » du score de maturité lit ces tables : chiffrer le dossier fait monter le
   score immédiatement (mesuré sur un parcours réel : 4/100 → 19/100).
 
+### Abonnements et paiements
+
+- **Cycle d'abonnement complet** : souscription, activation sur paiement abouti, résiliation,
+  échéance. Trois règles le portent. *Un paiement donne des droits, il ne les suppose pas* :
+  rien n'est accordé tant qu'il n'est pas abouti — en mobile money, la personne doit encore
+  valider sur son téléphone. *Les notifications sont idempotentes* : la référence porte une
+  contrainte d'unicité, et une notification rejouée — ce que font tous les prestataires — ne
+  prolonge pas l'abonnement une seconde fois. *Résilier n'est pas couper* : la période déjà
+  payée va à son terme, c'est l'échéance qui fait redescendre à l'offre gratuite.
+- **Notifications authentifiées** : signature HMAC-SHA256 vérifiée en temps constant avant
+  toute lecture du contenu. Sans secret configuré, aucune notification n'est acceptée — une
+  vérification qui s'ouvre quand la configuration est incomplète ne protège rien.
+- **Couche prestataire interchangeable**, sur le modèle de `AIProvider` : `manual`
+  (encaissement hors ligne validé depuis l'administration, et tracé au nom de qui valide) et
+  `mock` (simulé, refusé en production). Chaque paiement est une ligne conservée, jamais
+  écrasée, avec la charge utile reçue du prestataire.
+- Renouveler avant l'échéance **prolonge** la période au lieu de la raccourcir.
+- Écran d'abonnement : offres et prix venant du serveur, solde de crédits, historique des
+  paiements, résiliation.
+
 ### Tableau de bord et administration
 
 - Statistiques (projets, documents générés, opportunités compatibles, échéances), cartes projet
@@ -207,7 +227,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **182 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **208 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -233,7 +253,6 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 | --- | --- | --- |
 | **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration | La base est vide au démarrage : elle s'alimente par saisie administrateur. Le pipeline de veille automatisée (collecte, classification, validation) reste en Phase 6 |
 | **Notifications** | Table, API de lecture et de marquage, affichage au tableau de bord, tâches de détection d'échéances et de dossiers incomplets | Envoi effectif des e-mails (le service SMTP existe et journalise à défaut), déclenchement planifié |
-| **Abonnements** | Trois offres en base avec prix et quotas configurables depuis l'administration, quotas appliqués | Aucun paiement : changer d'offre se fait aujourd'hui par l'administration |
 | **Internationalisation** | Champ `preferred_locale`, paramètre de langue accepté par les prompts (français / anglais) | Traduction de l'interface : elle est en français |
 
 ---
@@ -259,10 +278,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
    désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
    registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
    de dix heures demandera toujours une relecture d'ensemble.
-6. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
+6. **Aucun prestataire de paiement réel** — le cycle d'abonnement fonctionne de bout en bout,
+   mais avec `manual` (encaissement hors ligne) ou `mock` (simulé). Brancher CinetPay, PayDunya,
+   Wave ou Flutterwave revient à écrire une classe implémentant `PaymentProvider` : trois
+   méthodes, documentées dans `app/services/payments/base.py`.
+7. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
    dans une seule taille de fenêtre. Firefox, WebKit et l'affichage mobile ne sont pas testés ;
    les ajouter ne demande qu'une ligne de configuration, mais allonge d'autant chaque exécution.
-7. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+8. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 
@@ -302,8 +325,10 @@ Installation manuelle : sections 6 et 7 du README.
 1. **Alimenter la base de financements** : le module fonctionne, mais il est vide. C'est
    désormais un travail éditorial — collecter des dispositifs réellement ouverts aux projets
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
-2. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
-   (mobile money notamment), gestion du cycle d'abonnement.
+2. **Brancher un prestataire de paiement réel** : le cycle d'abonnement est complet et la
+   couche prestataire est en place, mais aucun prestataire réel n'y est branché — cela demande
+   un compte, des clés et la documentation exacte de son API. Écrire cette intégration « de
+   mémoire » produirait un code qui compile et qui échoue en production.
 3. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
    classification → validation humaine → base), notifications par e-mail. Il alimentera la base
    de financements que l'administration remplit aujourd'hui à la main.

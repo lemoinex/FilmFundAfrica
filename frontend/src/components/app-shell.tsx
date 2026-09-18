@@ -12,6 +12,7 @@ const NAVIGATION = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: "grid" },
   { href: "/projets", label: "Mes projets", icon: "folder" },
   { href: "/financements", label: "Financements", icon: "target" },
+  { href: "/abonnement", label: "Abonnement", icon: "card" },
   { href: "/profil", label: "Profil", icon: "user" },
 ] as const;
 
@@ -27,6 +28,7 @@ function NavIcon({ name }: { name: string }) {
     target: "M12 3v3m0 12v3M3 12h3m12 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
     user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0",
     shield: "M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6l7-3z",
+    card: "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18",
   };
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>

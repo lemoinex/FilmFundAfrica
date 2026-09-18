@@ -20,6 +20,7 @@ from app.models.funding import (
     ProjectFundingMatch,
 )
 from app.models.jobs import GenerationJob
+from app.models.payment import Payment
 from app.models.project import Character, Project
 from app.models.system import AppSetting, AuditLog, Notification
 from app.models.user import EmailVerificationToken, PasswordResetToken, Profile, User
@@ -49,4 +50,5 @@ __all__ = [
     "AuditLog",
     "AppSetting",
     "GenerationJob",
+    "Payment",
 ]

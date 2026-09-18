@@ -9,6 +9,7 @@
 import type {
   AuthResponse,
   Budget,
+  CheckoutResponse,
   BudgetCategory,
   BudgetItem,
   Character,
@@ -27,12 +28,15 @@ import type {
   NotificationItem,
   Opportunity,
   OpportunityPage,
+  Payment,
+  Plan,
   Project,
   ProjectDocument,
   ProjectSummary,
   ReadinessScore,
   RefineAction,
   SchedulePhase,
+  SubscriptionState,
   ScreenplayCapacity,
   User,
 } from "./types";
@@ -428,6 +432,31 @@ export const dashboardApi = {
   notifications: () => request<NotificationItem[]>("/api/v1/notifications"),
   markRead: (id: string) =>
     request<{ detail: string }>(`/api/v1/notifications/${id}/read`, { method: "POST" }),
+};
+
+export const billingApi = {
+  plans: () => request<Plan[]>("/api/v1/billing/plans"),
+
+  subscription: () => request<SubscriptionState>("/api/v1/billing/subscription"),
+
+  payments: () => request<Payment[]>("/api/v1/billing/payments"),
+
+  /** Ouvre un paiement : rien n'est accordé tant qu'il n'a pas abouti. */
+  checkout: (planCode: string, phoneNumber?: string) =>
+    request<CheckoutResponse>("/api/v1/billing/checkout", {
+      method: "POST",
+      body: { plan_code: planCode, phone_number: phoneNumber ?? null },
+    }),
+
+  cancel: () =>
+    request<{ detail: string }>("/api/v1/billing/cancel", { method: "POST" }),
+
+  /** Réservée au prestataire simulé, en développement. */
+  simulate: (reference: string, succeed = true) =>
+    request<{ detail: string }>(
+      `/api/v1/billing/simulate/${reference}?succeed=${succeed}`,
+      { method: "POST" },
+    ),
 };
 
 export const budgetApi = {
