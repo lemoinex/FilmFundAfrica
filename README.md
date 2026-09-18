@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Tâches planifiées appelables par n8n
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          96 tests (pytest)
+│   └── tests/          109 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -135,6 +135,8 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote le découpage des scénarios | `8000` |
 | `AI_CREDITS_FREE/PRO/PRODUCER` | Quotas mensuels par offre | `1` / `300` / `500` |
 | `RATE_LIMIT_AUTH_PER_MINUTE` | Limitation sur les routes d'authentification | `10` |
+| `REDIS_URL` | Compteurs de limitation partagés entre répliques ; vide = compteurs en mémoire | vide |
+| `REDIS_TIMEOUT_SECONDS` | Délai au-delà duquel l'appel à Redis est abandonné | `0.25` |
 | `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
 | `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
@@ -361,7 +363,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 96 tests
+pytest                    # 109 tests
 ruff check .              # lint
 ```
 
@@ -391,9 +393,15 @@ L'application est conçue pour un hébergement conteneurisé :
 Derrière un proxy inverse, renseignez `TRUSTED_PROXY_IPS` avec son adresse : sans cela
 l'en-tête `X-Forwarded-For` est ignoré (et la limitation de débit s'applique à l'IP du proxy).
 
-**À faire avant une mise en production réelle** : la limitation de débit est en mémoire
-(mono-instance) — la basculer sur Redis pour plusieurs répliques ; brancher Sentry et un
-stockage d'objets si les utilisateurs téléversent des fichiers.
+**Avec plusieurs répliques, renseignez `REDIS_URL`.** Sans lui, chaque réplique compte les
+appels de son côté : avec trois répliques, `RATE_LIMIT_AUTH_PER_MINUTE=10` autorise en
+réalité trente tentatives de connexion par minute. Avec lui, la limite vaut pour le
+déploiement entier. Si Redis devient injoignable, l'API continue de répondre en comptant en
+mémoire (limite dégradée, jamais d'indisponibilité) et `GET /health` renvoie
+`"rate_limit": "redis-unreachable"` avec un statut `degraded` — à surveiller.
+
+**À faire avant une mise en production réelle** : brancher Sentry et un stockage d'objets si
+les utilisateurs téléversent des fichiers.
 
 ---
 

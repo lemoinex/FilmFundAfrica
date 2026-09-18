@@ -18,6 +18,24 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: filmfund-redis
+    restart: unless-stopped
+    # Les compteurs de limitation de debit se reconstruisent en une minute :
+    # les perdre au redemarrage est sans consequence, les ecrire sur disque
+    # serait du gaspillage.
+    command: redis-server --save "" --appendonly no
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -28,8 +46,11 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-filmfund}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-filmfund}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8000:8000"
@@ -74,14 +95,8 @@ services:
     depends_on:
       - backend
 
-# Evolution future : decommenter pour activer Redis + workers Celery/RQ.
-#  redis:
-#    image: redis:7-alpine
-#    container_name: filmfund-redis
-#    ports:
-#      - "6379:6379"
-
 volumes:
   postgres-data:
   n8n-data:
   backend-storage:
+  redis-data:

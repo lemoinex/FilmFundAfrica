@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     rate_limit_auth_per_minute: int = 10
     rate_limit_ai_per_minute: int = 10
     rate_limit_default_per_minute: int = 120
+    #: Vide : compteurs en memoire, propres a chaque processus. Renseigne
+    #: (`redis://host:6379/0`) : compteurs partages par toutes les repliques.
+    redis_url: str = ""
+    #: Un Redis lent ne doit pas tenir la requete ouverte : au-dela, on compte
+    #: en memoire pour cet appel.
+    redis_timeout_seconds: float = 0.25
 
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"

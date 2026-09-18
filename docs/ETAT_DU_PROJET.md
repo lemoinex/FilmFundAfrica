@@ -13,8 +13,8 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Fondations
 
-- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à quatre services (frontend, backend,
-  postgres, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
+- Monorepo `backend/` + `frontend/`, `docker-compose.yml` à cinq services (frontend, backend,
+  postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
 - Schéma PostgreSQL complet : **21 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
@@ -38,6 +38,13 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 - Limitation de débit sur les routes d'authentification et de génération IA, **non contournable
   par un en-tête `X-Forwarded-For` forgé** : cet en-tête n'est lu que si la connexion provient
   d'un proxy déclaré dans `TRUSTED_PROXY_IPS`. Les compteurs inactifs sont purgés.
+- **Limite partagée entre répliques** : avec `REDIS_URL`, les compteurs vivent dans Redis
+  (fenêtre glissante par ensemble ordonné, comptage en transaction `MULTI`/`EXEC`) et la limite
+  vaut pour le déploiement entier. Sans lui, chaque réplique compte de son côté et la limite
+  réelle est multipliée par leur nombre — mesuré : 10 connexions acceptées pour une limite
+  annoncée à 5, avec deux répliques. Si Redis devient injoignable, l'API continue de répondre
+  en comptant en mémoire (un coupe-circuit évite d'attendre un serveur muet à chaque appel) et
+  `GET /health` passe en `degraded` avec `"rate_limit": "redis-unreachable"`.
 - **Révocation des sessions** : un changement ou une réinitialisation de mot de passe invalide
   immédiatement tous les jetons émis auparavant, jetons de rafraîchissement compris.
 - **Le jeton de réinitialisation n'est jamais renvoyé par l'API** hors environnement
@@ -143,13 +150,15 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **96 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **109 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression.
+  des tests de non-régression. La limitation de débit non partagée entre répliques, longtemps
+  documentée comme une limite connue, l'est aussi. Le test d'intégration sur un vrai serveur
+  Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
   dépassement de quota ; puis saisie admin d'un dispositif → recherche filtrée → matching
@@ -173,27 +182,25 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ## KNOWN ISSUES
 
-1. **Limitation de débit en mémoire** — correcte sur une instance unique, sans effet réparti sur
-   plusieurs répliques. À basculer sur Redis avant une montée en charge horizontale.
-2. **Génération synchrone** — un scénario de 110 pages enchaîne plusieurs appels au fournisseur
+1. **Génération synchrone** — un scénario de 110 pages enchaîne plusieurs appels au fournisseur
    et peut dépasser plusieurs minutes, en tenant la requête HTTP ouverte. Une file de tâches
    (Redis + worker) est le prolongement naturel ; l'architecture y est préparée.
-3. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
+2. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-4. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
+3. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
    (8000), le découpage couvre jusqu'à 138 minutes. Au-delà, l'API refuse explicitement
    (`screenplay_too_long`) plutôt que de facturer un scénario tronqué, et l'interface n'affiche
    que les durées réellement productibles, obtenues auprès du serveur. Augmenter
    `AI_MAX_OUTPUT_TOKENS` relève la limite.
-5. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
+4. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
    aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
    dette à combler.
-6. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
+5. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
    permet à un tiers de tester si une adresse est inscrite. La connexion, elle, ne révèle rien
    (message et temps de réponse identiques). Le supprimer suppose de basculer sur une
    inscription en deux temps avec confirmation par e-mail.
-7. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 
@@ -204,7 +211,9 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 Voir [`.env.example`](../.env.example) et la section 4 du [README](../README.md).
 
 Indispensables en production : `DATABASE_URL`, `JWT_SECRET` (fort et unique), `CORS_ORIGINS`
-(domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`.
+(domaine réel), `AI_PROVIDER` + `AI_API_KEY`, `ENVIRONMENT=production`, `DEBUG=false`. Avec
+plusieurs répliques, `REDIS_URL` s'ajoute à cette liste : sans lui, la limitation de débit
+annoncée est multipliée par le nombre de répliques.
 
 ---
 
@@ -231,8 +240,8 @@ Installation manuelle : sections 6 et 7 du README.
    d'Afrique francophone, vérifier chaque source, les saisir depuis `/admin/financements`.
 2. **Phase 4 — Budget** : générateur de budget par type de projet, plan de financement,
    calendrier de production, export XLSX.
-3. **Passer la génération en asynchrone** : Redis + worker, avec suivi de progression par passe
-   pour les scénarios longs.
+3. **Passer la génération en asynchrone** : worker adossé au Redis désormais provisionné, avec
+   suivi de progression par passe pour les scénarios longs.
 4. **Tests frontend** : Playwright sur inscription → projet → génération → export.
 5. **Phase 5 — Monétisation** : intégration d'un prestataire de paiement adapté à la zone FCFA
    (mobile money notamment), gestion du cycle d'abonnement.

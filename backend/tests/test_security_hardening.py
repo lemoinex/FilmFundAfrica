@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.config import DEV_JWT_SECRET, Settings
-from app.core.rate_limit import RateLimiter, RateLimitExceeded, auth_limiter
+from app.core.rate_limit import MemoryBackend, RateLimiter, RateLimitExceeded, auth_limiter
 from tests.conftest import PROJECT_PAYLOAD, register_payload
 
 
@@ -92,11 +92,12 @@ def test_rate_limiter_evicts_stale_buckets(monkeypatch):
     # Windows) donnerait le même instant aux 50 appels.
     clock = iter(range(0, 10_000, 2))
     monkeypatch.setattr("app.core.rate_limit.time.monotonic", lambda: next(clock))
-    limiter = RateLimiter(max_calls=5, window_seconds=1)
+    backend = MemoryBackend()
+    limiter = RateLimiter(max_calls=5, window_seconds=1, backend=backend)
     for index in range(50):
         limiter.check(f"10.0.0.{index}:/login")
     # La purge empêche le dictionnaire de croître indéfiniment.
-    assert len(limiter._hits) < 50
+    assert len(backend._hits) < 50
 
 
 # ---------------------------------------------------------------------------
