@@ -38,6 +38,8 @@ def _create_schema() -> Generator[None, None, None]:
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    # Sous Windows, un fichier encore ouvert par le pool ne peut pas être supprimé.
+    engine.dispose()
     if os.path.exists(_db_path):
         os.unlink(_db_path)
 

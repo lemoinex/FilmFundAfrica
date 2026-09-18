@@ -31,6 +31,8 @@ ACT_RATIOS: tuple[tuple[str, float], ...] = (
 )
 
 MAX_PASSES = 10
+#: Plafond de sortie demandé par passe, avant bornage par `AI_MAX_OUTPUT_TOKENS`.
+SCREENPLAY_MAX_TOKENS_PER_CALL = 32000
 #: Marge de sécurité : on ne demande jamais à un fournisseur sa limite exacte.
 TOKEN_SAFETY_RATIO = 0.9
 #: Nombre de caractères de contexte de continuité repris d'une passe à l'autre.

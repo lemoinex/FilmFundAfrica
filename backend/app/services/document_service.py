@@ -31,7 +31,12 @@ from app.schemas.document import (
 from app.services.ai.service import AIService, word_count
 from app.services.credit_service import CreditService
 from app.services.scoring_service import ScoringService
-from app.services.screenplay_service import assemble, build_segment_prompt, plan_segments
+from app.services.screenplay_service import (
+    SCREENPLAY_MAX_TOKENS_PER_CALL,
+    assemble,
+    build_segment_prompt,
+    plan_segments,
+)
 
 logger = logging.getLogger("filmfund.documents")
 
@@ -118,9 +123,11 @@ class DocumentService:
         context = self.build_context(project, document_type)
 
         if document_type == DocumentType.SCREENPLAY:
+            # Plafond par appel identique à celui de `/documents/screenplay-capacity` :
+            # il ne dépend que du fournisseur, pas de la durée enregistrée sur le projet.
             segments = plan_segments(
                 payload.target_duration_minutes or project.duration or 90,
-                self.ai.effective_max_output_tokens(template._max_tokens(context, None)),
+                self.ai.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL),
             )
         else:
             segments = []
@@ -403,6 +410,7 @@ class DocumentService:
             origin="RESTORE",
             note=f"Restauration de la version {version_number}",
         )
+        self._sync_project_fields(project, document.document_type, document.content)
         self.db.commit()
         self.db.refresh(document)
         self.scoring.compute(project)

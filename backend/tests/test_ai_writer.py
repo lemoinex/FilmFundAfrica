@@ -253,6 +253,43 @@ def test_long_screenplay_generation_costs_one_credit_per_pass(client, make_user)
     assert result["credits_consumed"] == result["passes"]
 
 
+def test_screenplay_target_is_independent_of_project_duration(client, make_user):
+    """Une durée annoncée par `/screenplay-capacity` doit être réalisable,
+    même si la durée enregistrée sur le projet est bien plus courte."""
+    headers, _ = make_user("court@example.com", plan="PRODUCER")
+    capacity = client.get("/api/v1/documents/screenplay-capacity", headers=headers).json()
+    project_id = client.post(
+        "/api/v1/projects",
+        json={"title": "Court devenu long", "project_type": "FEATURE_FILM", "duration": 10},
+        headers=headers,
+    ).json()["id"]
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/documents/SCREENPLAY/generate",
+        json={"language": "fr", "target_duration_minutes": capacity["max_minutes"]},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_restoring_a_version_resyncs_project_fields(client, auth_headers, project):
+    document = _generate(client, auth_headers, project["id"]).json()["document"]
+    original = document["content"].strip()
+
+    client.put(
+        f"/api/v1/projects/{project['id']}/documents/{document['id']}",
+        json={"content": "Synopsis réécrit à la main."},
+        headers=auth_headers,
+    )
+    client.post(
+        f"/api/v1/projects/{project['id']}/documents/{document['id']}/versions/1/restore",
+        headers=auth_headers,
+    )
+
+    refreshed = client.get(f"/api/v1/projects/{project['id']}", headers=auth_headers).json()
+    assert refreshed["short_synopsis"] == original
+
+
 def test_screenplay_generation_refused_when_credits_insufficient(client, make_user):
     headers, _ = make_user("petit.budget@example.com")  # plan FREE : 1 crédit
     project_id = client.post(

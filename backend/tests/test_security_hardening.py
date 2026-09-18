@@ -87,8 +87,12 @@ def test_forged_x_forwarded_for_cannot_bypass_the_rate_limit(client):
     assert 429 in statuses
 
 
-def test_rate_limiter_evicts_stale_buckets():
-    limiter = RateLimiter(max_calls=5, window_seconds=0)
+def test_rate_limiter_evicts_stale_buckets(monkeypatch):
+    # Horloge simulée : la résolution de `time.monotonic()` (~15 ms sous
+    # Windows) donnerait le même instant aux 50 appels.
+    clock = iter(range(0, 10_000, 2))
+    monkeypatch.setattr("app.core.rate_limit.time.monotonic", lambda: next(clock))
+    limiter = RateLimiter(max_calls=5, window_seconds=1)
     for index in range(50):
         limiter.check(f"10.0.0.{index}:/login")
     # La purge empêche le dictionnaire de croître indéfiniment.

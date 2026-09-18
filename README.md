@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Tâches planifiées appelables par n8n
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          94 tests (pytest)
+│   └── tests/          96 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -361,7 +361,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 94 tests
+pytest                    # 96 tests
 ruff check .              # lint
 ```
 
