@@ -106,6 +106,18 @@ class PaymentStatus(StrEnum):
         return self is not PaymentStatus.PENDING
 
 
+class CandidateStatus(StrEnum):
+    """Etat d'un candidat de la veille automatisee.
+
+    Un candidat n'atteint la base vivante qu'apres passage par `APPROVED`,
+    decide par une personne.
+    """
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class NotificationType(StrEnum):
     NEW_OPPORTUNITY = "NEW_OPPORTUNITY"
     DEADLINE_SOON = "DEADLINE_SOON"

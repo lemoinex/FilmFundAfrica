@@ -6,6 +6,7 @@ from app.api.v1 import (
     admin,
     admin_funding,
     auth,
+    automation,
     billing,
     budget,
     dashboard,
@@ -33,5 +34,6 @@ api_router.include_router(billing.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_funding.router)
+api_router.include_router(automation.router)
 
 __all__ = ["api_router"]

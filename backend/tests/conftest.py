@@ -25,6 +25,9 @@ os.environ.update(
         # compris le rejet d'une notification mal signée, sans compte nulle part.
         "PAYMENT_PROVIDER": "mock",
         "PAYMENT_WEBHOOK_SECRET": "test-webhook-secret",
+        # Clé de l'automatisation : sans elle, les routes n8n restent fermées
+        # et les tests d'authentification n'auraient rien à vérifier.
+        "N8N_API_KEY": "cle-automatisation-de-test",
     }
 )
 

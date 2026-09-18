@@ -153,6 +153,23 @@ export interface GenerationResult {
   missing_information: string[];
 }
 
+export type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** Dispositif repéré par la veille, en attente de relecture humaine. */
+export interface OpportunityCandidate {
+  id: string;
+  name: string;
+  source_url: string;
+  source_name: string;
+  status: CandidateStatus;
+  payload: Record<string, unknown>;
+  review_note: string | null;
+  reviewed_at: string | null;
+  opportunity_id: string | null;
+  last_seen_at: string | null;
+  created_at: string;
+}
+
 export type PlanCode = "FREE" | "PRO_AUTHOR" | "PRODUCER";
 export type SubscriptionStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "REFUNDED";

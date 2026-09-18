@@ -1,7 +1,7 @@
 # État du projet — rapport de livraison
 
 Dernière mise à jour : 18 septembre 2026 · Périmètre livré : **Phase 1 (Foundation), Phase 2
-(AI Writer), Phase 3 (Funding Intelligence), Phase 4 (Budget) et Phase 5 (Abonnements)**, plus l'export qui figure
+(AI Writer), Phase 3 (Funding Intelligence), Phase 4 (Budget), Phase 5 (Abonnements) et Phase 6 (Automatisation)**, plus l'export qui figure
 parmi les fonctionnalités indispensables du MVP.
 
 Ce document dit ce qui fonctionne réellement, ce qui est partiel et ce qui n'est pas commencé.
@@ -15,7 +15,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 - Monorepo `backend/` + `frontend/`, `docker-compose.yml` à six services (frontend, backend,
   worker, postgres, redis, n8n), `.env.example` complet, `Dockerfile` pour chaque service.
-- Schéma PostgreSQL complet : **24 tables**, contraintes d'intégrité, index, migration Alembic
+- Schéma PostgreSQL complet : **25 tables**, contraintes d'intégrité, index, migration Alembic
   initiale. Les tables des phases 3 à 5 existent déjà, pour éviter une migration structurante
   plus tard.
 - Configuration centralisée et typée (`pydantic-settings`), aucun secret en dur.
@@ -210,6 +210,34 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   des offres et de leurs prix, **CRUD complet des dispositifs de financement et de leurs pièces
   exigées**.
 
+### Veille automatisée et tâches planifiées
+
+- **Le pipeline n8n n'écrit jamais dans la base vivante.** Il dépose des *candidats* dans une
+  file de validation ; un administrateur les relit depuis `/admin/veille`, corrige ce qui doit
+  l'être, puis publie ou écarte. Une opportunité proposée à un auteur engage son dossier de
+  financement : elle ne peut pas venir d'une classification automatique non relue. Vérifié de
+  bout en bout : deux candidats déposés, **zéro dispositif visible** avant relecture.
+- **Deux garde-fous à l'entrée** : pas d'URL source, pas de candidat ; et déduplication par
+  empreinte de la source — un second passage de la veille sur les mêmes pages produit
+  0 nouveau candidat et 2 doublons, au lieu de remplir la file. Une décision humaine tient :
+  un candidat écarté ne revient pas dans la file au passage suivant.
+- **Aucune valeur devinée** : une date illisible est écartée avec une trace dans les journaux,
+  jamais complétée. Les corrections du relecteur l'emportent sur l'extraction — c'est lui qui a
+  lu la source. La traçabilité (`source_url`, `source_name`, `last_verified_at`) suit le
+  candidat jusqu'au dispositif publié.
+- **Routes d'automatisation authentifiées** par clé partagée comparée en temps constant. Sans
+  clé configurée, elles sont fermées : une automatisation ouverte par défaut serait une porte
+  d'entrée sur la base de financements.
+- **Tâches planifiées déclenchables par liste fermée** (`notify_upcoming_deadlines`,
+  `notify_incomplete_projects`, `send_pending_notification_emails`, `reset_monthly_credits`,
+  `expire_due_subscriptions`) : une route acceptant un nom libre exposerait tout le module.
+  Toutes sont idempotentes.
+- **Envoi effectif des notifications par e-mail** : le drapeau `email_sent` existait sans que
+  rien ne l'écrive. Une notification n'est marquée envoyée que si l'envoi a réussi — sans SMTP,
+  elle reste en attente et repartira, au lieu d'être perdue.
+- Les deux workflows n8n appellent désormais ces routes, au lieu d'exécuter des commandes shell
+  dans le conteneur backend.
+
 ### Interface
 
 - Next.js 14 (App Router), TypeScript strict, Tailwind. 19 routes, build de production
@@ -227,7 +255,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **208 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **230 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -251,8 +279,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 | Fonctionnalité | Ce qui existe | Ce qui manque |
 | --- | --- | --- |
-| **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration | La base est vide au démarrage : elle s'alimente par saisie administrateur. Le pipeline de veille automatisée (collecte, classification, validation) reste en Phase 6 |
-| **Notifications** | Table, API de lecture et de marquage, affichage au tableau de bord, tâches de détection d'échéances et de dossiers incomplets | Envoi effectif des e-mails (le service SMTP existe et journalise à défaut), déclenchement planifié |
+| **Funding Intelligence** | Module complet : recherche, filtres, matching, explication IA, administration, et pipeline de veille avec file de validation | La base est vide au démarrage : la veille doit être branchée sur des sources réelles, et chaque candidat relu |
 | **Internationalisation** | Champ `preferred_locale`, paramètre de langue accepté par les prompts (français / anglais) | Traduction de l'interface : elle est en français |
 
 ---
@@ -282,10 +309,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
    mais avec `manual` (encaissement hors ligne) ou `mock` (simulé). Brancher CinetPay, PayDunya,
    Wave ou Flutterwave revient à écrire une classe implémentant `PaymentProvider` : trois
    méthodes, documentées dans `app/services/payments/base.py`.
-7. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
+7. **La veille n'a aucune source branchée** — le pipeline, la file de validation et les
+   garde-fous sont en place, mais le nœud « source » des workflows pointe sur une URL d'exemple.
+   Brancher un portail réel demande de choisir les sources et d'en lire la structure ; aucune
+   n'est proposée par défaut, faute de pouvoir en vérifier la fiabilité ici.
+8. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
    dans une seule taille de fenêtre. Firefox, WebKit et l'affichage mobile ne sont pas testés ;
    les ajouter ne demande qu'une ligne de configuration, mais allonge d'autant chaque exécution.
-8. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+9. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 
@@ -329,9 +360,9 @@ Installation manuelle : sections 6 et 7 du README.
    couche prestataire est en place, mais aucun prestataire réel n'y est branché — cela demande
    un compte, des clés et la documentation exacte de son API. Écrire cette intégration « de
    mémoire » produirait un code qui compile et qui échoue en production.
-3. **Phase 6 — Automatisation** : pipeline de veille n8n (source → extraction → nettoyage →
-   classification → validation humaine → base), notifications par e-mail. Il alimentera la base
-   de financements que l'administration remplit aujourd'hui à la main.
+3. **Brancher la veille sur des sources réelles** : le pipeline et la file de validation
+   fonctionnent, mais le nœud « source » des workflows pointe encore sur une URL d'exemple.
+   C'est un travail éditorial : choisir les portails à suivre, puis relire ce qu'ils remontent.
 4. **Observabilité** : brancher Sentry et un outil de produit analytics sur les points
    d'extension déjà en place.
 5. **Internationalisation** : extraire les chaînes de l'interface, ajouter l'anglais.

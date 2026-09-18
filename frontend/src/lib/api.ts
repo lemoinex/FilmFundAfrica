@@ -27,6 +27,7 @@ import type {
   MatchListResponse,
   NotificationItem,
   Opportunity,
+  OpportunityCandidate,
   OpportunityPage,
   Payment,
   Plan,
@@ -432,6 +433,26 @@ export const dashboardApi = {
   notifications: () => request<NotificationItem[]>("/api/v1/notifications"),
   markRead: (id: string) =>
     request<{ detail: string }>(`/api/v1/notifications/${id}/read`, { method: "POST" }),
+};
+
+export const candidateApi = {
+  /** File de validation de la veille : rien n'est publié sans relecture. */
+  list: (status?: string) =>
+    request<OpportunityCandidate[]>(
+      `/api/v1/admin/candidates${status ? `?status=${status}` : ""}`,
+    ),
+
+  approve: (candidateId: string, corrections: Record<string, unknown> = {}) =>
+    request<{ detail: string }>(`/api/v1/admin/candidates/${candidateId}/approve`, {
+      method: "POST",
+      body: corrections,
+    }),
+
+  reject: (candidateId: string, note?: string) =>
+    request<OpportunityCandidate>(`/api/v1/admin/candidates/${candidateId}/reject`, {
+      method: "POST",
+      body: { note: note ?? null },
+    }),
 };
 
 export const billingApi = {

@@ -19,6 +19,7 @@ from app.models.funding import (
     FundingRequirement,
     ProjectFundingMatch,
 )
+from app.models.ingestion import OpportunityCandidate
 from app.models.jobs import GenerationJob
 from app.models.payment import Payment
 from app.models.project import Character, Project
@@ -51,4 +52,5 @@ __all__ = [
     "AppSetting",
     "GenerationJob",
     "Payment",
+    "OpportunityCandidate",
 ]

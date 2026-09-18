@@ -11,6 +11,7 @@ from datetime import date, timedelta
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.enums import FundingStatus, NotificationType
 from app.models.funding import FundingOpportunity, ProjectFundingMatch
@@ -127,3 +128,67 @@ def reset_monthly_credits() -> int:
                 updated += 1
         db.commit()
     return updated
+
+
+def send_pending_notification_emails(limit: int = 200) -> int:
+    """Envoie par e-mail les notifications qui ne l'ont pas encore ete.
+
+    Le drapeau `email_sent` existait depuis le debut sans que rien ne l'ecrive :
+    les notifications s'affichaient dans l'application, et nulle part ailleurs.
+
+    Une notification n'est marquee envoyee que si l'envoi a reussi. Sans SMTP
+    configure, le service journalise et renvoie `False` : la notification reste
+    donc en attente et repartira des que SMTP le sera, au lieu d'etre perdue.
+    """
+    from app.services.email_service import EmailService
+
+    email = EmailService()
+    sent = 0
+
+    with SessionLocal() as db:
+        pending = db.scalars(
+            select(Notification)
+            .where(Notification.email_sent.is_(False))
+            .order_by(Notification.created_at)
+            .limit(limit)
+        ).all()
+
+        for notification in pending:
+            user = db.get(User, notification.user_id)
+            if user is None or not user.is_active:
+                continue
+            body = notification.body
+            if notification.link:
+                body = f"{body}\n\n{settings.frontend_url}{notification.link}"
+            if email.send_notification(user.email, notification.title, body):
+                notification.email_sent = True
+                sent += 1
+
+        db.commit()
+
+    logger.info(
+        "notifications envoyées par e-mail : %s / %s",
+        sent,
+        len(pending),
+        extra={"event": "notification_emails_sent"},
+    )
+    return sent
+
+
+def expire_due_subscriptions() -> int:
+    """Fait redescendre a l'offre gratuite les abonnements echus."""
+    from app.services.subscription_service import SubscriptionService
+
+    with SessionLocal() as db:
+        return SubscriptionService(db).expire_due()
+
+
+#: Taches appelables depuis l'exterieur (n8n, ordonnanceur). Liste fermee :
+#: une route qui accepterait un nom libre exposerait tout le module.
+SCHEDULED_TASKS = {
+    "notify_upcoming_deadlines": notify_upcoming_deadlines,
+    "notify_incomplete_projects": notify_incomplete_projects,
+    "reset_monthly_credits": reset_monthly_credits,
+    "send_pending_notification_emails": send_pending_notification_emails,
+    "expire_due_subscriptions": expire_due_subscriptions,
+}

@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          208 tests (pytest)
+│   └── tests/          230 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -146,6 +146,7 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
 | `N8N_WEBHOOK_URL` | Point d'entrée des automatisations | — |
+| `N8N_API_KEY` | Clé de l'automatisation (veille, tâches planifiées) ; vide = routes fermées | vide |
 | `NEXT_PUBLIC_API_URL` | URL de l'API vue par le navigateur | `http://localhost:8000` |
 
 **Aucune clé API réelle ne doit être commitée.** `.env` est ignoré par git.
@@ -387,7 +388,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 208 tests
+pytest                    # 230 tests
 ruff check .              # lint
 ```
 
