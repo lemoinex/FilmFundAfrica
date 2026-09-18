@@ -58,8 +58,11 @@ class Settings(BaseSettings):
     redis_timeout_seconds: float = 0.25
 
     # --- Taches de generation ---
-    #: Au-dela, une tache restee `RUNNING` est consideree comme interrompue
-    #: (worker disparu) : elle echoue et ses credits sont rendus.
+    #: Duree SANS SIGNE DE VIE au-dela de laquelle une tache est consideree
+    #: interrompue (worker disparu) : elle echoue et ses credits sont rendus.
+    #: Le worker touche la tache a chaque passe, si bien qu'une generation
+    #: longue mais vivante n'est jamais prise pour une tache morte. Le seuil
+    #: doit rester superieur a `AI_TIMEOUT_SECONDS`, duree maximale d'une passe.
     job_timeout_seconds: int = 900
     #: Age a partir duquel une tache encore en attente est reprise par le
     #: balayage, meme si le signal Redis s'est perdu.
@@ -70,6 +73,9 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = "claude-sonnet-4-5"
     ai_max_output_tokens: int = 8000
+    #: Nombre maximal de passes pour un scenario. Plafond de securite, pas
+    #: limite d'usage : c'est la duree demandee qui fixe le nombre de passes.
+    screenplay_max_passes: int = 40
     ai_timeout_seconds: int = 180
 
     # --- Credits IA par defaut (surchargeables en base) ---

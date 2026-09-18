@@ -85,4 +85,4 @@ export const FUNDING_STATUS_LABELS: Record<FundingStatus, string> = {
 };
 
 /** Durées cibles proposées pour un scénario (1 page ≈ 1 minute). */
-export const DURATION_PRESETS = [10, 26, 30, 52, 90, 100, 110, 120];
+export const DURATION_PRESETS = [10, 26, 30, 52, 90, 100, 110, 120, 150, 180];

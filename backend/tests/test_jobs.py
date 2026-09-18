@@ -315,6 +315,75 @@ def test_an_interrupted_job_fails_and_refunds(
     assert _credits(db_session, "interrompu@example.com") == after_reservation + 1
 
 
+def test_a_long_but_alive_job_is_not_declared_interrupted(
+    client, make_user, db_session, queued
+):
+    """Un scénario de quarante passes est long sans être mort.
+
+    Le délai se compte depuis le dernier signe de vie : le tuer parce qu'il
+    dure ferait perdre les passes déjà écrites et déjà payées.
+    """
+    headers, _ = make_user("longue.tache@example.com", plan="PRO_AUTHOR")
+    project_id = client.post(
+        "/api/v1/projects",
+        json={"title": "Projet test", "project_type": "DOCUMENTARY"},
+        headers=headers,
+    ).json()["id"]
+    job_id = _generate(client, headers, project_id).json()["id"]
+
+    job = db_session.get(GenerationJob, job_id)
+    job.status = JobStatus.RUNNING
+    job.started_at = datetime.now(UTC) - timedelta(hours=3)
+    job.heartbeat_at = datetime.now(UTC) - timedelta(seconds=5)
+    db_session.commit()
+
+    assert JobService(db_session, queue=queued).fail_timed_out() == 0
+    db_session.expire_all()
+    assert db_session.get(GenerationJob, job_id).status == JobStatus.RUNNING
+
+
+def test_a_job_whose_heartbeat_stopped_is_declared_interrupted(
+    client, make_user, db_session, queued
+):
+    headers, _ = make_user("coeur.arrete@example.com", plan="PRO_AUTHOR")
+    project_id = client.post(
+        "/api/v1/projects",
+        json={"title": "Projet test", "project_type": "DOCUMENTARY"},
+        headers=headers,
+    ).json()["id"]
+    job_id = _generate(client, headers, project_id).json()["id"]
+
+    job = db_session.get(GenerationJob, job_id)
+    job.status = JobStatus.RUNNING
+    # Démarrée il y a peu, mais plus aucun signe de vie depuis : worker disparu.
+    job.started_at = datetime.now(UTC) - timedelta(minutes=30)
+    job.heartbeat_at = datetime.now(UTC) - timedelta(hours=2)
+    db_session.commit()
+
+    assert JobService(db_session, queue=queued).fail_timed_out() == 1
+    db_session.expire_all()
+    assert db_session.get(GenerationJob, job_id).error_code == "job_interrupted"
+
+
+def test_each_pass_refreshes_the_heartbeat(client, make_user, db_session, queued):
+    headers, _ = make_user("battements@example.com", plan="PRODUCER")
+    project_id = client.post(
+        "/api/v1/projects",
+        json={"title": "Long métrage", "project_type": "FEATURE_FILM", "duration": 110},
+        headers=headers,
+    ).json()["id"]
+    job_id = _generate(
+        client, headers, project_id, document_type="SCREENPLAY", target_duration_minutes=110
+    ).json()["id"]
+
+    run_job(job_id)
+
+    db_session.expire_all()
+    job = db_session.get(GenerationJob, job_id)
+    assert job.heartbeat_at is not None
+    assert job.heartbeat_at >= job.started_at
+
+
 def test_an_already_running_job_is_not_executed_twice(client, auth_headers, project, queued):
     """Deux workers peuvent recevoir le même identifiant : un seul doit l'exécuter."""
     job_id = _generate(client, auth_headers, project["id"]).json()["id"]

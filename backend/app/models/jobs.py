@@ -70,6 +70,12 @@ class GenerationJob(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     credits_reserved: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Dernier signe de vie du worker sur cette tache, rafraichi a chaque passe.
+    #: C'est lui, et non `started_at`, qui distingue une generation longue mais
+    #: vivante d'une tache dont le worker a disparu.
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship()

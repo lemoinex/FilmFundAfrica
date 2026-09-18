@@ -85,13 +85,20 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   pourrait empiler des générations au-delà de son quota — et **rendus si la tâche échoue**. La
   base est la source de vérité : une file Redis perdue ne perd aucune tâche, un balayage les
   reprend, et une tâche dont le worker a disparu échoue proprement plutôt que de rester en
-  cours. Sans `REDIS_URL` ou sans worker, l'API génère elle-même : `GET /health` dit lequel
+  cours — le délai se comptant depuis le **dernier signe de vie** et non depuis le démarrage,
+  une génération longue mais vivante n'est jamais prise pour une tâche morte. Sans `REDIS_URL` ou sans worker, l'API génère elle-même : `GET /health` dit lequel
   des deux modes est actif.
 - **Scénarios longs en plusieurs passes** : un scénario dépassant ce qu'un appel unique peut
   produire est découpé selon la structure en trois actes ; chaque passe reçoit la fin de la
   précédente pour la continuité des personnages, des lieux et de la numérotation des séquences.
   Le coût en crédits est annoncé avant lancement.
-- Durée cible du scénario au choix (10 à 120 minutes), appliquant la règle « 1 page ≈ 1 minute ».
+- **Durée cible libre**, appliquant la règle « 1 page ≈ 1 minute » : le nombre de passes suit
+  la durée demandée, il n'est plus plafonné à dix. `AI_MAX_OUTPUT_TOKENS` fixe ce qu'une passe
+  produit, plus la longueur totale du scénario. Avec les valeurs par défaut, la durée maximale
+  réalisable passe de **138 à 681 minutes** ; surtout, avec un `AI_MAX_OUTPUT_TOKENS` modeste
+  (4000), un long métrage de 120 minutes était refusé et ne l'est plus. Un plafond de sécurité
+  (`SCREENPLAY_MAX_PASSES`, 40 par défaut) refuse toujours explicitement une durée aberrante,
+  en indiquant ce qui est réalisable.
 - Actions de retravail : **Régénérer, Améliorer, Raccourcir, Développer, Corriger**.
 - **Versioning complet** : chaque génération, sauvegarde manuelle ou restauration crée une
   version horodatée, avec son origine, le modèle et la version de prompt utilisés. Consultation
@@ -159,14 +166,15 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 
 ### Qualité
 
-- **124 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **131 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
   session, export non soumis à l'offre, découpage des scénarios longs non monotone,
   champs projet jamais rafraîchis, sous-comptage des appels IA) sont corrigés et couverts par
-  des tests de non-régression. Les deux limites connues les plus lourdes — limitation de débit
-  non partagée entre répliques, et génération tenue dans la requête HTTP — sont corrigées. Le test d'intégration sur un vrai serveur
+  des tests de non-régression. Les trois limites connues les plus lourdes — limitation de débit
+  non partagée entre répliques, génération tenue dans la requête HTTP, et durée de scénario
+  plafonnée par le budget de sortie du fournisseur — sont corrigées. Le test d'intégration sur un vrai serveur
   Redis est ignoré si aucun n'est joignable — les autres tournent sans dépendance externe.
 - Parcours de bout en bout vérifié sur une instance réelle : inscription → projet → génération →
   édition → restauration de version → score → export PDF et ZIP → tableau de bord → refus au
@@ -194,21 +202,20 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 1. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-2. **Durée maximale d'un scénario liée à `AI_MAX_OUTPUT_TOKENS`** — avec la valeur par défaut
-   (8000), le découpage couvre jusqu'à 138 minutes. Au-delà, l'API refuse explicitement
-   (`screenplay_too_long`) plutôt que de facturer un scénario tronqué, et l'interface n'affiche
-   que les durées réellement productibles, obtenues auprès du serveur. Augmenter
-   `AI_MAX_OUTPUT_TOKENS` relève la limite.
-3. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
+2. **Pas de tests frontend** — le typage strict et le build de production sont vérifiés, mais
    aucun test d'interaction n'est écrit. Playwright sur les parcours critiques est la première
    dette à combler.
-4. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
+3. **Inscription : 409 sur e-mail déjà pris** — c'est un compromis d'ergonomie assumé, qui
    permet à un tiers de tester si une adresse est inscrite. La connexion, elle, ne révèle rien
    (message et temps de réponse identiques). Le supprimer suppose de basculer sur une
    inscription en deux temps avec confirmation par e-mail.
-5. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
+4. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
    une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
    entre deux passes, non implémenté.
+5. **Continuité d'un très long scénario** — chaque passe ne voit que la fin de la précédente
+   (3500 caractères). Sur quarante passes, la dérive de style et de détails secondaires
+   s'accumule mécaniquement. Le découpage suit la structure dramatique, ce qui limite la
+   casse, mais un scénario de dix heures demandera une relecture d'ensemble.
 6. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.

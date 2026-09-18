@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 
+from app.core.errors import AppError
 from app.models.enums import DocumentType
 from app.prompts import PROMPT_REGISTRY, PromptContext, get_prompt
 from app.services.ai.service import AIService
 from app.services.screenplay_service import (
+    SCREENPLAY_MAX_TOKENS_PER_CALL,
     build_segment_prompt,
     last_scene_number,
+    pages_per_pass,
     plan_segments,
 )
 from tests.conftest import job_result
@@ -177,6 +180,50 @@ def test_screenplay_length_follows_target_duration(db_session, project):
     assert "90 pages de scénario" in prompt_90.user_prompt
     assert "120 pages de scénario" in prompt_120.user_prompt
     assert prompt_120.target_words_hint > prompt_90.target_words_hint
+
+
+def test_a_feature_length_screenplay_no_longer_depends_on_the_token_budget():
+    """Le défaut corrigé : un plafond de passes fixe rendait un long métrage
+    irréalisable dès que le fournisseur produisait peu par appel.
+
+    Avec l'ancien plafond de 10 passes et `AI_MAX_OUTPUT_TOKENS=4000`, la durée
+    maximale tombait à 66 minutes : un scénario de 120 minutes était refusé.
+    """
+    with pytest.raises(AppError) as refused:
+        plan_segments(120, max_tokens_per_call=4000, max_passes=10)
+    assert refused.value.code == "screenplay_too_long"
+
+    # Le nombre de passes suit désormais la durée demandée.
+    segments = plan_segments(120, max_tokens_per_call=4000)
+    assert sum(segment.pages for segment in segments) >= 115
+    assert all(segment.pages <= pages_per_pass(4000) for segment in segments)
+
+
+def test_the_pass_count_follows_the_requested_duration():
+    short = plan_segments(120, max_tokens_per_call=8000)
+    long = plan_segments(240, max_tokens_per_call=8000)
+    assert len(long) > len(short)
+    # Chaque passe reste sous le plafond de sortie d'un appel.
+    assert all(segment.pages <= pages_per_pass(8000) for segment in long)
+
+
+def test_the_safety_ceiling_still_refuses_an_absurd_duration():
+    """Le plafond n'est plus une limite d'usage, mais il protège encore."""
+    with pytest.raises(AppError) as refused:
+        plan_segments(5000, max_tokens_per_call=8000)
+    assert refused.value.code == "screenplay_too_long"
+    # Le message dit ce qui est réalisable plutôt que de laisser l'auteur deviner.
+    assert "Maximum réalisable" in refused.value.detail
+
+
+def test_announced_capacity_matches_what_the_planner_accepts(client, auth_headers):
+    """L'interface n'affiche que des durées réellement productibles."""
+    capacity = client.get("/api/v1/documents/screenplay-capacity", headers=auth_headers).json()
+    budget = AIService.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL)
+
+    assert len(plan_segments(capacity["max_minutes"], budget)) <= capacity["max_passes"]
+    with pytest.raises(AppError):
+        plan_segments(capacity["max_minutes"] + 1, budget)
 
 
 def test_short_screenplay_fits_a_single_pass():

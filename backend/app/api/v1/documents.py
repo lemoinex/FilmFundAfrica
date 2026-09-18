@@ -40,8 +40,8 @@ def screenplay_capacity() -> dict:
     from app.prompts.base import SCREENPLAY_WORDS_PER_PAGE
     from app.services.ai.service import AIService
     from app.services.screenplay_service import (
-        MAX_PASSES,
         SCREENPLAY_MAX_TOKENS_PER_CALL,
+        effective_max_passes,
         max_supported_minutes,
         pages_per_pass,
     )
@@ -49,7 +49,7 @@ def screenplay_capacity() -> dict:
     budget = AIService.effective_max_output_tokens(SCREENPLAY_MAX_TOKENS_PER_CALL)
     return {
         "pages_per_pass": pages_per_pass(budget),
-        "max_passes": MAX_PASSES,
+        "max_passes": effective_max_passes(),
         "max_minutes": max_supported_minutes(budget),
         "words_per_page": SCREENPLAY_WORDS_PER_PAGE,
     }

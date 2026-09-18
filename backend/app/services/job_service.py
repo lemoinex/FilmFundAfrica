@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -159,13 +159,17 @@ class JobService:
 
         Sans cela, une tache resterait `RUNNING` pour toujours et ses credits
         ne seraient jamais rendus.
+
+        Le delai se compte depuis le DERNIER SIGNE DE VIE, pas depuis le
+        demarrage : un scenario de quarante passes est long sans etre mort, et
+        le tuer parce qu'il dure ferait perdre le travail deja paye.
         """
         cutoff = datetime.now(UTC) - timedelta(seconds=settings.job_timeout_seconds)
         stuck = list(
             self.db.scalars(
                 select(GenerationJob)
                 .where(GenerationJob.status == JobStatus.RUNNING)
-                .where(GenerationJob.started_at < cutoff)
+                .where(func.coalesce(GenerationJob.heartbeat_at, GenerationJob.started_at) < cutoff)
             )
         )
         for job in stuck:
@@ -219,6 +223,7 @@ def _run(db: Session, job_id: str) -> JobStatus:
 
     job.status = JobStatus.RUNNING
     job.started_at = datetime.now(UTC)
+    job.heartbeat_at = job.started_at
     db.commit()
 
     user = db.get(User, job.user_id)
@@ -238,6 +243,7 @@ def _run(db: Session, job_id: str) -> JobStatus:
         """
         job.completed_passes = done
         job.total_passes = max(total, job.total_passes)
+        job.heartbeat_at = datetime.now(UTC)
         db.commit()
 
     try:

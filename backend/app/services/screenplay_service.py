@@ -16,6 +16,7 @@ import math
 import re
 from dataclasses import dataclass
 
+from app.core.config import settings
 from app.prompts.base import (
     SCREENPLAY_WORDS_PER_PAGE,
     PromptContext,
@@ -30,7 +31,11 @@ ACT_RATIOS: tuple[tuple[str, float], ...] = (
     ("Acte III — crise, climax et résolution", 0.25),
 )
 
-MAX_PASSES = 10
+#: Plafond de securite du nombre de passes, surchargeable par
+#: `SCREENPLAY_MAX_PASSES`. Ce n'est pas une limite d'usage : le nombre de
+#: passes suit la duree demandee. Il existe pour qu'une saisie aberrante ne
+#: lance pas cent appels au fournisseur.
+DEFAULT_MAX_PASSES = 40
 #: Plafond de sortie demandé par passe, avant bornage par `AI_MAX_OUTPUT_TOKENS`.
 SCREENPLAY_MAX_TOKENS_PER_CALL = 32000
 #: Marge de sécurité : on ne demande jamais à un fournisseur sa limite exacte.
@@ -71,31 +76,43 @@ def _split_blocks(total_pages: int, per_pass: int) -> list[tuple[str, int]]:
     return blocks
 
 
-def max_supported_minutes(max_tokens_per_call: int) -> int:
-    """Durée maximale dont le découpage tient en `MAX_PASSES` appels.
+def effective_max_passes(max_passes: int | None = None) -> int:
+    return max(max_passes if max_passes is not None else settings.screenplay_max_passes, 1)
+
+
+def max_supported_minutes(max_tokens_per_call: int, max_passes: int | None = None) -> int:
+    """Durée maximale que le plafond de passes permet de couvrir.
 
     Calculée à partir du découpage réel — la répartition par acte introduit des
     arrondis, si bien qu'une simple multiplication surestimerait la limite.
     """
+    ceiling = effective_max_passes(max_passes)
     per_pass = pages_per_pass(max_tokens_per_call)
     minutes = per_pass
-    while len(_split_blocks(minutes + 1, per_pass)) <= MAX_PASSES:
+    while len(_split_blocks(minutes + 1, per_pass)) <= ceiling:
         minutes += 1
     return minutes
 
 
-def plan_segments(target_minutes: int, max_tokens_per_call: int) -> list[ScreenplaySegment]:
+def plan_segments(
+    target_minutes: int, max_tokens_per_call: int, max_passes: int | None = None
+) -> list[ScreenplaySegment]:
     """Découpe le scénario en passes compatibles avec la limite du fournisseur.
+
+    Le nombre de passes suit la durée demandée : une durée plus longue coûte
+    plus de passes, elle ne devient pas irréalisable. `AI_MAX_OUTPUT_TOKENS`
+    fixe ce qu'une passe produit, pas la longueur totale du scénario.
 
     Chaque segment produit reste sous le plafond de sortie d'un appel : aucun
     segment n'est jamais plus long que ce qu'une passe peut réellement écrire,
     faute de quoi l'utilisateur paierait des crédits pour un scénario tronqué.
 
-    Lève `AppError` si la durée demandée dépasse ce que `MAX_PASSES` appels
-    permettent de couvrir, plutôt que de renvoyer un plan irréalisable.
+    Lève `AppError` au-delà du plafond de sécurité (`SCREENPLAY_MAX_PASSES`),
+    plutôt que de renvoyer un plan irréalisable.
     """
     total_pages = max(target_minutes, 1)
     per_pass = pages_per_pass(max_tokens_per_call)
+    ceiling = effective_max_passes(max_passes)
 
     if total_pages <= per_pass:
         return [
@@ -111,14 +128,14 @@ def plan_segments(target_minutes: int, max_tokens_per_call: int) -> list[Screenp
 
     raw_blocks = _split_blocks(total_pages, per_pass)
 
-    if len(raw_blocks) > MAX_PASSES:
+    if len(raw_blocks) > ceiling:
         from app.core.errors import AppError
 
         raise AppError(
             f"Durée trop longue pour une génération en une fois : {target_minutes} minutes "
-            f"demanderaient {len(raw_blocks)} passes, au-delà de la limite de {MAX_PASSES}. "
+            f"demanderaient {len(raw_blocks)} passes, au-delà de la limite de {ceiling}. "
             f"Maximum réalisable avec la configuration actuelle : "
-            f"{max_supported_minutes(max_tokens_per_call)} minutes.",
+            f"{max_supported_minutes(max_tokens_per_call, ceiling)} minutes.",
             code="screenplay_too_long",
         )
 

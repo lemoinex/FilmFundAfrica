@@ -73,7 +73,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          124 tests (pytest)
+│   └── tests/          131 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -132,12 +132,13 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
 | `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
-| `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote le découpage des scénarios | `8000` |
+| `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote la taille d'une passe | `8000` |
+| `SCREENPLAY_MAX_PASSES` | Plafond de sécurité du nombre de passes d'un scénario | `40` |
 | `AI_CREDITS_FREE/PRO/PRODUCER` | Quotas mensuels par offre | `1` / `300` / `500` |
 | `RATE_LIMIT_AUTH_PER_MINUTE` | Limitation sur les routes d'authentification | `10` |
 | `REDIS_URL` | Compteurs de limitation partagés entre répliques ; vide = compteurs en mémoire | vide |
 | `REDIS_TIMEOUT_SECONDS` | Délai au-delà duquel l'appel à Redis est abandonné | `0.25` |
-| `JOB_TIMEOUT_SECONDS` | Durée au-delà de laquelle une génération en cours est déclarée interrompue | `900` |
+| `JOB_TIMEOUT_SECONDS` | Durée **sans signe de vie** au-delà de laquelle une génération est déclarée interrompue | `900` |
 | `JOB_STALE_SECONDS` | Âge à partir duquel une tâche en attente est reprise par le balayage | `60` |
 | `TRUSTED_PROXY_IPS` | Proxys autorisés à définir `X-Forwarded-For` ; vide = en-tête ignoré | vide |
 | `SMTP_*` | Envoi des e-mails ; si vide, les messages sont journalisés | vide |
@@ -375,7 +376,7 @@ npm run build
 
 ```bash
 cd backend
-pytest                    # 124 tests
+pytest                    # 131 tests
 ruff check .              # lint
 ```
 
