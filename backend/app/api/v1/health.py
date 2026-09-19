@@ -77,10 +77,23 @@ def health(db: DbSession) -> dict:
         # l'application. Renseigne alors que `provided` reste incomplet, les
         # variables manquantes n'ont pas ete transmises a CE service — mauvaise
         # portee, valeur vide, ou deploiement anterieur a leur enregistrement.
+        # `host` vaut la valeur que l'hebergeur injecte lui-meme (sur Vercel,
+        # `VERCEL_ENV`). Vide alors que rien n'est recu, le processus ne voit
+        # aucune variable et la cause est en amont de l'application.
+        #
+        # `empty` separe ce que `provided` seul confondait : une variable
+        # posee sans valeur et une variable jamais posee produisent le meme
+        # effet mais ne se corrigent pas au meme endroit — l'une se
+        # renseigne, l'autre se cree ou se rattache au bon service.
         "config": {
             "host": os.environ.get("VERCEL_ENV", ""),
             "provided": [
                 name for name in WATCHED_ENV if os.environ.get(name, "").strip()
+            ],
+            "empty": [
+                name
+                for name in WATCHED_ENV
+                if name in os.environ and not os.environ[name].strip()
             ],
         },
     }

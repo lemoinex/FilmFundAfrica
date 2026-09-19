@@ -31,15 +31,21 @@ def test_the_probe_names_the_variables_it_received(client, monkeypatch):
     assert "REDIS_URL" not in config["provided"]
 
 
-def test_an_empty_variable_does_not_count_as_provided(client, monkeypatch):
-    """Une variable vide n'est pas une variable renseignée — ici aussi.
+def test_an_empty_variable_is_reported_apart_from_a_missing_one(client, monkeypatch):
+    """Les deux cas se corrigent à des endroits différents.
 
-    C'est précisément le cas que la sonde doit rendre visible : coller les
-    noms sans les valeurs produit des variables vides, indiscernables de
-    variables absentes par leurs seuls effets.
+    Une variable posée sans valeur se renseigne ; une variable jamais posée
+    se crée, ou se rattache au bon service. Confondues, elles envoient
+    chercher au mauvais endroit — et coller les noms sans les valeurs est
+    précisément la façon la plus courante d'en produire.
     """
     monkeypatch.setenv("SECRETS_KEY", "   ")
-    assert "SECRETS_KEY" not in client.get("/health").json()["config"]["provided"]
+    monkeypatch.delenv("REDIS_URL", raising=False)
+
+    config = client.get("/health").json()["config"]
+    assert config["empty"] == ["SECRETS_KEY"]
+    assert "SECRETS_KEY" not in config["provided"]
+    assert "REDIS_URL" not in config["empty"]
 
 
 def test_the_probe_never_publishes_a_value(client, monkeypatch):
