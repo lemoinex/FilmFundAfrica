@@ -6,7 +6,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from app.core.deps import CurrentUser, DbSession, OwnedProject
+from app.core.deps import CurrentUser, DbSession, OwnedProject, require_matching_access
 from app.core.i18n import request_locale
 from app.core.rate_limit import rate_limit_ai
 from app.models.enums import FundingCategory, ProjectType
@@ -79,6 +79,7 @@ def get_funding(opportunity_id: str, db: DbSession, _: CurrentUser) -> Opportuni
 @project_router.post(
     "/match-funding",
     response_model=MatchListResponse,
+    dependencies=[Depends(require_matching_access)],
     summary="Analyser les financements compatibles",
 )
 def compute_matches(
@@ -86,7 +87,10 @@ def compute_matches(
 ) -> MatchListResponse:
     """Calcule la compatibilité du projet avec tous les dispositifs ouverts.
 
-    Le calcul est déterministe et ne consomme aucun crédit IA.
+    Le calcul est déterministe et ne consomme aucun crédit IA — mais il est
+    réservé aux offres qui incluent le rapprochement. La **recherche** de
+    dispositifs, elle, reste ouverte à tous : un financement qu'on ne peut pas
+    trouver ne sert personne.
     """
     # La langue est relue ici, dans le corps : les dependances ont fini de
     # s'executer, et celle qui identifie le compte a pose sa preference.
@@ -109,7 +113,7 @@ def list_matches(
 @project_router.post(
     "/matches/{opportunity_id}/explain",
     response_model=MatchExplanation,
-    dependencies=[Depends(rate_limit_ai)],
+    dependencies=[Depends(rate_limit_ai), Depends(require_matching_access)],
     summary="Expliquer un rapprochement (1 crédit IA)",
 )
 def explain_match(

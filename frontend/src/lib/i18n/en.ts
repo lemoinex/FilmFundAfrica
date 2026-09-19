@@ -362,7 +362,7 @@ export const en: Record<MessageKey, string> = {
   "billing.exportAllowed": "Package export",
   "billing.exportDenied": "No export",
   "billing.matchingAllowed": "Funding matching",
-  "billing.matchingDenied": "Limited matching",
+  "billing.matchingDenied": "Search only, no compatibility analysis",
   "billing.mobileMoney": "Mobile money payment",
   "billing.mobileMoneyHint":
     "Enter the number to debit before subscribing, if your provider asks for it.",
@@ -705,6 +705,10 @@ export const en: Record<MessageKey, string> = {
   "match.rerun": "Run the analysis again",
   "match.failed": "The analysis failed.",
   "match.explainFailed": "The explanation could not be produced.",
+  "match.notIncluded": "Compatibility analysis not included",
+  "match.notIncludedHint":
+    "Your plan gives you search: you can browse every scheme. Analysing how this project matches them requires a higher plan.",
+  "match.upgrade": "See plans",
   "match.emptyBase": "No scheme in the database",
   "match.emptyBaseHint":
     "The funding database is still empty. An administrator can add schemes; the analysis will then run again on its own.",

@@ -59,6 +59,8 @@ export interface User {
   plan_code?: "FREE" | "PRO_AUTHOR" | "PRODUCER" | null;
   /** Faux en bêta interne pour un administrateur : aucun quota ne lui est opposé. */
   commercial_rules_apply?: boolean;
+  /** L'offre inclut-elle l'analyse de compatibilité ? La recherche reste ouverte à tous. */
+  allows_matching?: boolean;
 }
 
 export interface AuthResponse {

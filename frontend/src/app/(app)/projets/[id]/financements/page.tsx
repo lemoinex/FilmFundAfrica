@@ -76,6 +76,9 @@ export default function ProjectFundingPage() {
   }, [data, onlyEligible]);
 
   const ineligibleCount = (data?.results.length ?? 0) - (data?.results.filter((r) => r.eligible).length ?? 0);
+  // `undefined` pendant le chargement du profil : on n'affiche pas un refus
+  // à quelqu'un dont on ne connaît pas encore l'offre.
+  const canMatch = user?.allows_matching !== false;
 
   if (error && !data) return <Alert tone="danger">{error}</Alert>;
   if (!data) {
@@ -98,26 +101,52 @@ export default function ProjectFundingPage() {
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl text-slatey-100">{t("match.title")}</h1>
-            <p className="mt-1.5 text-sm text-slatey-400">
-              {t("match.subtitle", { when: formatRelative(data.computed_at) })}
-            </p>
+            {/* « Dernier calcul à l'instant » quand aucun calcul n'a eu lieu
+                est faux, et c'est exactement le cas d'une offre sans
+                rapprochement : la date vaudrait « maintenant » par défaut. */}
+            {data.total > 0 ? (
+              <p className="mt-1.5 text-sm text-slatey-400">
+                {t("match.subtitle", { when: formatRelative(data.computed_at) })}
+              </p>
+            ) : null}
           </div>
 
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleAnalyse}
-            disabled={analysing}
-          >
-            {analysing ? <Spinner /> : null}
-            {t("match.rerun")}
-          </button>
+          {/* Proposer une action que le serveur refusera ne sert personne :
+              le bouton disparaît, et l'écran dit pourquoi juste en dessous. */}
+          {canMatch ? (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleAnalyse}
+              disabled={analysing}
+            >
+              {analysing ? <Spinner /> : null}
+              {t("match.rerun")}
+            </button>
+          ) : (
+            <Link href="/abonnement" className="btn-primary">
+              {t("match.upgrade")}
+            </Link>
+          )}
         </div>
       </div>
 
       {error ? <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert> : null}
 
-      {data.total === 0 ? (
+      {data.total === 0 && !canMatch ? (
+        /* Le défaut corrigé : un écran vide se lisait « la base est vide »,
+           alors que le catalogue est plein et que c'est l'analyse qui n'est
+           pas incluse. On invitait à attendre un administrateur. */
+        <EmptyState
+          title={t("match.notIncluded")}
+          description={t("match.notIncludedHint")}
+          action={
+            <Link href="/abonnement" className="btn-secondary">
+              {t("match.upgrade")}
+            </Link>
+          }
+        />
+      ) : data.total === 0 ? (
         <EmptyState
           title={t("match.emptyBase")}
           description={t("match.emptyBaseHint")}

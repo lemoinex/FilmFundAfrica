@@ -267,12 +267,20 @@ class AuthService:
 
 def serialize_user(user: User) -> UserRead:
     plan_code: PlanCode | None = None
-    if user.subscription is not None and user.subscription.plan is not None:
-        plan_code = user.subscription.plan.code
+    plan = user.subscription.plan if user.subscription is not None else None
+    if plan is not None:
+        plan_code = plan.code
+
+    exempt = not commercial_rules_apply(user)
+    # Sans abonnement, c'est l'offre gratuite qui s'applique — et elle
+    # n'inclut pas le rapprochement. Repondre « oui » par defaut ferait
+    # proposer a l'ecran une action que le serveur refusera.
+    allows_matching = exempt or bool(plan is not None and plan.allows_matching)
     data = UserRead.model_validate(user)
     return data.model_copy(
         update={
             "plan_code": plan_code,
-            "commercial_rules_apply": commercial_rules_apply(user),
+            "commercial_rules_apply": not exempt,
+            "allows_matching": allows_matching,
         }
     )

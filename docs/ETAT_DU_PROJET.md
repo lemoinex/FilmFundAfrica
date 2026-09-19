@@ -287,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **529 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **537 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -335,8 +335,13 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 4. **Budget : aucun repère de prix** — la trame donne les postes, l'auteur cherche les tarifs
    ailleurs. Une base de coûts indicative par pays rendrait le chiffrage plus rapide, mais
    suppose des données vérifiées que le produit n'a pas : proposer des montants inventés serait
-   pire que ne rien proposer. Le drapeau d'offre `allows_advanced_budget` reste inutilisé — le
-   module est ouvert à tous, seul l'export XLSX suit la règle d'offre commune aux exports.
+   pire que ne rien proposer. Les drapeaux `allows_advanced_budget` et `allows_collaboration`
+   restent **inappliqués**, faute de fonctionnalité correspondante : le module budget est
+   ouvert à tous (seul l'export XLSX suit la règle d'offre commune), et la collaboration
+   d'équipe n'existe pas. Ils sont conservés en base pour le jour où ces fonctionnalités
+   seront écrites, mais **aucune description d'offre ne les annonce plus** — un test le
+   vérifie. Les quatre contraintes réellement appliquées sont `max_projects`,
+   `monthly_ai_credits`, `allows_export` et `allows_matching`.
 5. **Continuité de style sur un très long scénario** — les noms, lieux et segments écrits sont
    désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
    registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario

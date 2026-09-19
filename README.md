@@ -77,7 +77,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          529 tests (pytest)
+│   └── tests/          537 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -394,6 +394,16 @@ erreur explicite plutôt que de laisser passer une étape vide — dans la chaî
 d'agents, cela produirait un dossier amputé d'une section sans que rien ne le
 signale.
 
+**Ce que réserve une offre** — quatre contraintes, et seulement quatre :
+nombre de projets (`max_projects`), crédits IA mensuels
+(`monthly_ai_credits`), export du dossier (`allows_export`) et rapprochement
+projet / financements (`allows_matching`). La **recherche** de financements
+reste ouverte à toutes les offres : un dispositif qu'on ne peut pas trouver
+ne sert personne ; ce qui se réserve, c'est l'analyse de compatibilité, pas
+le catalogue. `allows_collaboration` et `allows_advanced_budget` existent en
+base mais ne gardent rien — les fonctionnalités correspondantes ne sont pas
+écrites, et aucune description d'offre ne les annonce.
+
 **Prompts versionnés** — un module par document dans `backend/app/prompts/`, chacun portant un
 numéro de version enregistré dans `document_versions` et `ai_usage`. Aucun prompt n'est écrit
 dans une route API. Chaque prompt reçoit le contexte structuré du projet **et** les documents
@@ -640,7 +650,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 529 tests
+pytest                    # 537 tests
 ruff check .              # lint
 ```
 

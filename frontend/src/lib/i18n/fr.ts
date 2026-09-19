@@ -367,7 +367,7 @@ export const fr = {
   "billing.exportAllowed": "Export du dossier",
   "billing.exportDenied": "Sans export",
   "billing.matchingAllowed": "Matching financements",
-  "billing.matchingDenied": "Matching limité",
+  "billing.matchingDenied": "Recherche seule, sans analyse de compatibilité",
   "billing.mobileMoney": "Paiement mobile money",
   "billing.mobileMoneyHint":
     "Renseignez le numéro à débiter avant de souscrire, si votre prestataire le demande.",
@@ -716,6 +716,10 @@ export const fr = {
   "match.rerun": "Relancer l'analyse",
   "match.failed": "Analyse impossible.",
   "match.explainFailed": "Explication impossible.",
+  "match.notIncluded": "Analyse de compatibilité non incluse",
+  "match.notIncludedHint":
+    "Votre offre donne accès à la recherche : vous pouvez consulter tous les dispositifs. L'analyse de compatibilité de ce projet, elle, demande une offre supérieure.",
+  "match.upgrade": "Voir les offres",
   "match.emptyBase": "Aucun dispositif dans la base",
   "match.emptyBaseHint":
     "La base des financements est encore vide. Un administrateur peut y ajouter des dispositifs ; l'analyse se relancera ensuite automatiquement.",

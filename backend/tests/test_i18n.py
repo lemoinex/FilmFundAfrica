@@ -281,7 +281,9 @@ def test_les_criteres_de_maturite_suivent_la_langue(client, make_user):
 
 
 def test_les_criteres_de_compatibilite_suivent_la_langue(client, make_user, db_session):
-    headers, _ = make_user()
+    # Une offre qui inclut le rapprochement : ce test porte sur la langue des
+    # critères, pas sur la garde commerciale qui les précède.
+    headers, _ = make_user(plan="PRO_AUTHOR")
     created = client.post(
         "/api/v1/projects",
         json={"title": "Le Fleuve", "country": "Sénégal", "project_type": "DOCUMENTARY"},

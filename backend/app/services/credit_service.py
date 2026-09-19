@@ -34,6 +34,20 @@ OPERATION_COST: dict[AIOperation, int] = {
     AIOperation.RUN_AGENT_CHAIN: 1,
 }
 
+#: Offres par defaut, creees au premier demarrage et modifiables ensuite
+#: depuis l'administration.
+#:
+#: **Trois drapeaux sont appliques, deux ne le sont pas encore.**
+#: `max_projects`, `monthly_ai_credits`, `allows_export` et `allows_matching`
+#: sont verifies (respectivement dans `check_project_quota`, `check_credits`,
+#: `require_export_access` et `require_matching_access`).
+#: `allows_collaboration` et `allows_advanced_budget` ne gardent rien : les
+#: fonctionnalites correspondantes n'existent pas. Ils sont conserves parce
+#: qu'ils sont en base depuis l'origine et que les retirer couterait une
+#: migration pour rien — mais **aucun ecran ne doit les presenter comme une
+#: difference entre offres** tant qu'ils ne sont pas appliques. Promettre une
+#: limite que le serveur ignore est le defaut qui vient d'etre corrige sur
+#: `allows_matching` ; ne le reintroduisons pas par ces deux-la.
 DEFAULT_PLANS: list[dict] = [
     {
         "code": PlanCode.FREE,
@@ -66,7 +80,14 @@ DEFAULT_PLANS: list[dict] = [
     {
         "code": PlanCode.PRODUCER,
         "name": "Producteur",
-        "description": "Multi-projets, export, budget avancé, collaboration d'équipe.",
+        # Ne decrit que ce qui existe : « budget avance » et « collaboration
+        # d'equipe » etaient annonces a 100 000 XAF sans qu'aucune de ces deux
+        # fonctionnalites n'existe. Les drapeaux restent poses pour le jour ou
+        # elles seront ecrites ; la phrase, elle, ne peut pas attendre.
+        "description": (
+            "Projets illimités, export, matching, et le plus gros volume de "
+            "génération IA."
+        ),
         "price_amount": 100000,
         "price_currency": "XAF",
         "max_projects": 0,

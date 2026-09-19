@@ -107,6 +107,12 @@ FR: dict[str, str] = {
         "L'export n'est pas inclus dans l'offre « {plan} ». Passez à une offre "
         "supérieure pour exporter votre dossier."
     ),
+    "quota.matchingNotIncluded": (
+        "Le rapprochement avec les financements n'est pas inclus dans l'offre "
+        "« {plan} ». La recherche reste ouverte — vous pouvez consulter tous les "
+        "dispositifs — mais l'analyse de compatibilité de votre projet demande une "
+        "offre supérieure."
+    ),
     # --- Quotas ---
     "auth.emailNotVerified": (
         "Adresse non confirmée. Ouvrez le lien reçu par e-mail, ou demandez-en un "
@@ -451,6 +457,11 @@ EN: dict[str, str] = {
     "quota.exportNotIncluded": (
         "Export is not included in the “{plan}” plan. Move to a higher plan to export "
         "your package."
+    ),
+    "quota.matchingNotIncluded": (
+        "Funding matching is not included in the “{plan}” plan. Search stays open — "
+        "you can browse every scheme — but analysing how your project matches them "
+        "requires a higher plan."
     ),
     # --- Quotas ---
     "auth.emailNotVerified": (

@@ -394,13 +394,23 @@ def test_explanation_costs_one_credit_then_is_cached(client, auth_headers, oppor
 
 
 def test_explanation_is_refused_without_credits(client, make_user, opportunity):
-    headers, _ = make_user("gratuit@example.com")  # plan FREE : 1 crédit
+    """Une offre qui inclut le rapprochement, mais un solde épuisé.
+
+    L'offre gratuite ne convient plus pour éprouver ce refus-là : elle
+    n'atteint plus cette route du tout, le rapprochement ne lui étant pas
+    inclus. Le test viserait alors la mauvaise garde et ne dirait plus rien
+    des crédits.
+    """
+    from app.core.database import SessionLocal
+    from app.models.user import User
+
+    headers, _ = make_user("sans.credit@example.com", plan="PRO_AUTHOR")
     project = _matching_project(client, headers)
-    client.post(
-        f"/api/v1/projects/{project['id']}/documents/SHORT_SYNOPSIS/generate",
-        json={"language": "fr"},
-        headers=headers,
-    )  # consomme l'unique crédit
+    with SessionLocal() as db:
+        db.query(User).filter(
+            User.email == "sans.credit@example.com"
+        ).one().ai_credits_remaining = 0
+        db.commit()
 
     response = client.post(
         f"/api/v1/projects/{project['id']}/matches/{opportunity['id']}/explain",
@@ -455,3 +465,92 @@ def test_document_criterion_gives_partial_credit(client, auth_headers, opportuni
     assert 0 < documents["earned"] < documents["weight"]
 
     assert next(c for c in full["criteria"] if c["key"] == "documents")["state"] == "met"
+
+
+# ----------------------------------------------------------------------
+# Le rapprochement suit l'offre — la recherche, non
+
+
+def test_the_free_plan_can_still_search_every_scheme(client, make_user, opportunity):
+    """La recherche reste ouverte à tous, et ce n'est pas un oubli.
+
+    Un dispositif qu'on ne peut pas trouver ne sert personne. Ce qui se
+    réserve, c'est le travail d'analyse — pas le catalogue.
+    """
+    headers, _ = make_user("chercheuse@example.com")
+    listing = client.get("/api/v1/funding", headers=headers)
+    assert listing.status_code == 200
+    assert listing.json()["total"] >= 1
+    assert client.get(
+        f"/api/v1/funding/{opportunity['id']}", headers=headers
+    ).status_code == 200
+
+
+def test_the_free_plan_cannot_compute_matches(client, make_user):
+    """Le défaut corrigé : l'offre annonçait la limite, le serveur l'ignorait.
+
+    `allows_matching` valait `False` pour l'offre gratuite depuis l'origine,
+    et la page de tarification l'affichait — mais aucun contrôle ne
+    l'appliquait.
+    """
+    headers, _ = make_user("gratuite.match@example.com")
+    project = _matching_project(client, headers)
+    response = client.post(
+        f"/api/v1/projects/{project['id']}/match-funding", headers=headers
+    )
+    assert response.status_code == 402
+    assert response.json()["code"] == "matching_not_included"
+
+
+def test_the_free_plan_cannot_ask_for_an_explanation(client, make_user, opportunity):
+    headers, _ = make_user("gratuite.explique@example.com")
+    project = _matching_project(client, headers)
+    response = client.post(
+        f"/api/v1/projects/{project['id']}/matches/{opportunity['id']}/explain",
+        headers=headers,
+    )
+    assert response.status_code == 402
+    assert response.json()["code"] == "matching_not_included"
+
+
+def test_a_paid_plan_still_matches(client, make_user, opportunity):
+    headers, _ = make_user("payante@example.com", plan="PRO_AUTHOR")
+    project = _matching_project(client, headers)
+    assert client.post(
+        f"/api/v1/projects/{project['id']}/match-funding", headers=headers
+    ).status_code == 200
+
+
+def test_reading_matches_already_computed_is_never_taken_away(client, make_user):
+    """Un rétrogradage ne doit pas effacer ce qui a déjà été calculé.
+
+    Mettre un péage devant ses propres données déjà produites serait hostile,
+    et sans rapport avec ce que l'offre réserve : le calcul, pas la lecture.
+    """
+    headers, _ = make_user("lectrice@example.com")
+    project = _matching_project(client, headers)
+    assert client.get(
+        f"/api/v1/projects/{project['id']}/matches", headers=headers
+    ).status_code == 200
+
+
+def test_during_the_internal_beta_an_administrator_matches_freely(
+    client, make_user, monkeypatch
+):
+    """Même prédicat que les autres contraintes commerciales, pas un second."""
+    from app.core.database import SessionLocal
+    from app.models.enums import UserType
+    from app.models.user import User
+
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "internal")
+    headers, _ = make_user("admin.match@example.com")
+    with SessionLocal() as db:
+        db.query(User).filter(
+            User.email == "admin.match@example.com"
+        ).one().user_type = UserType.ADMIN
+        db.commit()
+
+    project = _matching_project(client, headers)
+    assert client.post(
+        f"/api/v1/projects/{project['id']}/match-funding", headers=headers
+    ).status_code == 200

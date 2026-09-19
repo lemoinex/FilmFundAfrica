@@ -106,6 +106,35 @@ def get_owned_project(project_id: str, db: DbSession, current_user: CurrentUser)
 OwnedProject = Annotated[Project, Depends(get_owned_project)]
 
 
+def require_matching_access(db: DbSession, current_user: CurrentUser) -> User:
+    """Réserve le rapprochement aux offres qui l'incluent (`allows_matching`).
+
+    **La recherche de financements reste ouverte à tous** : c'est le cœur du
+    produit, et un dispositif qu'on ne peut pas trouver ne sert à personne.
+    Ce qui se réserve, c'est le calcul de compatibilité d'un projet et son
+    explication — le travail, pas le catalogue.
+
+    Ce drapeau existait depuis l'origine dans les offres (`FREE: false`,
+    `PRO: true`) et la page de tarification l'annonçait déjà, mais rien ne
+    l'appliquait : l'écran promettait une limite que le serveur ignorait.
+    """
+    from app.core.errors import QuotaExceededError
+    from app.core.platform import commercial_rules_apply
+    from app.services.credit_service import CreditService
+
+    if not commercial_rules_apply(current_user):
+        return current_user
+
+    plan = CreditService(db).plan_for_user(current_user)
+    if not plan.allows_matching:
+        raise QuotaExceededError(
+            "quota.matchingNotIncluded",
+            params={"plan": plan.name},
+            code="matching_not_included",
+        )
+    return current_user
+
+
 def require_export_access(db: DbSession, current_user: CurrentUser) -> User:
     """Réserve l'export aux offres qui l'incluent (`allows_export`).
 

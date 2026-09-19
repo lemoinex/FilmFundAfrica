@@ -47,6 +47,11 @@ class UserRead(ORMModel):
     #: « 0 credit restant » a quelqu'un qui n'est pas facture : avant le mode
     #: interne, 0 voulait dire bloque, ce n'est plus vrai.
     commercial_rules_apply: bool = True
+    #: L'offre inclut-elle le rapprochement projet / financements ? La
+    #: recherche, elle, reste ouverte a tous. L'interface en a besoin pour
+    #: dire la verite *avant* le clic : sans cela, un ecran vide se lirait
+    #: comme « la base est vide » alors que le catalogue est plein.
+    allows_matching: bool = True
 
 
 class AdminUserUpdate(BaseModel):

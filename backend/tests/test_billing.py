@@ -405,3 +405,43 @@ def test_payment_statuses_are_final_except_pending():
 def test_every_plan_code_exists_in_database(client, auth_headers):
     plans = client.get("/api/v1/billing/plans", headers=auth_headers).json()
     assert {plan["code"] for plan in plans} == {code.value for code in PlanCode}
+
+
+# ----------------------------------------------------------------------
+# Une offre ne promet que ce que le serveur applique
+
+
+def test_no_plan_advertises_a_feature_that_does_not_exist():
+    """Le défaut corrigé : « budget avancé, collaboration d'équipe » à 100 000 XAF.
+
+    Ni l'un ni l'autre n'existe dans le produit. Les drapeaux restent en base
+    pour le jour où ces fonctionnalités seront écrites, mais une description
+    payante ne peut pas les annoncer avant.
+    """
+    from app.services.credit_service import DEFAULT_PLANS
+
+    interdits = ("collaboration", "budget avancé", "budget avance")
+    for plan in DEFAULT_PLANS:
+        description = plan["description"].lower()
+        for mot in interdits:
+            assert mot not in description, f"{plan['code']} annonce « {mot} »"
+
+
+def test_the_enforced_flags_are_the_ones_the_plans_differ_on():
+    """Ce qui distingue les offres doit être ce que le serveur vérifie.
+
+    `allows_collaboration` et `allows_advanced_budget` ne gardent rien : si un
+    jour ils deviennent la seule différence entre deux offres, la plus chère
+    ne vaudra rien de plus que l'autre.
+    """
+    from app.services.credit_service import DEFAULT_PLANS
+
+    appliques = ("max_projects", "monthly_ai_credits", "allows_export", "allows_matching")
+    for plan in DEFAULT_PLANS:
+        autres = [p for p in DEFAULT_PLANS if p["code"] != plan["code"]]
+        for autre in autres:
+            if all(plan[champ] == autre[champ] for champ in appliques):
+                raise AssertionError(
+                    f"« {plan['name']} » et « {autre['name']} » ne se distinguent par "
+                    "aucune contrainte réellement appliquée"
+                )
