@@ -47,7 +47,17 @@ class AIService:
 
     def __init__(self, provider: AIProvider | None = None, model: str | None = None) -> None:
         self.provider = provider or build_provider()
-        self.model = model or settings.ai_model
+        # `AI_MODEL` prime, sinon le defaut du fournisseur choisi. Sans
+        # l'un ni l'autre, on refuse ici plutot qu'au premier appel : une
+        # requete partie avec un modele vide coute un aller-retour pour
+        # apprendre ce qu'on savait deja.
+        self.model = model or settings.ai_model or self.provider.default_model
+        if not self.model:
+            raise AIProviderError(
+                "ai.modelRequired",
+                params={"provider": self.provider.name},
+                code="ai_model_required",
+            )
 
     # ------------------------------------------------------------------
     @staticmethod

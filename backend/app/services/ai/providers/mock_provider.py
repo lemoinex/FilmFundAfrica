@@ -27,6 +27,7 @@ MISSING = "Information non fournie."
 
 class MockProvider(AIProvider):
     name = "mock"
+    default_model = "mock-deterministic"
 
     def complete(self, request: AICompletionRequest) -> AICompletionResponse:
         started = time.perf_counter()

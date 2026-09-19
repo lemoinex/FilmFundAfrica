@@ -76,7 +76,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          446 tests (pytest)
+│   └── tests/          452 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -138,7 +138,7 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `PAYMENT_WEBHOOK_SECRET` | Secret signant les notifications du prestataire | vide |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
-| `AI_MODEL` | Modèle Claude utilisé | `claude-opus-5` |
+| `AI_MODEL` | Modèle visé ; vide = défaut du fournisseur choisi (**requis avec `openai`**) | vide |
 | `AI_EFFORT` | Profondeur de réflexion (`low`…`max`) ; vide = défaut du serveur | `high` |
 | `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote la taille d'une passe | `8000` |
 | `SCREENPLAY_MAX_PASSES` | Plafond de sécurité du nombre de passes d'un scénario | `40` |
@@ -300,10 +300,25 @@ AIService
 Pour activer une génération réelle :
 
 ```bash
+# Claude — le fournisseur visé
 AI_PROVIDER=anthropic
+AI_API_KEY=sk-ant-...
+# AI_MODEL facultatif : claude-opus-5 par défaut
+
+# OpenAI — toujours disponible au choix
+AI_PROVIDER=openai
 AI_API_KEY=sk-...
-AI_MODEL=claude-opus-5
+AI_MODEL=...   # obligatoire ici
 ```
+
+**Deux fournisseurs réels au choix, et le modèle par défaut appartient au
+fournisseur, pas au réglage.** Les deux ne parlent pas le même catalogue : un
+`AI_MODEL` unique partagé enverrait le modèle de l'un à l'autre. Laissé vide,
+Anthropic retombe sur `claude-opus-5` ; OpenAI n'a pas de défaut, parce que
+choisir un modèle OpenAI à la place de l'exploitant reviendrait à deviner. Sans
+modèle, le service refuse au démarrage (`ai_model_required`) plutôt qu'au
+premier appel payant, et une production configurée sur `openai` sans `AI_MODEL`
+ne démarre pas.
 
 **Le fournisseur visé est Claude.** `mock` reste le défaut parce que
 l'application doit démarrer sans clé — pour les tests, la démonstration hors
@@ -552,7 +567,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 446 tests
+pytest                    # 452 tests
 ruff check .              # lint
 ```
 

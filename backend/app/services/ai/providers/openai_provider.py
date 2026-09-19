@@ -15,6 +15,9 @@ OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 class OpenAIProvider(AIProvider):
     name = "openai"
+    #: Volontairement vide : choisir un modele OpenAI a la place de
+    #: l'exploitant reviendrait a deviner. `AI_MODEL` est donc requis.
+    default_model = ""
 
     def __init__(self, api_key: str | None = None, timeout: int | None = None) -> None:
         self.api_key = api_key or settings.ai_api_key

@@ -106,6 +106,19 @@ def project_stats(db: DbSession, _: CurrentAdmin) -> dict:
     }
 
 
+def _effective_model() -> str:
+    """Modèle réellement utilisé, ou une mention explicite s'il manque."""
+    from app.core.errors import AppError
+    from app.services.ai.service import build_provider
+
+    try:
+        return settings.ai_model or build_provider().default_model or "non configuré"
+    except AppError:
+        # Fournisseur inconstructible (clé absente) : le tableau de bord doit
+        # rester lisible plutôt que de tomber avec lui.
+        return settings.ai_model or "non configuré"
+
+
 # ---------------------------------------------------------------------------
 # IA
 # ---------------------------------------------------------------------------
@@ -125,7 +138,10 @@ def ai_stats(db: DbSession, _: CurrentAdmin) -> dict:
     )
     return {
         "provider": settings.ai_provider,
-        "model": settings.ai_model,
+        # Le modele effectif, pas le reglage : vide, c'est le defaut du
+        # fournisseur qui s'applique, et c'est lui qu'un administrateur
+        # doit lire pour savoir ce qui part reellement.
+        "model": _effective_model(),
         "calls": int(totals[0]),
         "input_tokens": int(totals[1]),
         "output_tokens": int(totals[2]),

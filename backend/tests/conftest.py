@@ -18,6 +18,11 @@ os.environ.update(
         "DATABASE_URL": f"sqlite:///{_db_path}",
         "JWT_SECRET": "test-secret-not-used-in-production",
         "AI_PROVIDER": "mock",
+        # Les doublures de fournisseur utilisées dans les tests ne
+        # déclarent pas de modèle par défaut — c'est le rôle d'un vrai
+        # fournisseur. L'environnement en fournit un, comme le ferait
+        # n'importe quel déploiement.
+        "AI_MODEL": "modele-de-test",
         "RATE_LIMIT_AUTH_PER_MINUTE": "1000",
         "RATE_LIMIT_AI_PER_MINUTE": "1000",
         "SMTP_HOST": "",

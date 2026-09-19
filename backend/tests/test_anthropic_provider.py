@@ -185,3 +185,84 @@ def test_a_missing_key_refuses_to_build_the_provider(monkeypatch):
     with pytest.raises(AIProviderError) as refused:
         AnthropicProvider()
     assert refused.value.code == "ai_provider_not_configured"
+
+
+# ----------------------------------------------------------------------
+# Deux fournisseurs au choix
+
+
+def test_each_provider_carries_its_own_default_model():
+    """Un réglage partagé enverrait le modèle de l'un à l'autre.
+
+    Le défaut corrigé : avec `AI_MODEL` fixé à un modèle Claude, choisir
+    OpenAI lui aurait envoyé `claude-opus-5`.
+    """
+    from app.services.ai.providers.mock_provider import MockProvider
+    from app.services.ai.providers.openai_provider import OpenAIProvider
+
+    assert AnthropicProvider.default_model == "claude-opus-5"
+    assert MockProvider.default_model == "mock-deterministic"
+    # OpenAI n'en a pas : choisir un modèle à la place de l'exploitant
+    # reviendrait à deviner.
+    assert OpenAIProvider.default_model == ""
+
+
+def test_the_service_falls_back_to_the_provider_default(monkeypatch):
+    from app.services.ai.service import AIService
+
+    monkeypatch.setattr("app.core.config.settings.ai_model", "")
+    service = AIService(provider=AnthropicProvider(api_key="clé-de-test"))
+    assert service.model == "claude-opus-5"
+
+
+def test_an_explicit_model_always_wins(monkeypatch):
+    from app.services.ai.service import AIService
+
+    monkeypatch.setattr("app.core.config.settings.ai_model", "claude-sonnet-5")
+    service = AIService(provider=AnthropicProvider(api_key="clé-de-test"))
+    assert service.model == "claude-sonnet-5"
+
+
+def test_openai_without_a_model_refuses_before_spending_anything(monkeypatch):
+    """Mieux vaut refuser ici qu'apprendre au premier appel payant."""
+    from app.services.ai.providers.openai_provider import OpenAIProvider
+    from app.services.ai.service import AIService
+
+    monkeypatch.setattr("app.core.config.settings.ai_model", "")
+    with pytest.raises(AIProviderError) as refused:
+        AIService(provider=OpenAIProvider(api_key="clé-de-test"))
+    assert refused.value.code == "ai_model_required"
+    assert "openai" in refused.value.detail
+
+
+def test_openai_with_a_model_is_accepted(monkeypatch):
+    from app.services.ai.providers.openai_provider import OpenAIProvider
+    from app.services.ai.service import AIService
+
+    monkeypatch.setattr("app.core.config.settings.ai_model", "un-modele-openai")
+    service = AIService(provider=OpenAIProvider(api_key="clé-de-test"))
+    assert service.model == "un-modele-openai"
+
+
+def test_openai_still_receives_its_temperature(monkeypatch):
+    """Son API l'attend : la table de capacités ne concerne que Claude."""
+    from app.services.ai.providers.openai_provider import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="clé-de-test")
+    captured = {}
+
+    def fake_post(self, url, json=None, headers=None):  # noqa: ARG001
+        captured.update(json)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "model": "un-modele-openai",
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            },
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    provider.complete(_request("un-modele-openai", temperature=0.3))
+    assert captured["temperature"] == 0.3

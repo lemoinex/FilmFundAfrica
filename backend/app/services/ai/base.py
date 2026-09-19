@@ -37,6 +37,14 @@ class AIProvider(ABC):
 
     name: str = "abstract"
 
+    #: Modele utilise quand `AI_MODEL` n'est pas renseigne.
+    #:
+    #: Il appartient au fournisseur, pas a la configuration : un seul reglage
+    #: partage enverrait le modele de l'un a l'autre. Vide signifie qu'aucun
+    #: defaut n'est raisonnable et que `AI_MODEL` devient obligatoire — mieux
+    #: vaut refuser de demarrer que deviner un nom de modele.
+    default_model: str = ""
+
     @abstractmethod
     def complete(self, request: AICompletionRequest) -> AICompletionResponse:
         """Retourne une completion ou leve `AIProviderError`."""

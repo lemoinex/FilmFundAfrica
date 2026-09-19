@@ -153,6 +153,10 @@ FR: dict[str, str] = {
         "Fournisseur IA inconnu : « {name} ». Valeurs acceptées : anthropic, openai, "
         "mock."
     ),
+    "ai.modelRequired": (
+        "AI_MODEL est requis avec AI_PROVIDER={provider} : aucun modèle par défaut "
+        "n'est supposé à votre place."
+    ),
     "funding.sourceRequiredToPublish": (
         "Impossible de publier ce dispositif comme ouvert sans son URL source."
     ),
@@ -477,6 +481,10 @@ EN: dict[str, str] = {
     ),
     "ai.providerUnknown": (
         "Unknown AI provider: “{name}”. Accepted values: anthropic, openai, mock."
+    ),
+    "ai.modelRequired": (
+        "AI_MODEL is required with AI_PROVIDER={provider}: no default model is "
+        "assumed on your behalf."
     ),
     "funding.sourceRequiredToPublish": (
         "This scheme cannot be published as open without its source URL."

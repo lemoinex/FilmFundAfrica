@@ -94,10 +94,12 @@ class Settings(BaseSettings):
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"
     ai_api_key: str = ""
-    #: Modele Claude vise. Les modeles actuels refusent `temperature` et
-    #: acceptent une reflexion adaptative : le fournisseur ajuste ce qu'il
-    #: envoie selon le modele, il n'y a rien a changer ailleurs.
-    ai_model: str = "claude-opus-5"
+    #: Modele vise. **Vide = le defaut du fournisseur choisi**, et non un
+    #: modele en dur : les deux fournisseurs ne parlent pas le meme
+    #: catalogue, et un reglage partage enverrait le modele de l'un a
+    #: l'autre. Anthropic a un defaut ; OpenAI non, faute de pouvoir le
+    #: choisir a la place de l'exploitant.
+    ai_model: str = ""
     #: Profondeur de reflexion demandee, quand le modele la supporte.
     #: Vide = defaut du serveur. Un dossier de financement se relit une
     #: fois et se depose une fois : la qualite prime sur le cout.
@@ -159,6 +161,11 @@ class Settings(BaseSettings):
             problems.append("DEBUG doit valoir false en production")
         if self.ai_provider != "mock" and not self.ai_api_key:
             problems.append(f"AI_API_KEY est requis avec AI_PROVIDER={self.ai_provider}")
+        if self.ai_provider == "openai" and not self.ai_model:
+            problems.append(
+                "AI_MODEL est requis avec AI_PROVIDER=openai : aucun modele par "
+                "defaut n'est suppose a votre place"
+            )
         if self.payment_provider == "mock":
             problems.append(
                 "PAYMENT_PROVIDER=mock encaisse des paiements fictifs : interdit en production"

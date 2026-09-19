@@ -83,6 +83,7 @@ def capabilities_for(model: str) -> ModelCapabilities:
 
 class AnthropicProvider(AIProvider):
     name = "anthropic"
+    default_model = "claude-opus-5"
 
     def __init__(self, api_key: str | None = None, timeout: int | None = None) -> None:
         self.api_key = api_key or settings.ai_api_key
