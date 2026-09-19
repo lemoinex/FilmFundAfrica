@@ -287,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **537 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **545 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -346,18 +346,26 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
    désormais rappelés à chaque passe, ce qui écarte la dérive la plus visible. Restent le
    registre de langue et les détails secondaires, qu'aucun rappel factuel ne fixe : un scénario
    de dix heures demandera toujours une relecture d'ensemble.
-6. **Aucun prestataire de paiement réel** — le cycle d'abonnement fonctionne de bout en bout,
+6. **Souscription fermée pendant la bêta privée** — avec `PLATFORM_MODE=internal`
+   (le défaut), `POST /billing/checkout` et la simulation de paiement répondent
+   `403 subscription_closed`, pour tout le monde y compris les administrateurs : il n'y a
+   rien à vendre tant que le produit n'est pas commercialisé. Résiliation et webhook du
+   prestataire restent ouverts. Rien n'est supprimé — offres, abonnements, paiements et
+   historiques sont conservés, et `PLATFORM_MODE=public` rouvre tout. Conséquence à
+   connaître : un compte non administrateur créé pendant la bêta reste sur l'offre
+   gratuite sans pouvoir en changer.
+7. **Aucun prestataire de paiement réel** — le cycle d'abonnement fonctionne de bout en bout,
    mais avec `manual` (encaissement hors ligne) ou `mock` (simulé). Brancher CinetPay, PayDunya,
    Wave ou Flutterwave revient à écrire une classe implémentant `PaymentProvider` : trois
    méthodes, documentées dans `app/services/payments/base.py`.
-7. **La veille n'a aucune source branchée** — le pipeline, la file de validation et les
+8. **La veille n'a aucune source branchée** — le pipeline, la file de validation et les
    garde-fous sont en place, mais le nœud « source » des workflows pointe sur une URL d'exemple.
    Brancher un portail réel demande de choisir les sources et d'en lire la structure ; aucune
    n'est proposée par défaut, faute de pouvoir en vérifier la fiabilité ici.
-8. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
+9. **Couverture navigateur limitée à Chromium** — les parcours sont joués sur un seul moteur,
    dans une seule taille de fenêtre. Firefox, WebKit et l'affichage mobile ne sont pas testés ;
    les ajouter ne demande qu'une ligne de configuration, mais allonge d'autant chaque exécution.
-9. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
+10. **Polices chargées au runtime** — `next/font` télécharge les polices au moment du build, ce
    qui casse la construction d'image dans un environnement sans accès à Google Fonts. Elles sont
    donc chargées par feuille de style, avec des piles système en repli.
 

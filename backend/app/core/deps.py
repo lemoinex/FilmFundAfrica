@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -104,6 +104,35 @@ def get_owned_project(project_id: str, db: DbSession, current_user: CurrentUser)
 
 
 OwnedProject = Annotated[Project, Depends(get_owned_project)]
+
+
+def require_subscription_open(current_user: CurrentUser) -> User:
+    """Ferme la souscription pendant la beta privee.
+
+    Pendant la phase interne, la plateforme n'est pas commercialisee : il ne
+    doit pas etre possible d'engager un paiement. **Rien n'est supprime** —
+    offres, prestataires, abonnements et historiques restent en place, et
+    rouvrir tient au seul `PLATFORM_MODE=public`.
+
+    La fermeture vaut pour **tout le monde, administrateurs compris** : ce
+    n'est pas une contrainte d'offre opposee a un compte, c'est l'etat du
+    produit. D'ou un controle sur le mode, et non sur l'utilisateur.
+
+    Deux actions restent ouvertes, volontairement. **Resilier** : empecher
+    quelqu'un de mettre fin a un abonnement souscrit avant la beta serait
+    abusif. **Le webhook du prestataire** : un paiement deja engage doit
+    pouvoir aboutir, sans quoi on encaisserait sans rien accorder.
+    """
+    from app.core.errors import AppError
+    from app.core.platform import is_internal
+
+    if is_internal():
+        raise AppError(
+            "billing.subscriptionClosed",
+            code="subscription_closed",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    return current_user
 
 
 def require_matching_access(db: DbSession, current_user: CurrentUser) -> User:

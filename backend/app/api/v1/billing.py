@@ -9,7 +9,12 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.deps import CurrentUser, DbSession, Translator
+from app.core.deps import (
+    CurrentUser,
+    DbSession,
+    Translator,
+    require_subscription_open,
+)
 from app.core.errors import AppError
 from app.core.rate_limit import rate_limit_auth
 from app.models.billing import SubscriptionPlan
@@ -66,7 +71,7 @@ def my_subscription(db: DbSession, current_user: CurrentUser) -> SubscriptionRea
     "/checkout",
     response_model=CheckoutResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(rate_limit_auth)],
+    dependencies=[Depends(rate_limit_auth), Depends(require_subscription_open)],
     summary="Souscrire à une offre",
 )
 def start_checkout(
@@ -112,6 +117,7 @@ def cancel(db: DbSession, current_user: CurrentUser, t: Translator) -> Message:
 @router.post(
     "/simulate/{reference}",
     response_model=Message,
+    dependencies=[Depends(require_subscription_open)],
     summary="Simuler l'issue d'un paiement (développement)",
 )
 def simulate_payment(

@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Payment, Plan, SubscriptionState } from "@/lib/types";
 
 export default function SubscriptionPage() {
-  const { refreshUser } = useAuth();
+  const { refreshUser, user } = useAuth();
   const { t, tn, formatDate, formatNumber } = useI18n();
 
   /** Un prix nul n'est pas « 0 XOF / mois » mais l'offre gratuite. */
@@ -103,6 +103,9 @@ export default function SubscriptionPage() {
   }
 
   const current = subscription.plan;
+  // `undefined` pendant le chargement du profil : on n'annonce pas une
+  // fermeture dont on n'est pas encore sûr.
+  const closed = user?.subscription_open === false;
 
   return (
     <div className="space-y-7">
@@ -110,6 +113,12 @@ export default function SubscriptionPage() {
         <h1 className="font-display text-3xl text-slatey-100">{t("billing.title")}</h1>
         <p className="mt-1.5 text-sm text-slatey-400">{t("billing.subtitle")}</p>
       </div>
+
+      {closed ? (
+        <Alert tone="warning" title={t("billing.betaTitle")}>
+          {t("billing.betaBody")}
+        </Alert>
+      ) : null}
 
       {error ? <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert> : null}
       {notice ? <Alert tone="info" onDismiss={() => setNotice(null)}>{notice}</Alert> : null}
@@ -180,7 +189,7 @@ export default function SubscriptionPage() {
                 </li>
               </ul>
 
-              {plan.price_amount > 0 && !isCurrent ? (
+              {plan.price_amount > 0 && !isCurrent && !closed ? (
                 <button
                   type="button"
                   className="btn-primary mt-5 w-full"
@@ -196,6 +205,9 @@ export default function SubscriptionPage() {
         })}
       </div>
 
+      {/* Le champ de paiement disparaît avec la souscription — il n'est pas
+          supprimé, seulement masqué tant qu'il n'y a rien à payer. */}
+      {closed ? null : (
       <div className="card p-6">
         <SectionHeading
           title={t("billing.mobileMoney")}
@@ -210,6 +222,7 @@ export default function SubscriptionPage() {
           onChange={(event) => setPhone(event.target.value)}
         />
       </div>
+      )}
 
       {payments.length > 0 ? (
         <div className="card p-6">

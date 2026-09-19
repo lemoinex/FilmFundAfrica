@@ -80,6 +80,11 @@ FR: dict[str, str] = {
     "billing.planUpdated": "Offre mise à jour.",
     "billing.subscriptionAlreadyCancelled": "Cet abonnement est déjà résilié.",
     "billing.planUnavailable": "Cette offre n'est plus proposée.",
+    "billing.subscriptionClosed": (
+        "FilmFund Africa est en bêta privée : la souscription est fermée. Les "
+        "offres et les abonnements existants sont conservés, et la souscription "
+        "rouvrira à l'ouverture commerciale."
+    ),
     # --- Administration ---
     "admin.userNotFound": "Utilisateur introuvable.",
     "admin.cannotSuspendSelf": "Vous ne pouvez pas suspendre votre propre compte.",
@@ -431,6 +436,11 @@ EN: dict[str, str] = {
     "billing.planUpdated": "Plan updated.",
     "billing.subscriptionAlreadyCancelled": "This subscription is already cancelled.",
     "billing.planUnavailable": "This plan is no longer offered.",
+    "billing.subscriptionClosed": (
+        "FilmFund Africa is in private beta: subscribing is closed. Existing "
+        "plans and subscriptions are kept, and subscribing reopens at the "
+        "commercial launch."
+    ),
     # --- Administration ---
     "admin.userNotFound": "User not found.",
     "admin.cannotSuspendSelf": "You cannot suspend your own account.",

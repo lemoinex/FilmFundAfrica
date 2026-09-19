@@ -352,6 +352,9 @@ export const fr = {
   "billing.cancelConfirm":
     "Résilier l'abonnement ? Il reste actif jusqu'à la fin de la période payée.",
   "billing.cancelFailed": "Résiliation impossible.",
+  "billing.betaTitle": "Bêta privée — souscription fermée",
+  "billing.betaBody":
+    "FilmFund Africa n'est pas encore commercialisé. Les offres ci-dessous sont conservées telles quelles et rouvriront à l'ouverture commerciale ; aucun abonnement ni paiement existant n'est perdu.",
   "billing.subscribe": "Souscrire",
   "billing.subscribeFailed": "Souscription impossible.",
   "billing.checkoutOpened":

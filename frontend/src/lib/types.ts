@@ -61,6 +61,8 @@ export interface User {
   commercial_rules_apply?: boolean;
   /** L'offre inclut-elle l'analyse de compatibilité ? La recherche reste ouverte à tous. */
   allows_matching?: boolean;
+  /** Faux pendant la bêta privée : aucune souscription possible, pour personne. */
+  subscription_open?: boolean;
 }
 
 export interface AuthResponse {

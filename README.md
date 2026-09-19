@@ -77,7 +77,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          537 tests (pytest)
+│   └── tests/          545 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -150,6 +150,38 @@ affiché ; le dépasser ne change rien. Passer en phase commerciale demande de
 mettre `PLATFORM_MODE=public` et de redémarrer. Le retour arrière est
 identique, immédiat, et ne détruit aucune donnée : abonnements, plans,
 paiements et historiques restent en place dans les deux modes.
+
+**La souscription est fermée en `internal`, pour tout le monde.** Ce n'est
+pas une contrainte d'offre opposée à un compte — c'est l'état du produit :
+il n'y a rien à vendre tant qu'il n'est pas commercialisé, et un
+administrateur ne fait pas exception. `POST /billing/checkout` et la
+simulation de paiement répondent `403 subscription_closed` ; l'écran
+d'abonnement affiche les offres mais plus le bouton de souscription ni le
+champ de paiement.
+
+Deux actions restent ouvertes, délibérément :
+
+- **Résilier** — empêcher quelqu'un de mettre fin à un abonnement souscrit
+  avant la bêta serait abusif.
+- **Le webhook du prestataire** — un paiement déjà engagé doit pouvoir
+  aboutir, sans quoi on encaisserait sans rien accorder.
+
+Rien n'est supprimé : offres, prix, abonnements, paiements et historiques
+restent en base et lisibles. `PLATFORM_MODE=public` rouvre tout.
+
+**Accès pendant la bêta.** La plateforme s'utilise avec des comptes
+administrateurs, créés un par un :
+
+```bash
+cd backend
+python -m scripts.create_admin --email prenom.nom@exemple.com
+```
+
+Le mot de passe est demandé à la saisie, masqué et confirmé — **jamais en
+argument** (il finirait dans l'historique du shell et dans la liste des
+processus), jamais dans un fichier versionné. Pour un déploiement sans
+terminal, `FILMFUND_ADMIN_PASSWORD` est acceptée le temps de la commande.
+`--promote` élève un compte existant sans toucher à son mot de passe.
 
 Le mode est visible sans lire la configuration : `GET /health` le publie sous
 `platform_mode`, et un bandeau le rappelle en tête de l'administration.
@@ -650,7 +682,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 537 tests
+pytest                    # 545 tests
 ruff check .              # lint
 ```
 

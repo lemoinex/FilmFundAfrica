@@ -3,6 +3,12 @@
 Trois propriétés portent le module et sont testées en priorité : un paiement
 non abouti n'accorde rien, une notification rejouée ne prolonge pas
 l'abonnement, et une notification non signée est refusée.
+
+**Le module s'exécute en mode `public`.** Le cycle commercial appartient à la
+phase commerciale : pendant la bêta privée la souscription est fermée, et un
+module qui tournerait dans ce mode ne vérifierait plus que la fermeture.
+Elle a ses propres tests, en fin de fichier, qui posent le mode interne
+explicitement.
 """
 
 from __future__ import annotations
@@ -19,6 +25,11 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.services.payments import sign_payload
 from app.services.subscription_service import SubscriptionService
+
+
+@pytest.fixture(autouse=True)
+def _phase_commerciale(monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "public")
 
 
 def _checkout(client, headers, plan="PRO_AUTHOR", **body) -> dict:
@@ -445,3 +456,101 @@ def test_the_enforced_flags_are_the_ones_the_plans_differ_on():
                     f"« {plan['name']} » et « {autre['name']} » ne se distinguent par "
                     "aucune contrainte réellement appliquée"
                 )
+
+
+# ----------------------------------------------------------------------
+# Bêta privée : la souscription est fermée, rien n'est supprimé
+
+
+@pytest.fixture
+def beta(monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "internal")
+
+
+def test_subscribing_is_closed_during_the_private_beta(client, make_user, beta):
+    headers, _ = make_user("beta.souscrit@example.com")
+    response = client.post(
+        "/api/v1/billing/checkout", json={"plan_code": "PRO_AUTHOR"}, headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "subscription_closed"
+
+
+def test_an_administrator_cannot_subscribe_either(client, make_user, beta):
+    """Ce n'est pas une contrainte d'offre, c'est l'état du produit.
+
+    Les autres restrictions s'effacent pour un administrateur en bêta ; la
+    souscription, non — il n'y a rien à vendre pendant la phase interne, et
+    laisser passer un paiement encaisserait pour un service non commercialisé.
+    """
+    from app.models.enums import UserType
+
+    headers, _ = make_user("beta.admin@example.com")
+    with SessionLocal() as db:
+        db.query(User).filter(
+            User.email == "beta.admin@example.com"
+        ).one().user_type = UserType.ADMIN
+        db.commit()
+
+    response = client.post(
+        "/api/v1/billing/checkout", json={"plan_code": "PRODUCER"}, headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "subscription_closed"
+
+
+def test_simulating_a_payment_is_closed_too(client, make_user, beta):
+    """Sinon on contournerait la fermeture par la porte de développement."""
+    headers, _ = make_user("beta.simule@example.com")
+    response = client.post(
+        "/api/v1/billing/simulate/une-reference", headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "subscription_closed"
+
+
+def test_the_offers_remain_visible_and_readable(client, make_user, beta):
+    """Rien n'est supprimé : les offres restent lisibles, seule l'action ferme."""
+    headers, _ = make_user("beta.lecture@example.com")
+    plans = client.get("/api/v1/billing/plans", headers=headers)
+    assert plans.status_code == 200
+    assert {p["code"] for p in plans.json()} == {"FREE", "PRO_AUTHOR", "PRODUCER"}
+    assert client.get("/api/v1/billing/subscription", headers=headers).status_code == 200
+    assert client.get("/api/v1/billing/payments", headers=headers).status_code == 200
+
+
+def test_cancelling_an_existing_subscription_stays_possible(client, make_user, beta):
+    """Empêcher quelqu'un de résilier serait abusif, et sans rapport avec la bêta."""
+    headers, _ = make_user("beta.resilie@example.com", plan="PRO_AUTHOR")
+    assert client.post("/api/v1/billing/cancel", headers=headers).status_code == 200
+
+
+def test_a_payment_already_under_way_can_still_settle(client, make_user, monkeypatch):
+    """Le webhook reste ouvert : encaisser sans rien accorder serait pire.
+
+    Un paiement engagé avant la bascule doit pouvoir aboutir — sa
+    notification arrive après, quand la bêta est déjà en place.
+    """
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "public")
+    headers, _ = make_user("beta.encours@example.com")
+    payment = _checkout(client, headers)["payment"]
+
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "internal")
+    assert _notify(client, payment["provider_reference"]).status_code == 200
+    assert _plan_of("beta.encours@example.com") == "PRO_AUTHOR"
+
+
+def test_the_profile_says_the_subscription_is_closed(client, make_user, beta):
+    """L'interface doit pouvoir le dire avant le clic, pas après le refus."""
+    headers, _ = make_user("beta.profil@example.com")
+    assert client.get(
+        "/api/v1/auth/me", headers=headers
+    ).json()["subscription_open"] is False
+
+
+def test_the_commercial_phase_reopens_it(client, make_user, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "public")
+    headers, _ = make_user("public.souscrit@example.com")
+    assert client.post(
+        "/api/v1/billing/checkout", json={"plan_code": "PRO_AUTHOR"}, headers=headers
+    ).status_code == 201

@@ -347,6 +347,9 @@ export const en: Record<MessageKey, string> = {
   "billing.cancelConfirm":
     "Cancel the subscription? It stays active until the end of the paid period.",
   "billing.cancelFailed": "The subscription could not be cancelled.",
+  "billing.betaTitle": "Private beta — subscribing is closed",
+  "billing.betaBody":
+    "FilmFund Africa is not on sale yet. The plans below are kept as they are and will reopen at the commercial launch; no existing subscription or payment is lost.",
   "billing.subscribe": "Subscribe",
   "billing.subscribeFailed": "Subscribing is not possible right now.",
   "billing.checkoutOpened":

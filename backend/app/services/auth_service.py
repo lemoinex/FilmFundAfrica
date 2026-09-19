@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import AuthenticationError, NotFoundError
 from app.core.i18n import resolve_locale
-from app.core.platform import commercial_rules_apply
+from app.core.platform import commercial_rules_apply, is_internal
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -282,5 +282,6 @@ def serialize_user(user: User) -> UserRead:
             "plan_code": plan_code,
             "commercial_rules_apply": not exempt,
             "allows_matching": allows_matching,
+            "subscription_open": not is_internal(),
         }
     )

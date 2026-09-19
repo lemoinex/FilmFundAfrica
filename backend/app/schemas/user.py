@@ -52,6 +52,10 @@ class UserRead(ORMModel):
     #: dire la verite *avant* le clic : sans cela, un ecran vide se lirait
     #: comme « la base est vide » alors que le catalogue est plein.
     allows_matching: bool = True
+    #: La souscription est-elle ouverte ? Faux pendant la beta privee, pour
+    #: tout le monde. L'interface s'en sert pour ne pas proposer un paiement
+    #: que le serveur refusera — les offres restent affichees, l'action non.
+    subscription_open: bool = True
 
 
 class AdminUserUpdate(BaseModel):
