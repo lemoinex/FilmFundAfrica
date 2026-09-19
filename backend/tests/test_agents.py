@@ -124,7 +124,12 @@ def test_the_development_agent_never_restarts_from_scratch():
 
 @pytest.mark.parametrize("role", VALIDATOR_AGENTS)
 def test_validators_are_the_least_creative(role):
-    """Un controle doit etre reproductible, pas inspire."""
+    """Un controle doit etre reproductible, pas inspire.
+
+    Ne mord que sur les modeles anterieurs : les modeles Claude actuels
+    refusent `temperature`, et le fournisseur ne l'envoie plus. La valeur
+    reste declaree parce qu'un deploiement peut viser un modele ancien.
+    """
     assert get_agent(role).temperature <= 0.2
 
 

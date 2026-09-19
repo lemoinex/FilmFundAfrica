@@ -76,7 +76,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          428 tests (pytest)
+│   └── tests/          446 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -138,7 +138,8 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `PAYMENT_WEBHOOK_SECRET` | Secret signant les notifications du prestataire | vide |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
 | `AI_API_KEY` | Clé du fournisseur choisi | vide |
-| `AI_MODEL` | Modèle utilisé | `claude-sonnet-4-5` |
+| `AI_MODEL` | Modèle Claude utilisé | `claude-opus-5` |
+| `AI_EFFORT` | Profondeur de réflexion (`low`…`max`) ; vide = défaut du serveur | `high` |
 | `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote la taille d'une passe | `8000` |
 | `SCREENPLAY_MAX_PASSES` | Plafond de sécurité du nombre de passes d'un scénario | `40` |
 | `AI_CREDITS_FREE/PRO/PRODUCER` | Quotas mensuels par offre | `1` / `300` / `500` |
@@ -301,8 +302,28 @@ Pour activer une génération réelle :
 ```bash
 AI_PROVIDER=anthropic
 AI_API_KEY=sk-...
-AI_MODEL=claude-sonnet-4-5
+AI_MODEL=claude-opus-5
 ```
+
+**Le fournisseur visé est Claude.** `mock` reste le défaut parce que
+l'application doit démarrer sans clé — pour les tests, la démonstration hors
+ligne et un premier lancement — mais aucun dossier réel n'en sortira : en mode
+`mock`, la chaîne d'agents rend systématiquement un dossier non exportable.
+
+**Les paramètres envoyés dépendent du modèle**, et le fournisseur s'en charge
+seul. L'API Messages a évolué : les modèles actuels **refusent `temperature`
+avec une erreur 400** et acceptent en échange une réflexion adaptative et un
+niveau d'effort. Une table de capacités dans
+`backend/app/services/ai/providers/anthropic_provider.py` dit ce que chaque
+famille accepte ; devant un modèle inconnu, rien d'optionnel n'est envoyé —
+un paramètre omis prend son défaut serveur, un paramètre de trop fait échouer
+l'appel.
+
+**Un refus n'est pas une réponse.** Le modèle peut décliner une demande : la
+réponse arrive alors en HTTP 200, sans contenu. Le fournisseur la transforme en
+erreur explicite plutôt que de laisser passer une étape vide — dans la chaîne
+d'agents, cela produirait un dossier amputé d'une section sans que rien ne le
+signale.
 
 **Prompts versionnés** — un module par document dans `backend/app/prompts/`, chacun portant un
 numéro de version enregistré dans `document_versions` et `ai_usage`. Aucun prompt n'est écrit
@@ -531,7 +552,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 428 tests
+pytest                    # 446 tests
 ruff check .              # lint
 ```
 

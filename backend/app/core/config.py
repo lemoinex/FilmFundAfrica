@@ -94,7 +94,14 @@ class Settings(BaseSettings):
     # --- IA ---
     ai_provider: Literal["anthropic", "openai", "mock"] = "mock"
     ai_api_key: str = ""
-    ai_model: str = "claude-sonnet-4-5"
+    #: Modele Claude vise. Les modeles actuels refusent `temperature` et
+    #: acceptent une reflexion adaptative : le fournisseur ajuste ce qu'il
+    #: envoie selon le modele, il n'y a rien a changer ailleurs.
+    ai_model: str = "claude-opus-5"
+    #: Profondeur de reflexion demandee, quand le modele la supporte.
+    #: Vide = defaut du serveur. Un dossier de financement se relit une
+    #: fois et se depose une fois : la qualite prime sur le cout.
+    ai_effort: Literal["", "low", "medium", "high", "xhigh", "max"] = "high"
     ai_max_output_tokens: int = 8000
     #: Nombre maximal de passes pour un scenario. Plafond de securite, pas
     #: limite d'usage : c'est la duree demandee qui fixe le nombre de passes.

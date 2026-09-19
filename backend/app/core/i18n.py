@@ -92,6 +92,10 @@ FR: dict[str, str] = {
     # --- Fournisseur d'IA ---
     "ai.unreachable": "Fournisseur IA injoignable : {reason}",
     "ai.emptyResponse": "Le fournisseur IA a renvoyé une réponse vide.",
+    "ai.refused": (
+        "Le modèle a refusé de traiter cette demande ({reason}). Reformulez, ou "
+        "signalez-le si le refus vous paraît infondé."
+    ),
     # --- Session et quotas ---
     "auth.sessionPasswordChanged": (
         "Session expirée : le mot de passe a été modifié. Reconnectez-vous."
@@ -414,6 +418,10 @@ EN: dict[str, str] = {
     # --- AI provider ---
     "ai.unreachable": "AI provider unreachable: {reason}",
     "ai.emptyResponse": "The AI provider returned an empty response.",
+    "ai.refused": (
+        "The model declined to handle this request ({reason}). Rephrase it, or "
+        "report it if the refusal looks unfounded."
+    ),
     # --- Session and quotas ---
     "auth.sessionPasswordChanged": (
         "Session expired: the password was changed. Please sign in again."
