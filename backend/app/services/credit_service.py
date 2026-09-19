@@ -194,13 +194,18 @@ class CreditService:
         return cost
 
     def refund(self, user: User, amount: int) -> None:
-        """Rend une reserve dont la generation n'a rien produit."""
+        """Rend une reserve qui n'a pas ete consommee.
+
+        Un echec n'est plus le seul cas : une generation arretee a la demande
+        rend les passes qui n'ont pas tourne. Le journal ne doit donc plus
+        parler d'echec — il enverrait chercher une panne qui n'existe pas.
+        """
         if amount <= 0:
             return
         user.ai_credits_remaining += amount
         logger.info(
-            "crédits rendus après échec",
-            extra={"event": "ai_credits_refunded"},
+            "crédits non consommés rendus",
+            extra={"event": "ai_credits_refunded", "amount": amount},
         )
 
     # ------------------------------------------------------------------

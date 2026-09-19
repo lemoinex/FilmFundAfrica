@@ -89,6 +89,9 @@ FR: dict[str, str] = {
     "notification.markedRead": "Notification marquée comme lue.",
     # --- Taches de generation ---
     "job.notFound": "Tâche introuvable.",
+    "job.alreadyFinished": (
+        "Cette génération est déjà terminée ({status}) : il n'y a plus rien à arrêter."
+    ),
     # --- Fournisseur d'IA ---
     "ai.unreachable": "Fournisseur IA injoignable : {reason}",
     "ai.emptyResponse": "Le fournisseur IA a renvoyé une réponse vide.",
@@ -431,6 +434,9 @@ EN: dict[str, str] = {
     "notification.markedRead": "Notification marked as read.",
     # --- Generation jobs ---
     "job.notFound": "Job not found.",
+    "job.alreadyFinished": (
+        "This generation has already finished ({status}): there is nothing left to stop."
+    ),
     # --- AI provider ---
     "ai.unreachable": "AI provider unreachable: {reason}",
     "ai.emptyResponse": "The AI provider returned an empty response.",

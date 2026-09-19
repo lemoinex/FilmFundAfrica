@@ -115,7 +115,11 @@ class DossierService:
 
         record = AgentRun(
             dossier_id=dossier.id,
-            status=JobStatus.SUCCEEDED,
+            # La colonne existait deja pour cela : un passage arrete a la
+            # demande n'a pas reussi, il a ete interrompu. L'export s'en sert
+            # pour ne pas dire que « les controles ont releve des points »
+            # alors qu'ils n'ont pas tourne.
+            status=JobStatus.CANCELLED if run.cancelled else JobStatus.SUCCEEDED,
             verdict=run.verdict,
             rounds=run.rounds,
             exhausted=run.exhausted,

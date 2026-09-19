@@ -560,6 +560,12 @@ export const en: Record<MessageKey, string> = {
   "dossier.verdict.PASS_WITH_WARNINGS": "Passed, with reservations",
   "dossier.verdict.REQUIRES_CORRECTION": "Needs correction",
   "dossier.verdict.BLOCKED": "Blocked",
+  "dossier.stop": "Stop",
+  "dossier.stopping": "Stop requested…",
+  "dossier.stopHint":
+    "Stopping takes effect between two agents: credits for the agents that do not run are given back.",
+  "dossier.stopPending":
+    "The current agent finishes — its call has already gone out. The chain stops right after.",
   "dossier.stalled":
     "The correction round changed nothing: this needs a human decision, not another pass.",
   "dossier.exhausted": "The correction limit was reached. The package remains unsendable.",
@@ -1018,6 +1024,7 @@ export const en: Record<MessageKey, string> = {
   "api.sessionExpired": "Session expired. Please sign in again.",
   "api.jobTrackingAborted": "Tracking of the generation was interrupted.",
   "api.generationFailed": "The generation failed.",
+  "api.generationCancelled": "Generation stopped. The passes that did not run are given back.",
 
   // --- HTTP client (continued) ---
   "api.httpError": "Error {status}",

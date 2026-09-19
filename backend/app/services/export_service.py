@@ -182,6 +182,7 @@ class ExportService:
         exportable: bool,
         verdict: str | None,
         findings: list | None = None,
+        interrupted: bool = False,
     ) -> bytes:
         """Le dossier construit par la chaine d'agents, en PDF.
 
@@ -247,7 +248,11 @@ class ExportService:
             story.append(Paragraph(_escape_xml(meta), styles["Heading3"]))
 
         story.append(Spacer(1, 1 * cm))
-        story.extend(self._dossier_banner(dossier, exportable, verdict, warning, body))
+        story.extend(
+            self._dossier_banner(
+                dossier, exportable, verdict, warning, body, interrupted=interrupted
+            )
+        )
         story.extend(
             [
                 Spacer(1, 2 * cm),
@@ -270,17 +275,23 @@ class ExportService:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _dossier_banner(dossier, exportable: bool, verdict, warning, body) -> list:
+    def _dossier_notice(exportable: bool, interrupted: bool) -> tuple[str, str]:
+        """L'avertissement qui correspond a l'etat reel du passage."""
+        if exportable:
+            return VALIDATED_NOTICE
+        return INTERRUPTED_WARNING if interrupted else DRAFT_WARNING
+
+    @staticmethod
+    def _dossier_banner(dossier, exportable: bool, verdict, warning, body, interrupted=False) -> list:
         """Ce que le lecteur doit savoir avant la premiere ligne du dossier."""
         blocks: list = []
-        if exportable:
-            lead, rest = VALIDATED_NOTICE
-            blocks.append(Paragraph(f"<b>{_escape_xml(lead)}</b> {_escape_xml(rest)}", body))
-        else:
-            lead, rest = DRAFT_WARNING
-            blocks.append(
-                Paragraph(f"<b>{_escape_xml(lead)}</b> {_escape_xml(rest)}", warning)
+        lead, rest = ExportService._dossier_notice(exportable, interrupted)
+        blocks.append(
+            Paragraph(
+                f"<b>{_escape_xml(lead)}</b> {_escape_xml(rest)}",
+                body if exportable else warning,
             )
+        )
         if verdict:
             # Le libellé, pas la valeur de l'énumération : « BLOCKED » dans un
             # document français destiné à être lu par un tiers fait négligé.
@@ -372,6 +383,7 @@ class ExportService:
         exportable: bool,
         verdict: str | None,
         findings: list | None = None,
+        interrupted: bool = False,
     ) -> bytes:
         """Le dossier de la chaine en Word, aux memes regles que le PDF.
 
@@ -404,7 +416,7 @@ class ExportService:
             subtitle.runs[0].font.color.rgb = RGBColor(0x6B, 0x6B, 0x6B)
 
         docx.add_paragraph()
-        self._docx_banner(docx, dossier, exportable, verdict)
+        self._docx_banner(docx, dossier, exportable, verdict, interrupted=interrupted)
         docx.add_paragraph()
         docx.add_paragraph(f"Généré le {date.today():%d/%m/%Y} — FilmFund Africa")
 
@@ -420,8 +432,8 @@ class ExportService:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _docx_banner(docx, dossier, exportable: bool, verdict) -> None:
-        lead, rest = VALIDATED_NOTICE if exportable else DRAFT_WARNING
+    def _docx_banner(docx, dossier, exportable: bool, verdict, interrupted=False) -> None:
+        lead, rest = ExportService._dossier_notice(exportable, interrupted)
         paragraph = docx.add_paragraph()
         run = paragraph.add_run(lead)
         run.bold = True
@@ -729,6 +741,17 @@ DRAFT_WARNING = (
     "BROUILLON — dossier non validé.",
     "Les contrôles ont relevé des points à traiter : ce document ne doit pas être "
     "soumis en l'état. Les constats figurent en fin de document.",
+)
+
+#: Une chaine interrompue n'a rien reproche au dossier : elle ne l'a pas lu
+#: jusqu'au bout. Reutiliser l'avertissement de brouillon ferait croire a des
+#: constats qui n'existent pas, et masquerait la vraie raison — le controle
+#: n'a pas eu lieu.
+INTERRUPTED_WARNING = (
+    "BROUILLON — contrôle interrompu.",
+    "La chaîne d'agents a été arrêtée avant son terme : ce dossier n'a pas été "
+    "contrôlé, et l'absence de point signalé ne vaut pas approbation. Relancez "
+    "un passage complet avant toute soumission.",
 )
 
 VALIDATED_NOTICE = (

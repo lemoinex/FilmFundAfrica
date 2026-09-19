@@ -626,6 +626,10 @@ export const jobApi = {
 
   listForProject: (projectId: string) =>
     request<GenerationJob[]>(`/api/v1/projects/${projectId}/jobs`),
+
+  /** Arrête une génération, ou demande son arrêt si elle a déjà commencé. */
+  cancel: (jobId: string) =>
+    request<GenerationJob>(`/api/v1/jobs/${jobId}/cancel`, { method: "POST" }),
 };
 
 /** Première attente avant d'interroger une tâche, en millisecondes. */
@@ -659,6 +663,11 @@ export async function waitForJob<T = GenerationResult>(
     options.onProgress?.(current);
   }
 
+  // Un arrêt demandé n'est pas un échec. Le signaler comme tel afficherait
+  // « la génération a échoué » à quelqu'un qui vient de l'arrêter lui-même.
+  if (current.status === "CANCELLED") {
+    throw new ApiError(tr("api.generationCancelled"), 0, "job_cancelled");
+  }
   if (current.status === "FAILED" || current.result === null) {
     throw new ApiError(
       current.error_message ?? tr("api.generationFailed"),

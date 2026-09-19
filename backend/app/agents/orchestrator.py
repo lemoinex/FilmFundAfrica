@@ -51,13 +51,24 @@ class PipelineRun:
     exhausted: bool = False
     #: Vrai quand un tour n'a rien change aux constats ouverts.
     stalled: bool = False
+    #: Vrai quand l'utilisateur a demande l'arret en cours de route.
+    cancelled: bool = False
     #: Signal d'avancement, appele apres chaque agent.
     _on_step: Callable[[int, int], None] | None = None
+    #: Interrogee entre deux agents : vrai = on s'arrete la.
+    _should_stop: Callable[[], bool] | None = None
 
     @property
     def is_exportable(self) -> bool:
         from app.agents import is_exportable
 
+        # Une chaine interrompue n'a pas ete controlee jusqu'au bout, meme si
+        # les validateurs avaient deja rendu un verdict favorable a un tour
+        # precedent : les agents suivants n'ont pas tourne sur l'etat final.
+        # Laisser exporter un tel dossier reviendrait a le presenter comme
+        # verifie alors que la verification a ete interrompue.
+        if self.cancelled:
+            return False
         return self.verdict is not None and is_exportable(self.verdict)
 
     def blocking_findings(self) -> list[Finding]:
@@ -84,6 +95,7 @@ class Orchestrator:
         funding_requirements: dict | None = None,
         project_context: dict | None = None,
         on_step: Callable[[int, int], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> PipelineRun:
         """Deroule la chaine, puis la reprend tant qu'il le faut.
 
@@ -91,14 +103,20 @@ class Orchestrator:
         d'affichage : un passage complet peut depasser le delai au-dela duquel
         une tache est declaree interrompue, et sans signe de vie regulier le
         surveillant tuerait une chaine qui travaille.
+
+        `should_stop` est interrogee **entre deux agents**, jamais pendant.
+        Un appel deja parti est deja facture : l'interrompre ne rendrait rien
+        et laisserait l'etat du dossier a moitie ecrit. Entre deux agents, au
+        contraire, l'etat est celui qu'un agent vient de rendre — coherent,
+        conservable, simplement incomplet.
         """
-        run = PipelineRun(state=state, _on_step=on_step)
+        run = PipelineRun(state=state, _on_step=on_step, _should_stop=should_stop)
 
         self._run_sequence(
             run, BUILDER_AGENTS + VALIDATOR_AGENTS, funding_requirements, project_context
         )
 
-        while not run.is_exportable and run.rounds < self.max_correction_rounds:
+        while not run.cancelled and not run.is_exportable and run.rounds < self.max_correction_rounds:
             target = self._correction_target(run)
             if target is None:
                 # Verdict negatif sans destinataire : rejouer a l'identique
@@ -132,7 +150,10 @@ class Orchestrator:
                 break
 
         run.exhausted = (
-            not run.is_exportable and not run.stalled and run.rounds >= self.max_correction_rounds
+            not run.cancelled
+            and not run.is_exportable
+            and not run.stalled
+            and run.rounds >= self.max_correction_rounds
         )
         return run
 
@@ -154,6 +175,17 @@ class Orchestrator:
         project_context: dict | None,
     ) -> None:
         for role in sequence:
+            if run._should_stop is not None and run._should_stop():
+                run.cancelled = True
+                logger.info(
+                    "chaîne interrompue à la demande",
+                    extra={
+                        "event": "agent_chain_cancelled",
+                        "completed_steps": len(run.outputs),
+                        "next_agent": role,
+                    },
+                )
+                return
             definition = get_agent(role)
             payload = AgentInput(
                 project_state=run.state,

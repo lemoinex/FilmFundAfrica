@@ -287,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **505 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **529 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de
@@ -321,9 +321,13 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
 1. **`AI_PROVIDER=mock` par défaut** — l'application démarre sans clé d'IA et produit alors des
    documents structurés mais non rédigés, explicitement marqués comme tels. C'est un choix
    assumé pour que l'installation fonctionne immédiatement, pas un oubli.
-2. **Pas d'annulation d'une génération en cours** — une tâche lancée va à son terme ; seule
-   une interruption du worker la termine, en rendant les crédits. Annuler suppose un contrôle
-   entre deux passes, non implémenté.
+2. **Annulation impossible sans worker** — une génération peut être arrêtée
+   (`POST /jobs/{id}/cancel`) : immédiatement si elle est en file, entre deux passes si elle
+   est en cours, en ne rendant que les passes qui n'ont pas tourné. Mais sans `REDIS_URL` ni
+   worker, l'API exécute la génération **dans la requête HTTP** : elle est terminée avant
+   qu'on puisse l'arrêter. Il reste aussi un cas irréductible — une génération en un seul
+   appel n'a pas de frontière avant sa fin : la demande est enregistrée, la tâche ira à son
+   terme.
 3. **Inscription inutilisable sans SMTP hors développement** — l'activation d'un compte passe
    désormais par un e-mail. En `staging` ou en production sans `SMTP_HOST`, le message est
    seulement journalisé : personne ne peut activer son compte. Configurer SMTP devient donc

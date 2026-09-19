@@ -60,6 +60,10 @@ class _Telemetry:
     output_tokens: int = 0
     latency_ms: int = 0
     prompt_name: str | None = None
+    #: Appels reellement effectues. Distinct du nombre de passes *prevues* :
+    #: une ecriture interrompue en compte moins, et c'est ce chiffre-la qui
+    #: dit ce qui a ete produit et facture.
+    passes: int = 0
 
 
 class DocumentService:
@@ -151,6 +155,7 @@ class DocumentService:
         *,
         reserved_credits: int | None = None,
         on_pass: Callable[[int, int], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> GenerationResult:
         """Génère un document.
 
@@ -183,6 +188,7 @@ class DocumentService:
                 target_minutes=payload.target_duration_minutes or project.duration or 90,
                 instructions=payload.additional_instructions,
                 on_pass=on_pass,
+                should_stop=should_stop,
             )
             prompt_version = template.version
         else:
@@ -204,6 +210,7 @@ class DocumentService:
                 output_tokens=response.output_tokens,
                 latency_ms=response.latency_ms,
                 prompt_name=prompt.prompt_name,
+                passes=1,
             )
 
         document = self._upsert_document(
@@ -229,7 +236,9 @@ class DocumentService:
             input_tokens=telemetry.input_tokens,
             output_tokens=telemetry.output_tokens,
             latency_ms=telemetry.latency_ms,
-            units=passes,
+            # Ce qui a tourne, pas ce qui etait prevu : une ecriture
+            # interrompue ne doit pas etre facturee au tarif du plan complet.
+            units=telemetry.passes or passes,
             # Deja debite a la mise en file : on journalise sans reprelever.
             consume=reserved_credits is None,
             # Les passes d'un scenario ont deja ete journalisees une par une.
@@ -248,7 +257,10 @@ class DocumentService:
             model=telemetry.model,
             prompt_version=prompt_version,
             latency_ms=telemetry.latency_ms,
-            passes=passes,
+            # Les passes reellement ecrites, et non celles planifiees : une
+            # ecriture interrompue en compte moins, et annoncer le plan
+            # laisserait croire le scenario complet.
+            passes=telemetry.passes or passes,
             missing_information=AIService.extract_missing_information(text),
         )
 
@@ -286,6 +298,7 @@ class DocumentService:
         target_minutes: int,
         instructions: str | None,
         on_pass: Callable[[int, int], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> tuple[str, _Telemetry]:
         """Écrit le scénario segment par segment, avec continuité entre les passes."""
         parts: list[str] = []
@@ -295,6 +308,24 @@ class DocumentService:
         state = ScreenplayState()
 
         for segment in segments:
+            # Entre deux passes, et jamais pendant : un appel deja parti est
+            # deja facture. On garde ce qui est ecrit — un scenario arrete au
+            # deuxieme acte reste un scenario de deux actes, et le jeter
+            # ferait payer des passes dont il ne resterait rien.
+            #
+            # `parts` non vide : on n'interrompt jamais avant la premiere
+            # passe, sans quoi il n'y aurait pas de document a conserver.
+            if parts and should_stop is not None and should_stop():
+                logger.info(
+                    "écriture du scénario interrompue à la demande",
+                    extra={
+                        "event": "screenplay_cancelled",
+                        "written_passes": len(parts),
+                        "planned_passes": len(segments),
+                    },
+                )
+                break
+
             prompt = build_segment_prompt(
                 template,
                 context,
@@ -337,6 +368,7 @@ class DocumentService:
             telemetry.output_tokens += response.output_tokens
             telemetry.latency_ms += response.latency_ms
             telemetry.prompt_name = prompt.prompt_name
+            telemetry.passes = len(parts)
 
             logger.info(
                 "segment de scénario généré",

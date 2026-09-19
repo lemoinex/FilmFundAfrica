@@ -15,7 +15,8 @@ class GenerationJobRead(ORMModel):
 
     Le frontend interroge cette ressource jusqu'a un etat terminal :
     `SUCCEEDED` porte alors le `result` complet, `FAILED` la raison de l'echec.
-    `completed_passes` / `total_passes` donnent l'avancement d'un scenario long.
+    `CANCELLED` porte le travail conserve jusqu'a l'arret. `completed_passes`
+    / `total_passes` donnent l'avancement d'un scenario long.
     """
 
     id: str
@@ -34,6 +35,9 @@ class GenerationJobRead(ORMModel):
     #: La forme depend de `kind` : un document genere, ou le bilan d'un
     #: passage de la chaine.
     result: GenerationResult | AgentChainResult | None = None
+    #: Renseigne des qu'un arret a ete demande, meme si la tache n'est pas
+    #: encore arretee : elle ne s'interrompt qu'entre deux passes.
+    cancel_requested_at: datetime | None = None
     created_at: datetime
     started_at: datetime | None = None
     heartbeat_at: datetime | None = None

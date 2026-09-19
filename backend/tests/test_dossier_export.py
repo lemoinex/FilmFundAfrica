@@ -402,3 +402,56 @@ def test_a_validated_word_dossier_has_no_red_warning(client, paid, monkeypatch):
     )
     assert lead.bold
     assert lead.font.color.rgb is None
+
+
+# ----------------------------------------------------------------------
+# Un contrôle interrompu ne se lit pas comme un contrôle sévère
+
+
+def _notice(exportable: bool, interrupted: bool) -> tuple[str, str]:
+    from app.services.export_service import ExportService
+
+    return ExportService._dossier_notice(exportable, interrupted)
+
+
+def test_an_interrupted_run_says_the_control_did_not_happen():
+    """Le défaut corrigé : « les contrôles ont relevé des points à traiter ».
+
+    Pour une chaîne arrêtée en chemin, c'est faux deux fois — les contrôles
+    n'ont rien relevé, et ils n'ont pas tourné. Le lecteur en conclurait que
+    le dossier a été lu et jugé perfectible, alors qu'il n'a pas été lu.
+    """
+    from app.services.export_service import DRAFT_WARNING, INTERRUPTED_WARNING
+
+    lead, rest = _notice(exportable=False, interrupted=True)
+    assert (lead, rest) == INTERRUPTED_WARNING
+    assert (lead, rest) != DRAFT_WARNING
+    assert "interrompu" in lead.lower()
+    # Et surtout : l'absence de constat ne vaut pas approbation.
+    assert "ne vaut pas approbation" in rest
+
+
+def test_an_ordinary_draft_keeps_its_own_warning():
+    from app.services.export_service import DRAFT_WARNING
+
+    assert _notice(exportable=False, interrupted=False) == DRAFT_WARNING
+
+
+def test_an_interrupted_run_is_never_presented_as_validated():
+    """Même interrompue, une chaîne ne peut pas produire un dossier « contrôlé »."""
+    from app.services.export_service import VALIDATED_NOTICE
+
+    assert _notice(exportable=False, interrupted=True) != VALIDATED_NOTICE
+    assert _notice(exportable=True, interrupted=False) == VALIDATED_NOTICE
+
+
+def test_both_formats_use_the_same_selector():
+    """Le PDF et le Word ne doivent pas diverger sur ce qui compte le plus."""
+    import inspect
+
+    from app.services.export_service import ExportService
+
+    pdf = inspect.getsource(ExportService._dossier_banner)
+    docx = inspect.getsource(ExportService._docx_banner)
+    assert "_dossier_notice" in pdf
+    assert "_dossier_notice" in docx

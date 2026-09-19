@@ -47,3 +47,6 @@ logs/
 /frontend/test-results/
 /frontend/blob-report/
 /backend/.e2e.db
+
+# Instantané Redis, déposé par un serveur lancé depuis ce dossier.
+dump.rdb

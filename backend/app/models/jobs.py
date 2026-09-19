@@ -78,6 +78,15 @@ class GenerationJob(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     heartbeat_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    #: Instant ou l'utilisateur a demande l'arret. Une demande, pas un etat :
+    #: une tache deja en cours ne s'interrompt qu'entre deux passes, la ou le
+    #: travail acquis est coherent. Tuer un appel en cours ne rendrait rien —
+    #: le fournisseur l'a deja facture — et laisserait le dossier a moitie
+    #: ecrit.
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship()

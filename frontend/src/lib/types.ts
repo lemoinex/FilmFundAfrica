@@ -301,7 +301,13 @@ export interface SchedulePhase {
   notes: string | null;
 }
 
-export type JobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+export type JobStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "SUCCEEDED"
+  | "FAILED"
+  /** Arrêtée à la demande. Distinct d'un échec : personne n'a rien raté. */
+  | "CANCELLED";
 
 /**
  * Une génération demandée. L'API répond par cette tâche plutôt que d'attendre
@@ -323,6 +329,8 @@ export interface GenerationJob {
   error_message: string | null;
   /** La forme dépend de `kind`. */
   result: GenerationResult | AgentChainResult | null;
+  /** Renseigné dès qu'un arrêt est demandé, avant même qu'il prenne effet. */
+  cancel_requested_at: string | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

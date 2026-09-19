@@ -71,6 +71,59 @@ class JobService:
         )
 
     # ------------------------------------------------------------------
+    # Annulation
+    # ------------------------------------------------------------------
+    def request_cancel(self, job: GenerationJob) -> GenerationJob:
+        """Enregistre une demande d'arret, ou annule tout de suite si possible.
+
+        Une tache encore en file n'a rien consomme : elle s'arrete
+        immediatement et rend tout. Une tache en cours ne s'arrete qu'entre
+        deux passes — c'est la seule frontiere ou l'etat est coherent, et un
+        appel deja parti est de toute facon deja facture.
+
+        Demander deux fois ne fait rien de plus : la demande est une date, pas
+        un compteur.
+        """
+        if job.status.is_final:
+            raise AppError(
+                "job.alreadyFinished",
+                params={"status": str(job.status)},
+                code="job_already_finished",
+            )
+
+        if job.cancel_requested_at is None:
+            job.cancel_requested_at = datetime.now(UTC)
+
+        if job.status == JobStatus.QUEUED:
+            # Rien n'a tourne : la reserve entiere revient.
+            self._cancel(job, consumed_units=0)
+            logger.info(
+                "tâche annulée avant exécution",
+                extra={"event": "job_cancelled_queued", "job_id": job.id},
+            )
+
+        self.db.commit()
+        return job
+
+    def _cancel(self, job: GenerationJob, *, consumed_units: int) -> None:
+        """Termine une tache en annulation, en ne rendant que l'inutilise.
+
+        Rembourser tout laisserait quiconque depenser l'argent du fournisseur
+        sans rien payer, en lancant puis annulant. Ne rien rembourser ferait
+        payer un arret a la premiere passe au prix de huit. On rend donc les
+        unites qui n'ont pas tourne, et c'est la seule regle que ni l'un ni
+        l'autre ne peut retourner contre nous.
+        """
+        user = self.db.get(User, job.user_id)
+        kept = min(max(consumed_units, 0), job.credits_reserved)
+        refund = job.credits_reserved - kept
+        if user is not None and refund:
+            self.credits.refund(user, refund)
+        job.credits_reserved = kept
+        job.status = JobStatus.CANCELLED
+        job.finished_at = datetime.now(UTC)
+
+    # ------------------------------------------------------------------
     # Mise en file
     # ------------------------------------------------------------------
     def enqueue_generate(
@@ -258,6 +311,22 @@ def _run(db: Session, job_id: str) -> JobStatus:
 
     documents = DocumentService(db)
 
+    def cancel_requested() -> bool:
+        """Lit la demande d'arret en base, et non l'objet charge en memoire.
+
+        La demande vient d'une autre session — celle de la requete HTTP. Se
+        fier a l'instance chargee au demarrage de la tache reviendrait a ne
+        jamais la voir arriver.
+        """
+        return (
+            db.scalar(
+                select(GenerationJob.cancel_requested_at).where(
+                    GenerationJob.id == job_id
+                )
+            )
+            is not None
+        )
+
     def publish_progress(done: int, total: int) -> None:
         """Rend l'avancement visible pendant que la generation continue.
 
@@ -272,7 +341,7 @@ def _run(db: Session, job_id: str) -> JobStatus:
 
     try:
         if job.kind == JobKind.RUN_AGENT_CHAIN:
-            return _run_agent_chain(db, job, project, publish_progress)
+            return _run_agent_chain(db, job, project, publish_progress, cancel_requested)
         if job.kind == JobKind.GENERATE_DOCUMENT:
             result = documents.generate(
                 user,
@@ -281,6 +350,7 @@ def _run(db: Session, job_id: str) -> JobStatus:
                 GenerateRequest(**job.payload),
                 reserved_credits=job.credits_reserved,
                 on_pass=publish_progress,
+                should_stop=cancel_requested,
             )
         else:
             document = documents.get_owned_document(job.document_id or "", project)
@@ -306,9 +376,26 @@ def _run(db: Session, job_id: str) -> JobStatus:
         return JobStatus.FAILED
 
     job = db.get(GenerationJob, job_id)
-    job.status = JobStatus.SUCCEEDED
     job.document_id = result.document.id
     job.result = result.model_dump(mode="json")
+
+    # Le document produit est conserve dans tous les cas : ce qui a ete ecrit
+    # a ete paye. Seul le statut distingue une generation menee a son terme
+    # d'une generation arretee en chemin.
+    if job.cancel_requested_at is not None and result.passes < job.total_passes:
+        JobService(db)._cancel(job, consumed_units=result.passes)
+        db.commit()
+        logger.info(
+            "génération interrompue à la demande",
+            extra={
+                "event": "job_cancelled",
+                "written_passes": result.passes,
+                "planned_passes": job.total_passes,
+            },
+        )
+        return JobStatus.CANCELLED
+
+    job.status = JobStatus.SUCCEEDED
     job.completed_passes = job.total_passes
     job.finished_at = datetime.now(UTC)
     db.commit()
@@ -336,6 +423,7 @@ def _run_agent_chain(
     job: GenerationJob,
     project: Project,
     publish_progress: Callable[[int, int], None],
+    cancel_requested: Callable[[], bool],
 ) -> JobStatus:
     """Execute un passage complet de la chaine et enregistre son resultat.
 
@@ -350,7 +438,9 @@ def _run_agent_chain(
     dossiers = DossierService(db)
     state = dossiers.load_state(project.id)
 
-    run = Orchestrator().run(state, on_step=publish_progress)
+    run = Orchestrator().run(
+        state, on_step=publish_progress, should_stop=cancel_requested
+    )
     record = dossiers.save_run(project.id, run)
 
     # Les credits ont ete reserves a la mise en file : on ne redebite pas,
@@ -377,10 +467,16 @@ def _run_agent_chain(
         )
 
     job = db.get(GenerationJob, job.id)
-    job.status = JobStatus.SUCCEEDED
     job.completed_passes = len(run.outputs)
     job.total_passes = max(job.total_passes, len(run.outputs))
-    job.finished_at = datetime.now(UTC)
+    if run.cancelled:
+        # Le dossier partiel vient d'etre sauvegarde, comme tout passage : les
+        # agents qui ont tourne ont produit du travail reel. Il n'est pas
+        # exportable — la chaine de controle n'est pas allee a son terme.
+        JobService(db)._cancel(job, consumed_units=len(run.outputs))
+    else:
+        job.status = JobStatus.SUCCEEDED
+        job.finished_at = datetime.now(UTC)
     # Le verdict n'est pas le statut de la tache : une chaine qui aboutit a un
     # dossier bloque a reussi son travail, elle a seulement conclu au refus.
     job.result = {
@@ -391,16 +487,17 @@ def _run_agent_chain(
         "stalled": run.stalled,
         "exhausted": run.exhausted,
         "steps": len(run.outputs),
+        "cancelled": run.cancelled,
         "open_findings": len(run.state.unresolved_issues),
     }
     db.commit()
     logger.info(
-        "passage de la chaîne terminé",
+        "passage de la chaîne interrompu" if run.cancelled else "passage de la chaîne terminé",
         extra={
-            "event": "agent_chain_finished",
+            "event": "agent_chain_cancelled" if run.cancelled else "agent_chain_finished",
             "verdict": run.verdict,
             "rounds": run.rounds,
             "steps": len(run.outputs),
         },
     )
-    return JobStatus.SUCCEEDED
+    return JobStatus.CANCELLED if run.cancelled else JobStatus.SUCCEEDED

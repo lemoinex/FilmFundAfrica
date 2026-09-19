@@ -165,19 +165,26 @@ class JobKind(StrEnum):
 class JobStatus(StrEnum):
     """Cycle de vie d'une tache de generation.
 
-    `QUEUED` -> `RUNNING` -> `SUCCEEDED` ou `FAILED`. Une tache ne repasse
-    jamais a un etat anterieur : le frontend peut arreter de l'interroger des
-    qu'elle est dans un etat terminal.
+    `QUEUED` -> `RUNNING` -> `SUCCEEDED`, `FAILED` ou `CANCELLED`. Une tache ne
+    repasse jamais a un etat anterieur : le frontend peut arreter de
+    l'interroger des qu'elle est dans un etat terminal.
+
+    `CANCELLED` est distinct de `FAILED`, et ce n'est pas une nuance
+    d'affichage : un echec est un defaut du systeme, une annulation est une
+    decision de l'utilisateur. Les confondre afficherait « la generation a
+    echoue » a quelqu'un qui vient de l'arreter lui-meme, et noierait les
+    vrais echecs dans les statistiques.
     """
 
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
     @property
     def is_final(self) -> bool:
-        return self in (JobStatus.SUCCEEDED, JobStatus.FAILED)
+        return self in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED)
 
 
 class AgentRole(StrEnum):

@@ -113,5 +113,9 @@ class AgentChainResult(BaseModel):
     rounds: int = 0
     stalled: bool = False
     exhausted: bool = False
+    #: Vrai quand l'utilisateur a arrete le passage en cours de route. Le
+    #: dossier partiel est conserve, mais jamais exportable : la chaine de
+    #: controle n'est pas allee a son terme.
+    cancelled: bool = False
     steps: int = 0
     open_findings: int = 0

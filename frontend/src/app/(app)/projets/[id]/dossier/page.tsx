@@ -10,6 +10,7 @@ import {
   authApi,
   dossierApi,
   downloadExport,
+  jobApi,
   projectApi,
   waitForJob,
 } from "@/lib/api";
@@ -63,6 +64,8 @@ export default function DossierPage() {
 
   const [showResolved, setShowResolved] = useState(false);
   const [running, setRunning] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<GenerationJob | null>(null);
   const [outcome, setOutcome] = useState<AgentChainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,8 +108,10 @@ export default function DossierPage() {
 
   async function handleRun() {
     setError(null);
+    setNotice(null);
     setOutcome(null);
     setProgress(null);
+    setStopping(false);
     setRunning(true);
     try {
       // Le passage est une tâche : huit appels au fournisseur ne tiennent pas
@@ -119,10 +124,30 @@ export default function DossierPage() {
       // de l'en-tête resterait sur sa valeur d'avant le passage.
       setCredits((await authApi.me()).ai_credits_remaining);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("dossier.runFailed"));
+      // Un arrêt demandé n'est pas un échec : le dire en rouge reprocherait
+      // à l'utilisateur ce qu'il vient de décider.
+      if (err instanceof ApiError && err.code === "job_cancelled") {
+        setNotice(err.message);
+        await refresh(showResolved);
+        setCredits((await authApi.me()).ai_credits_remaining);
+      } else {
+        setError(err instanceof ApiError ? err.message : t("dossier.runFailed"));
+      }
     } finally {
       setRunning(false);
+      setStopping(false);
       setProgress(null);
+    }
+  }
+
+  async function handleStop() {
+    if (!progress) return;
+    setStopping(true);
+    try {
+      await jobApi.cancel(progress.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("dossier.runFailed"));
+      setStopping(false);
     }
   }
 
@@ -300,6 +325,19 @@ export default function DossierPage() {
                 }}
               />
             </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                className="btn-secondary px-3 py-1.5 text-xs"
+                disabled={stopping}
+                onClick={() => void handleStop()}
+              >
+                {stopping ? t("dossier.stopping") : t("dossier.stop")}
+              </button>
+              <p className="hint">
+                {stopping ? t("dossier.stopPending") : t("dossier.stopHint")}
+              </p>
+            </div>
           </div>
         ) : null}
 
@@ -313,6 +351,14 @@ export default function DossierPage() {
         {outcome?.exhausted ? (
           <div className="mt-4">
             <Alert tone="warning">{t("dossier.exhausted")}</Alert>
+          </div>
+        ) : null}
+
+        {notice ? (
+          <div className="mt-4">
+            <Alert tone="info" onDismiss={() => setNotice(null)}>
+              {notice}
+            </Alert>
           </div>
         ) : null}
 

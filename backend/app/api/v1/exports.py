@@ -51,6 +51,7 @@ def _agent_dossier_context(project, db):
 
     from app.agents import is_exportable
     from app.models.agents import AgentRun, DossierFinding
+    from app.models.enums import JobStatus
     from app.services.dossier_service import DossierService
 
     dossier = DossierService(db).get_or_create(project.id)
@@ -74,7 +75,11 @@ def _agent_dossier_context(project, db):
         )
     )
     exportable = bool(last.verdict and is_exportable(last.verdict))
-    return dossier, exportable, last.verdict, findings
+    # Un passage arrete en chemin n'a pas « releve des points » : il n'a pas
+    # lu le dossier jusqu'au bout. Les deux etats ne meritent pas le meme
+    # avertissement.
+    interrupted = last.status == JobStatus.CANCELLED
+    return dossier, exportable, last.verdict, findings, interrupted
 
 
 @router.get("/pdf", summary="Exporter le dossier complet en PDF")
@@ -99,9 +104,14 @@ def export_agent_dossier_pdf(project: OwnedProject, db: DbSession) -> Response:
     L'export n'est jamais refusé : un auteur a le droit de lire son travail en
     cours. Ce qui est interdit, c'est qu'un brouillon se présente comme abouti.
     """
-    dossier, exportable, verdict, findings = _agent_dossier_context(project, db)
+    dossier, exportable, verdict, findings, interrupted = _agent_dossier_context(project, db)
     content = ExportService(db).agent_dossier_to_pdf(
-        project, dossier, exportable=exportable, verdict=verdict, findings=findings
+        project,
+        dossier,
+        exportable=exportable,
+        verdict=verdict,
+        findings=findings,
+        interrupted=interrupted,
     )
     return _attachment(
         content, "application/pdf", _dossier_filename(project.title, exportable, "pdf")
@@ -116,9 +126,14 @@ def export_agent_dossier_docx(project: OwnedProject, db: DbSession) -> Response:
     dossier avant de le rendre. Contenu et avertissements sont identiques au
     PDF : ils sont partagés, pas recopiés.
     """
-    dossier, exportable, verdict, findings = _agent_dossier_context(project, db)
+    dossier, exportable, verdict, findings, interrupted = _agent_dossier_context(project, db)
     content = ExportService(db).agent_dossier_to_docx(
-        project, dossier, exportable=exportable, verdict=verdict, findings=findings
+        project,
+        dossier,
+        exportable=exportable,
+        verdict=verdict,
+        findings=findings,
+        interrupted=interrupted,
     )
     return _attachment(
         content,

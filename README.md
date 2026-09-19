@@ -77,7 +77,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          505 tests (pytest)
+│   └── tests/          529 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -400,6 +400,25 @@ dans une route API. Chaque prompt reçoit le contexte structuré du projet **et*
 dont il dépend : la note de réalisation voit la note d'intention et le synopsis, le scénario
 voit le traitement.
 
+**Arrêter une génération** — `POST /jobs/{id}/cancel`. En file d'attente,
+l'arrêt est immédiat et les crédits reviennent en entier. En cours, la tâche
+s'interrompt **entre deux passes** : c'est la seule frontière où l'état est
+cohérent, et un appel déjà parti est de toute façon déjà facturé. Le travail
+produit jusque-là est conservé — un scénario arrêté au deuxième acte reste un
+scénario de deux actes — et seules les passes qui n'ont pas tourné sont
+rendues. Un dossier d'agents interrompu n'est jamais exportable : sa chaîne de
+contrôle n'est pas allée à son terme.
+
+Un dossier interrompu s'exporte quand même — un auteur a le droit de lire son
+travail en cours — mais il porte « BROUILLON — contrôle interrompu » dès la
+première page, et dit explicitement que l'absence de point signalé ne vaut
+pas approbation. C'est différent d'un brouillon ordinaire, dont les contrôles
+*ont* relevé des points.
+
+Deux limites honnêtes : une génération en **un seul appel** n'a pas de
+frontière avant sa fin, et **sans worker** l'API génère dans la requête — la
+tâche s'achève avant qu'on puisse l'arrêter.
+
 **Scénarios longs** — un long métrage de 110 pages représente environ 21 000 mots, bien au-delà
 de ce qu'un appel unique produit. `screenplay_service.py` découpe donc l'écriture en passes
 successives suivant la structure en trois actes, chaque passe recevant la fin de la précédente
@@ -621,7 +640,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 505 tests
+pytest                    # 529 tests
 ruff check .              # lint
 ```
 

@@ -569,6 +569,12 @@ export const fr = {
   "dossier.verdict.PASS_WITH_WARNINGS": "Conforme, avec réserves",
   "dossier.verdict.REQUIRES_CORRECTION": "À corriger",
   "dossier.verdict.BLOCKED": "Bloqué",
+  "dossier.stop": "Arrêter",
+  "dossier.stopping": "Arrêt demandé…",
+  "dossier.stopHint":
+    "L'arrêt prend effet entre deux agents : les crédits des agents qui n'auront pas tourné vous sont rendus.",
+  "dossier.stopPending":
+    "L'agent en cours va au bout — son appel est déjà parti. La chaîne s'arrêtera juste après.",
   "dossier.stalled":
     "La reprise n'a rien changé : le problème demande une décision humaine, pas un tour de plus.",
   "dossier.exhausted":
@@ -1033,6 +1039,7 @@ export const fr = {
   "api.sessionExpired": "Session expirée. Reconnectez-vous.",
   "api.jobTrackingAborted": "Suivi de la génération interrompu.",
   "api.generationFailed": "La génération a échoué.",
+  "api.generationCancelled": "Génération arrêtée. Les passes qui n'ont pas tourné vous sont rendues.",
 
   // --- Client HTTP (suite) ---
   "api.httpError": "Erreur {status}",

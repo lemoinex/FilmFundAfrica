@@ -4,7 +4,10 @@ Boucle d'attente sur la file Redis. A chaque tour :
 
 1. publier un battement de coeur — sans lui, l'API considere qu'il n'y a pas
    de worker et execute les generations elle-meme plutot que de les deposer
-   dans une file que personne ne lit ;
+   dans une file que personne ne lit. Le battement continue **pendant**
+   l'execution, depuis un fil dedie : une chaine de seize appels dure bien
+   plus que le TTL, et un worker occupe passerait pour un worker mort — au
+   moment precis ou il travaille ;
 2. attendre une tache (`BLPOP`), et l'executer ;
 3. quand rien ne vient, balayer la base : taches en attente dont le signal
    s'est perdu, taches `RUNNING` dont le worker a disparu.
@@ -18,6 +21,7 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+import threading
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -31,6 +35,10 @@ logger = logging.getLogger("filmfund.worker")
 
 #: Attente maximale d'une tache avant de rendre la main a la boucle.
 POLL_TIMEOUT_SECONDS = 5
+
+#: Periode du battement pendant l'execution d'une tache. Un tiers du TTL :
+#: deux battements peuvent se perdre sans que le worker soit declare mort.
+HEARTBEAT_INTERVAL_SECONDS = max(HEARTBEAT_TTL_SECONDS // 3, 1)
 
 
 class Worker:
@@ -67,12 +75,28 @@ class Worker:
             self.sweep()
 
     def _execute(self, job_id: str) -> None:
+        # Le defaut corrige : le battement n'etait publie qu'entre deux
+        # taches, avec un TTL de 30 s. Une chaine d'agents ou un scenario long
+        # depasse largement cette duree — l'API cessait alors de voir le
+        # worker et se remettait a generer dans la requete HTTP, exactement ce
+        # que la file existe pour eviter, et precisement quand il est charge.
+        done = threading.Event()
+
+        def beat() -> None:
+            while not done.wait(HEARTBEAT_INTERVAL_SECONDS):
+                self.queue.heartbeat(HEARTBEAT_TTL_SECONDS)
+
+        pulse = threading.Thread(target=beat, name="worker-heartbeat", daemon=True)
+        pulse.start()
         try:
             run_job(job_id)
         except Exception:  # noqa: BLE001 - une tache ne doit jamais tuer le worker
             logger.exception(
                 "tâche non exécutée jusqu'au bout", extra={"event": "worker_job_crashed"}
             )
+        finally:
+            done.set()
+            pulse.join(timeout=1)
 
     # ------------------------------------------------------------------
     def sweep(self) -> int:
