@@ -479,6 +479,89 @@ export const en: Record<MessageKey, string> = {
   "project.arc": "Arc — ",
 
   // --- AI Writer ---
+  // --- Dossier built by the agent chain ---
+  "project.openDossier": "Funding package",
+  "dossier.title": "Funding package",
+  "dossier.subtitle":
+    "Eight experts work on your project in turn, then two reviewers check it before it can be sent.",
+  "dossier.run": "Run the chain",
+  "dossier.rerun": "Run the chain again",
+  "dossier.running": "Run in progress…",
+  "dossier.runFailed": "The run failed.",
+  "dossier.cost_one": "{count} credit",
+  "dossier.cost_other": "{count} credits",
+  "dossier.costHint":
+    "A run costs one credit per agent: all eight are billed, and so is any correction round.",
+  "dossier.progress": "Agent {done} of {total}",
+  "dossier.neverRun": "The chain has never run on this project.",
+  "dossier.neverRunHint":
+    "Run it to get a first version of the package, then the findings to address.",
+  "dossier.lastRun": "Last run {when}",
+  "dossier.runsCount_one": "{count} run",
+  "dossier.runsCount_other": "{count} runs",
+
+  // --- Verdict ---
+  "dossier.exportable": "The package can be sent",
+  "dossier.notExportable": "The package cannot be sent",
+  "dossier.exportableHint": "A human read-through is still due before any submission.",
+  "dossier.verdict.PASS": "Passed",
+  "dossier.verdict.PASS_WITH_WARNINGS": "Passed, with reservations",
+  "dossier.verdict.REQUIRES_CORRECTION": "Needs correction",
+  "dossier.verdict.BLOCKED": "Blocked",
+  "dossier.stalled":
+    "The correction round changed nothing: this needs a human decision, not another pass.",
+  "dossier.exhausted": "The correction limit was reached. The package remains unsendable.",
+
+  // --- Findings ---
+  "dossier.loadFailed": "Could not load the package.",
+  "dossier.noFindingHint": "Nothing stands against the package right now.",
+  "dossier.noHistoryHint": "Changes will appear here from the first run.",
+  "dossier.findings": "Findings",
+  "dossier.noFinding": "No open finding.",
+  "dossier.showResolved": "Also show resolved findings",
+  "dossier.hideResolved": "Hide resolved findings",
+  "dossier.resolved": "Resolved",
+  "dossier.openFindings_one": "{count} open finding",
+  "dossier.openFindings_other": "{count} open findings",
+  "dossier.blockingFindings_one": "{count} of them blocking",
+  "dossier.blockingFindings_other": "{count} of them blocking",
+  "dossier.toFix": "To be fixed by",
+  "dossier.suggestion": "Suggested correction",
+  "severity.CRITICAL": "Blocking",
+  "severity.MAJOR": "Major",
+  "severity.MINOR": "Minor",
+  "severity.PASS": "Fine",
+
+  // --- Sections ---
+  "dossier.sections": "The package",
+  "dossier.emptySection": "Nothing yet.",
+  "dossier.section.concept": "Concept",
+  "dossier.section.screenplay": "Screenplay",
+  "dossier.section.director_vision": "Directorial vision",
+  "dossier.section.production_plan": "Production plan",
+  "dossier.section.financing_plan": "Financing plan",
+  "dossier.section.impact_analysis": "Impact",
+
+  // --- History ---
+  "dossier.history": "Changes",
+  "dossier.noHistory": "No change recorded.",
+  "dossier.runs": "Runs",
+  "dossier.runDetail": "Run detail",
+  "dossier.rounds_one": "{count} correction round",
+  "dossier.rounds_other": "{count} correction rounds",
+  "dossier.noRound": "no correction round",
+  "dossier.step": "Step {n}",
+
+  // --- Agents ---
+  "agent.DEVELOPMENT": "Development",
+  "agent.SCREENWRITER": "Screenplay",
+  "agent.DIRECTOR": "Directing",
+  "agent.PRODUCER": "Production",
+  "agent.FINANCING": "Financing",
+  "agent.IMPACT": "Impact",
+  "agent.CONSISTENCY_VALIDATOR": "Consistency review",
+  "agent.FUNDING_PACKAGE_VALIDATOR": "Package review",
+
   "writer.title": "AI Writer",
   "writer.subtitle":
     "Every document is written from the project context and the documents already written, so it stays consistent with them.",

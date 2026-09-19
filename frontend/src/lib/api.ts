@@ -8,6 +8,8 @@
 
 import { currentLocale, tr } from "./i18n/translate";
 import type {
+  AgentRun,
+  AgentRunDetail,
   AuthResponse,
   Budget,
   CheckoutResponse,
@@ -19,6 +21,10 @@ import type {
   DocumentType,
   DocumentTypeInfo,
   DocumentVersion,
+  Dossier,
+  DossierFinding,
+  DossierModification,
+  DossierStatus,
   FundingPlan,
   FundingPlanLine,
   FundingSourceType,
@@ -615,10 +621,10 @@ const JOB_POLL_MAX_MS = 5000;
  * minutes — inutile d'interroger le serveur toutes les secondes pendant tout
  * ce temps.
  */
-export async function waitForJob(
+export async function waitForJob<T = GenerationResult>(
   job: GenerationJob,
   options: { onProgress?: (job: GenerationJob) => void; signal?: AbortSignal } = {},
-): Promise<GenerationResult> {
+): Promise<T> {
   let current = job;
   let delay = JOB_POLL_START_MS;
   options.onProgress?.(current);
@@ -640,8 +646,35 @@ export async function waitForJob(
       current.error_code ?? "job_failed",
     );
   }
-  return current.result;
+  return current.result as T;
 }
+
+export const dossierApi = {
+  /** Lance un passage. Répond par une tâche : huit appels ne tiennent pas
+   *  dans une requête HTTP. */
+  run: (projectId: string) =>
+    request<GenerationJob>(`/api/v1/projects/${projectId}/dossier/run`, { method: "POST" }),
+
+  get: (projectId: string) => request<Dossier>(`/api/v1/projects/${projectId}/dossier`),
+
+  status: (projectId: string) =>
+    request<DossierStatus>(`/api/v1/projects/${projectId}/dossier/status`),
+
+  findings: (projectId: string, includeResolved = false) =>
+    request<DossierFinding[]>(
+      `/api/v1/projects/${projectId}/dossier/findings` +
+        (includeResolved ? "?include_resolved=true" : ""),
+    ),
+
+  modifications: (projectId: string) =>
+    request<DossierModification[]>(`/api/v1/projects/${projectId}/dossier/modifications`),
+
+  runs: (projectId: string) =>
+    request<AgentRun[]>(`/api/v1/projects/${projectId}/dossier/runs`),
+
+  run_detail: (projectId: string, runId: string) =>
+    request<AgentRunDetail>(`/api/v1/projects/${projectId}/dossier/runs/${runId}`),
+};
 
 /** Télécharge un export en réutilisant le jeton d'accès courant. */
 export async function downloadExport(path: string, fallbackName: string): Promise<void> {

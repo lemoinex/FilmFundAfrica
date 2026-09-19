@@ -504,7 +504,7 @@ une erreur remontée se relie aux journaux JSON sans avoir à joindre son conten
 cd frontend
 npm run typecheck
 npm run build
-npm run test:e2e           # 17 parcours de bout en bout (Playwright)
+npm run test:e2e           # 20 parcours de bout en bout (Playwright)
 ```
 
 ### Intégration continue

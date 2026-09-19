@@ -237,18 +237,44 @@ qui conclut `BLOCKED` a parfaitement fait son travail. La tâche est donc
 que soit le verdict** — le jeter obligerait à tout refaire, à huit appels la
 tentative, pour corriger un seul point.
 
+## L'écran
+
+`/projets/{id}/dossier`, accessible depuis la fiche projet. Il montre, dans cet
+ordre : **si le dossier peut partir**, le bouton pour lancer un passage avec son
+coût annoncé **avant**, les constats les plus graves d'abord, les sections du
+dossier, l'historique des modifications, puis les passages dépliables agent par
+agent.
+
+Trois choix d'affichage méritent d'être dits :
+
+**Le coût est annoncé avant, pas découvert après.** Huit crédits s'affichent à
+côté du bouton.
+
+**Un passage enlisé ou épuisé le dit sur la ligne du passage**, pas seulement
+juste après l'avoir lancé. Sans cela, on recharge la page, on voit « à
+corriger », et on relance sans comprendre pourquoi rien ne bouge. C'est un
+manque que la capture d'écran a révélé, pas les tests.
+
+**Rien ne se présente comme validé.** Quand le dossier est exportable, l'écran
+rappelle qu'une relecture humaine reste due.
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
 **En place** : les huit agents, les contrats, le moteur, l'orchestrateur, la
-persistance, **la file et les routes**. **109 tests** couvrent l'ensemble.
+persistance, la file, les routes, **et l'écran**. La chaîne est utilisable de
+bout en bout par un auteur. **112 tests backend** la couvrent, plus 3 parcours
+de bout en bout.
 
 **Pas encore** :
 
-1. **L'interface.** Aucun écran ne consomme ces routes. C'est le seul morceau
-   qui manque pour qu'un auteur puisse s'en servir.
-2. **L'export du dossier en PDF/DOCX.** `final_documents` existe et attend ;
+1. **L'export du dossier en PDF/DOCX.** `final_documents` existe et attend ;
    l'export actuel porte sur les documents, pas sur le dossier de la chaîne.
-3. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
+2. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
    vide, l'API exécute le passage elle-même — vingt minutes de requête ouverte.
    Sur un hébergement sans worker, c'est la limite décrite dans
    [`deploy/VERCEL.md`](../deploy/VERCEL.md).
+3. **Une décision produit à prendre** : l'offre gratuite accorde **un** crédit,
+   une chaîne en coûte **huit**. Un compte gratuit ne peut donc jamais essayer
+   la fonction principale du produit. Le refus est propre et lisible, mais c'est
+   un arbitrage commercial, pas un défaut technique — à trancher avant la mise
+   en ligne.

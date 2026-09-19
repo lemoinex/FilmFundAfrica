@@ -258,7 +258,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   langue. Accords, dates, nombres et durées relatives viennent d'`Intl`, pas du catalogue.
   Sélecteur de langue dans l'en-tête, sur les pages d'authentification, sur la page publique
   et dans le profil.
-- **17 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
+- **20 tests de bout en bout (Playwright)** sur un vrai navigateur, une vraie API et une base
   neuve : inscription → confirmation d'adresse → connexion, non-énumération visible à l'écran,
   création de projet, génération d'un document puis ouverture dans l'éditeur, limites d'offre
   (projets, crédits, export), trame de budget et couverture du plan de financement, bascule de

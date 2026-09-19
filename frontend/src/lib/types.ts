@@ -310,18 +310,133 @@ export interface GenerationJob {
   id: string;
   project_id: string;
   document_id: string | null;
-  kind: "GENERATE_DOCUMENT" | "REFINE_DOCUMENT";
-  document_type: DocumentType;
+  kind: "GENERATE_DOCUMENT" | "REFINE_DOCUMENT" | "RUN_AGENT_CHAIN";
+  /** Nul pour un passage de la chaîne, qui ne vise aucun document. */
+  document_type: DocumentType | null;
   status: JobStatus;
   total_passes: number;
   completed_passes: number;
   credits_reserved: number;
   error_code: string | null;
   error_message: string | null;
-  result: GenerationResult | null;
+  /** La forme dépend de `kind`. */
+  result: GenerationResult | AgentChainResult | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Dossier construit par la chaîne d'agents
+
+export type AgentRole =
+  | "DEVELOPMENT"
+  | "SCREENWRITER"
+  | "DIRECTOR"
+  | "PRODUCER"
+  | "FINANCING"
+  | "IMPACT"
+  | "CONSISTENCY_VALIDATOR"
+  | "FUNDING_PACKAGE_VALIDATOR";
+
+export type Severity = "CRITICAL" | "MAJOR" | "MINOR" | "PASS";
+
+export type ValidationVerdict =
+  | "PASS"
+  | "PASS_WITH_WARNINGS"
+  | "REQUIRES_CORRECTION"
+  | "BLOCKED";
+
+export interface AgentChainResult {
+  run_id: string;
+  verdict: ValidationVerdict | null;
+  /** Ce que le verdict autorise — distinct du succès technique de la tâche. */
+  exportable: boolean;
+  rounds: number;
+  stalled: boolean;
+  exhausted: boolean;
+  steps: number;
+  open_findings: number;
+}
+
+export interface DossierFinding {
+  id: string;
+  severity: Severity;
+  element: string;
+  description: string;
+  /** Agent capable de corriger. Sans lui, le constat n'a pas de destinataire. */
+  owner: AgentRole | null;
+  suggested_correction: string | null;
+  /** Renseigné quand le constat a été levé : daté, pas effacé. */
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export interface DossierModification {
+  id: string;
+  agent: AgentRole;
+  element: string;
+  reason: string;
+  impact: string;
+  validation_status: ValidationVerdict | null;
+  created_at: string;
+}
+
+export interface AgentStep {
+  id: string;
+  sequence: number;
+  agent: AgentRole;
+  agent_version: string;
+  analysis: string;
+  rationale: string;
+  next_agent_instructions: string;
+  verdict: ValidationVerdict | null;
+  changeset: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AgentRun {
+  id: string;
+  verdict: ValidationVerdict | null;
+  rounds: number;
+  exhausted: boolean;
+  stalled: boolean;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface AgentRunDetail extends AgentRun {
+  steps: AgentStep[];
+}
+
+export interface Dossier {
+  id: string;
+  project_id: string;
+  project_identity: Record<string, unknown>;
+  logline: Record<string, unknown> | null;
+  concept: Record<string, unknown>;
+  synopsis: Record<string, unknown>;
+  characters: Record<string, unknown>[];
+  screenplay: Record<string, unknown>;
+  director_vision: Record<string, unknown>;
+  production_plan: Record<string, unknown>;
+  budget: Record<string, unknown>;
+  financing_plan: Record<string, unknown>;
+  cultural_analysis: Record<string, unknown>;
+  impact_analysis: Record<string, unknown>;
+  final_documents: string[];
+  updated_at: string;
+}
+
+export interface DossierStatus {
+  project_id: string;
+  verdict: ValidationVerdict | null;
+  /** Seul critère d'export : ni l'absence d'erreur ni le nombre de passages. */
+  exportable: boolean;
+  open_findings: number;
+  blocking_findings: number;
+  last_run_at: string | null;
+  runs: number;
 }
 
 export interface ScoreCriterion {

@@ -125,6 +125,9 @@ export default function ProjectDetailPage() {
           <Link href={`/projets/${id}/ai-writer`} className="btn-primary">
             {t("project.openWriter")}
           </Link>
+          <Link href={`/projets/${id}/dossier`} className="btn-secondary">
+            {t("project.openDossier")}
+          </Link>
           <Link href={`/projets/${id}/financements`} className="btn-secondary">
             {t("project.matchingFunding")}
           </Link>

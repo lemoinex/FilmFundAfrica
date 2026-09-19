@@ -487,6 +487,90 @@ export const fr = {
   "project.arc": "Arc — ",
 
   // --- AI Writer ---
+  // --- Dossier construit par la chaîne d'agents ---
+  "project.openDossier": "Dossier de financement",
+  "dossier.title": "Dossier de financement",
+  "dossier.subtitle":
+    "Huit experts se relaient sur votre projet, puis deux instances le contrôlent avant qu'il puisse partir.",
+  "dossier.run": "Lancer la chaîne",
+  "dossier.rerun": "Relancer la chaîne",
+  "dossier.running": "Passage en cours…",
+  "dossier.runFailed": "Le passage a échoué.",
+  "dossier.cost_one": "{count} crédit",
+  "dossier.cost_other": "{count} crédits",
+  "dossier.costHint":
+    "Un passage coûte un crédit par agent : les huit sont facturés, les reprises éventuelles aussi.",
+  "dossier.progress": "Agent {done} sur {total}",
+  "dossier.neverRun": "La chaîne n'a jamais tourné sur ce projet.",
+  "dossier.neverRunHint":
+    "Lancez-la pour obtenir une première version du dossier, puis les constats à corriger.",
+  "dossier.lastRun": "Dernier passage {when}",
+  "dossier.runsCount_one": "{count} passage",
+  "dossier.runsCount_other": "{count} passages",
+
+  // --- Verdict ---
+  "dossier.exportable": "Le dossier peut partir",
+  "dossier.notExportable": "Le dossier ne peut pas partir",
+  "dossier.exportableHint": "Une relecture humaine reste due avant toute soumission.",
+  "dossier.verdict.PASS": "Conforme",
+  "dossier.verdict.PASS_WITH_WARNINGS": "Conforme, avec réserves",
+  "dossier.verdict.REQUIRES_CORRECTION": "À corriger",
+  "dossier.verdict.BLOCKED": "Bloqué",
+  "dossier.stalled":
+    "La reprise n'a rien changé : le problème demande une décision humaine, pas un tour de plus.",
+  "dossier.exhausted":
+    "La limite de reprises est atteinte. Le dossier reste non exportable.",
+
+  // --- Constats ---
+  "dossier.loadFailed": "Impossible de charger le dossier.",
+  "dossier.noFindingHint": "Rien ne s'oppose au dossier pour l'instant.",
+  "dossier.noHistoryHint": "Les modifications apparaîtront ici dès le premier passage.",
+  "dossier.findings": "Constats",
+  "dossier.noFinding": "Aucun constat ouvert.",
+  "dossier.showResolved": "Voir aussi les constats levés",
+  "dossier.hideResolved": "Masquer les constats levés",
+  "dossier.resolved": "Levé",
+  "dossier.openFindings_one": "{count} constat ouvert",
+  "dossier.openFindings_other": "{count} constats ouverts",
+  "dossier.blockingFindings_one": "dont {count} bloquant",
+  "dossier.blockingFindings_other": "dont {count} bloquants",
+  "dossier.toFix": "À corriger par",
+  "dossier.suggestion": "Correction proposée",
+  "severity.CRITICAL": "Bloquant",
+  "severity.MAJOR": "Important",
+  "severity.MINOR": "Mineur",
+  "severity.PASS": "Conforme",
+
+  // --- Sections ---
+  "dossier.sections": "Le dossier",
+  "dossier.emptySection": "Rien encore.",
+  "dossier.section.concept": "Concept",
+  "dossier.section.screenplay": "Scénario",
+  "dossier.section.director_vision": "Vision de réalisation",
+  "dossier.section.production_plan": "Plan de production",
+  "dossier.section.financing_plan": "Plan de financement",
+  "dossier.section.impact_analysis": "Impact",
+
+  // --- Historique ---
+  "dossier.history": "Modifications",
+  "dossier.noHistory": "Aucune modification enregistrée.",
+  "dossier.runs": "Passages",
+  "dossier.runDetail": "Détail du passage",
+  "dossier.rounds_one": "{count} reprise",
+  "dossier.rounds_other": "{count} reprises",
+  "dossier.noRound": "sans reprise",
+  "dossier.step": "Étape {n}",
+
+  // --- Agents ---
+  "agent.DEVELOPMENT": "Développement",
+  "agent.SCREENWRITER": "Scénario",
+  "agent.DIRECTOR": "Réalisation",
+  "agent.PRODUCER": "Production",
+  "agent.FINANCING": "Financement",
+  "agent.IMPACT": "Impact",
+  "agent.CONSISTENCY_VALIDATOR": "Contrôle de cohérence",
+  "agent.FUNDING_PACKAGE_VALIDATOR": "Contrôle du dossier",
+
   "writer.title": "AI Writer",
   "writer.subtitle":
     "Chaque document est écrit à partir du contexte du projet et des documents déjà rédigés, pour rester cohérent avec eux.",
