@@ -4,6 +4,13 @@ Alembic et `Base.metadata.create_all` dependent de ce module pour connaitre
 l'ensemble des tables.
 """
 
+from app.models.agents import (
+    AgentRun,
+    AgentStep,
+    DossierFinding,
+    DossierModification,
+    ProjectDossier,
+)
 from app.models.base import Base
 from app.models.billing import AIUsage, Subscription, SubscriptionPlan
 from app.models.budget import (
@@ -28,6 +35,11 @@ from app.models.user import EmailVerificationToken, PasswordResetToken, Profile,
 
 __all__ = [
     "Base",
+    "ProjectDossier",
+    "AgentRun",
+    "AgentStep",
+    "DossierFinding",
+    "DossierModification",
     "User",
     "Profile",
     "PasswordResetToken",

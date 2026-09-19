@@ -152,23 +152,60 @@ développer et la tester — mais chaque agent rend un constat `MAJOR` disant qu
 rien n'a été rédigé ni contrôlé. Un dossier « validé » par un fournisseur qui
 n'analyse rien serait un mensonge utile à personne.
 
+## La persistance
+
+Cinq tables, et un découpage qui n'est pas arbitraire.
+
+| Table | Rôle |
+| --- | --- |
+| `project_dossiers` | les sections produites par les agents, une ligne par projet |
+| `agent_runs` | un passage complet : verdict, tours, garde-fou déclenché |
+| `agent_steps` | chaque exécution d'agent, avec sa télémétrie |
+| `dossier_findings` | les constats, ouverts ou datés |
+| `dossier_modifications` | qui a changé quoi, pourquoi, avec quel impact |
+
+Les **sections** restent en JSON : un plan de production n'a pas la même forme
+d'un projet à l'autre, et les figer en colonnes reviendrait à décider aujourd'hui
+de ce qu'un agent aura le droit de produire demain.
+
+Les **constats** et les **traces** sont normalisés. On veut pouvoir demander
+« quels blocages restent ouverts » ou « qui a touché au budget, et pourquoi »
+sans relire du JSON — sans quoi la traçabilité du §17 ne sert à rien.
+
+`project_dossiers` est distinct de `projects` à dessein : ces sections sont
+produites par les agents, alors que la fiche projet porte ce que l'auteur a
+saisi. Les confondre ferait écraser sa saisie par une production d'agent.
+
+### Deux écarts assumés
+
+**`validation_history` n'est pas stockée.** Chaque étape de validateur porte
+déjà son verdict ; elle est reconstituée à la lecture. Deux sources de vérité
+finiraient par diverger.
+
+**Un constat résolu est daté, pas supprimé.** Savoir qu'un blocage a existé et
+quand il a été levé fait partie de l'histoire du dossier. Un constat qui
+disparaît sans trace empêche de savoir s'il a été corrigé ou simplement oublié.
+
+### Reprendre, pas recommencer
+
+C'est le point de la persistance, et c'est ce que les tests vérifient : un second
+passage recharge les sections remplies, les constats encore ouverts et
+l'historique, puis **l'allonge** au lieu de le réécrire. Un même constat relevé
+deux fois reste un constat.
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
-**En place** : les huit définitions, les contrats, le registre, l'ordre du
-pipeline, le routage des corrections, la logique de verdict, **le moteur
-d'exécution et l'orchestrateur**. La chaîne accumule réellement un dossier,
-section par section, en traçant chaque modification. **77 tests** la couvrent.
+**En place** : les huit définitions, les contrats, le registre, le routage des
+corrections, le moteur d'exécution, l'orchestrateur, **et la persistance**. La
+chaîne accumule un dossier, le garde, et le reprend. **94 tests** la couvrent.
 
 **Pas encore** :
 
-1. **La persistance de `ProjectState`.** Il vit en mémoire le temps d'un
-   passage ; il n'a ni table ni migration. L'historique des modifications et les
-   constats non résolus ne survivent pas à la session — c'est le prochain
-   chantier, et il conditionne tout usage réel.
-2. **Les routes et l'interface.** Aucun point d'entrée HTTP, aucun écran.
-3. **Le coût.** Un passage propre, c'est huit appels ; avec les reprises,
-   jusqu'à trente-deux avant que les garde-fous ne coupent. Le modèle de crédits
-   compte par document généré : il ne sait pas compter une chaîne. Le brancher
-   tel quel facturerait une chaîne comme un synopsis.
-4. **La file.** Un passage complet dépasse largement une requête HTTP : il doit
-   passer par le worker, comme la génération de scénario.
+1. **Les routes et l'interface.** Aucun point d'entrée HTTP, aucun écran. Le
+   moteur est complet mais rien ne l'expose.
+2. **La file.** Un passage complet dépasse largement une requête HTTP : il doit
+   passer par le worker, comme la génération de scénario. `agent_runs` porte
+   déjà un `status` et un champ `error` pour ça.
+3. **Le coût.** Un passage propre, c'est huit appels ; jusqu'à seize avant que
+   les garde-fous ne coupent. Le modèle de crédits compte par document généré :
+   le brancher tel quel facturerait une chaîne comme un synopsis.

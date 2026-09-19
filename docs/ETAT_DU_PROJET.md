@@ -287,7 +287,7 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
   peut pas nommer — corps de requête, données d'identification et variables locales des
   piles d'appels. Le navigateur suit la même règle, y compris sur les fils d'Ariane, qui
   portent les jetons de confirmation dans l'URL.
-- **366 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
+- **383 tests** au vert (`pytest`), `ruff` sans avertissement. Une revue de sécurité dédiée a
   été menée sur le code livré ; les neuf défauts qu'elle a confirmés (contournement de la
   limitation de débit, secret JWT par défaut accepté en production, fuite du jeton de
   réinitialisation hors production, oracle de temps à la connexion, absence de révocation de

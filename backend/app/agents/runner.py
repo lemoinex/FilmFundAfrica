@@ -206,9 +206,14 @@ class AgentRunner:
             for finding in parsed.findings
         ]
 
-        state.unresolved_issues = [
+        kept = [
             issue for issue in state.unresolved_issues if issue.owner is not definition.role
-        ] + incoming
+        ]
+        # Deux validateurs qui relevent le meme defaut relevent un defaut, pas
+        # deux. Sans dedoublonnage ici, l'etat en memoire porterait des doublons
+        # que la persistance, elle, fusionne : deux comportements pour une meme
+        # donnee.
+        state.unresolved_issues = _deduplicate(kept + incoming)
 
         if parsed.verdict is not None:
             state.validation_history.append(parsed.verdict)
@@ -221,3 +226,19 @@ def owner_or_default(finding: Finding, fallback: AgentRole) -> AgentRole:
     revient a l'agent qui l'a emis, ce qui le rend visible plutot que perdu.
     """
     return finding.owner or fallback
+
+
+def _deduplicate(findings: list[Finding]) -> list[Finding]:
+    """Constats distincts, dans l'ordre ou ils sont apparus.
+
+    L'identite d'un constat est ce qu'il decrit, pas qui l'a signale : le meme
+    defaut releve par deux validateurs reste un seul defaut a corriger.
+    """
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[Finding] = []
+    for finding in findings:
+        key = (finding.severity.value, finding.element, finding.description)
+        if key not in seen:
+            seen.add(key)
+            unique.append(finding)
+    return unique
