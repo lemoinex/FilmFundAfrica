@@ -7,6 +7,7 @@ from datetime import datetime
 from app.models.enums import DocumentType, JobKind, JobStatus
 from app.schemas.common import ORMModel
 from app.schemas.document import GenerationResult
+from app.schemas.dossier import AgentChainResult
 
 
 class GenerationJobRead(ORMModel):
@@ -21,14 +22,18 @@ class GenerationJobRead(ORMModel):
     project_id: str
     document_id: str | None = None
     kind: JobKind
-    document_type: DocumentType
+    #: Nul pour un passage de la chaine d'agents, qui ne vise aucun
+    #: document en particulier.
+    document_type: DocumentType | None = None
     status: JobStatus
     total_passes: int
     completed_passes: int
     credits_reserved: int
     error_code: str | None = None
     error_message: str | None = None
-    result: GenerationResult | None = None
+    #: La forme depend de `kind` : un document genere, ou le bilan d'un
+    #: passage de la chaine.
+    result: GenerationResult | AgentChainResult | None = None
     created_at: datetime
     started_at: datetime | None = None
     heartbeat_at: datetime | None = None

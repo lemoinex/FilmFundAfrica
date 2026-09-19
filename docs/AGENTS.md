@@ -193,19 +193,62 @@ passage recharge les sections remplies, les constats encore ouverts et
 l'historique, puis **l'allonge** au lieu de le réécrire. Un même constat relevé
 deux fois reste un constat.
 
+## Les routes, et pourquoi c'est une tâche
+
+Un passage enchaîne huit appels au fournisseur, davantage avec les reprises.
+Le tenir dans la requête HTTP la ferait expirer, et une coupure perdrait tout.
+Le lancement passe donc par la **même file** que la génération de documents —
+réservation de crédits, battement de cœur, reprise des tâches abandonnées,
+repli en ligne quand aucun worker n'écoute. Rien de tout cela n'a été réécrit.
+
+| Route | Rôle |
+| --- | --- |
+| `POST /projects/{id}/dossier/run` | lance un passage, rend une tâche (202) |
+| `GET /projects/{id}/dossier` | le dossier tel qu'il est |
+| `GET /projects/{id}/dossier/status` | le dossier peut-il partir ? |
+| `GET /projects/{id}/dossier/findings` | constats ouverts, les plus graves d'abord |
+| `GET /projects/{id}/dossier/modifications` | qui a changé quoi, et pourquoi |
+| `GET /projects/{id}/dossier/runs` | historique des passages |
+| `GET /projects/{id}/dossier/runs/{run_id}` | le détail, agent par agent |
+
+L'avancement se suit sur `GET /jobs/{id}`, exactement comme une génération.
+
+### Le battement de cœur n'est pas décoratif
+
+Huit appels de trois minutes dépassent `JOB_TIMEOUT_SECONDS` (900 s). Sans
+signe de vie après chaque agent, le surveillant déclarerait morte une chaîne
+qui travaille et rembourserait les crédits d'un passage en cours. L'orchestrateur
+signale donc chaque étape.
+
+### Un passage coûte huit crédits, pas un
+
+`AIOperation.RUN_AGENT_CHAIN` est facturée **par agent**. Une offre gratuite,
+qui accorde un crédit, ne peut donc pas lancer de chaîne — et le refus tombe
+avant le premier appel au fournisseur, pas après huit appels déjà payés.
+
+Les reprises ne sont pas réservées d'avance : on ne sait pas encore s'il y en
+aura. Elles sont journalisées à l'exécution.
+
+### Une tâche réussie n'est pas un dossier validé
+
+Ce sont deux choses distinctes, et les confondre serait dangereux : une chaîne
+qui conclut `BLOCKED` a parfaitement fait son travail. La tâche est donc
+`SUCCEEDED`, et c'est `exportable` qui dit non. **Le dossier est sauvegardé quel
+que soit le verdict** — le jeter obligerait à tout refaire, à huit appels la
+tentative, pour corriger un seul point.
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
-**En place** : les huit définitions, les contrats, le registre, le routage des
-corrections, le moteur d'exécution, l'orchestrateur, **et la persistance**. La
-chaîne accumule un dossier, le garde, et le reprend. **94 tests** la couvrent.
+**En place** : les huit agents, les contrats, le moteur, l'orchestrateur, la
+persistance, **la file et les routes**. **109 tests** couvrent l'ensemble.
 
 **Pas encore** :
 
-1. **Les routes et l'interface.** Aucun point d'entrée HTTP, aucun écran. Le
-   moteur est complet mais rien ne l'expose.
-2. **La file.** Un passage complet dépasse largement une requête HTTP : il doit
-   passer par le worker, comme la génération de scénario. `agent_runs` porte
-   déjà un `status` et un champ `error` pour ça.
-3. **Le coût.** Un passage propre, c'est huit appels ; jusqu'à seize avant que
-   les garde-fous ne coupent. Le modèle de crédits compte par document généré :
-   le brancher tel quel facturerait une chaîne comme un synopsis.
+1. **L'interface.** Aucun écran ne consomme ces routes. C'est le seul morceau
+   qui manque pour qu'un auteur puisse s'en servir.
+2. **L'export du dossier en PDF/DOCX.** `final_documents` existe et attend ;
+   l'export actuel porte sur les documents, pas sur le dossier de la chaîne.
+3. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
+   vide, l'API exécute le passage elle-même — vingt minutes de requête ouverte.
+   Sur un hébergement sans worker, c'est la limite décrite dans
+   [`deploy/VERCEL.md`](../deploy/VERCEL.md).

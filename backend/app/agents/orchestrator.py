@@ -16,9 +16,16 @@ Deux garde-fous, pour des raisons opposees :
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.agents import BUILDER_AGENTS, VALIDATOR_AGENTS, correction_route, get_agent
+from app.agents import (
+    AGENT_PIPELINE,
+    BUILDER_AGENTS,
+    VALIDATOR_AGENTS,
+    correction_route,
+    get_agent,
+)
 from app.agents.contracts import AgentInput, AgentOutput, Finding, ProjectState
 from app.agents.runner import AgentRunner, owner_or_default
 from app.models.enums import AgentRole, ValidationVerdict
@@ -44,6 +51,8 @@ class PipelineRun:
     exhausted: bool = False
     #: Vrai quand un tour n'a rien change aux constats ouverts.
     stalled: bool = False
+    #: Signal d'avancement, appele apres chaque agent.
+    _on_step: Callable[[int, int], None] | None = None
 
     @property
     def is_exportable(self) -> bool:
@@ -74,10 +83,20 @@ class Orchestrator:
         *,
         funding_requirements: dict | None = None,
         project_context: dict | None = None,
+        on_step: Callable[[int, int], None] | None = None,
     ) -> PipelineRun:
-        run = PipelineRun(state=state)
+        """Deroule la chaine, puis la reprend tant qu'il le faut.
 
-        self._run_sequence(run, BUILDER_AGENTS + VALIDATOR_AGENTS, funding_requirements, project_context)
+        `on_step` est appele apres chaque agent. Ce n'est pas un confort
+        d'affichage : un passage complet peut depasser le delai au-dela duquel
+        une tache est declaree interrompue, et sans signe de vie regulier le
+        surveillant tuerait une chaine qui travaille.
+        """
+        run = PipelineRun(state=state, _on_step=on_step)
+
+        self._run_sequence(
+            run, BUILDER_AGENTS + VALIDATOR_AGENTS, funding_requirements, project_context
+        )
 
         while not run.is_exportable and run.rounds < self.max_correction_rounds:
             target = self._correction_target(run)
@@ -149,6 +168,10 @@ class Orchestrator:
                 run.state = output.updated_state
             if role in VALIDATOR_AGENTS and output.verdict is not None:
                 run.verdict = output.verdict
+            if run._on_step is not None:
+                # Le total annonce est celui d'un passage propre : une reprise
+                # le depasse, et c'est a l'appelant de le borner s'il l'affiche.
+                run._on_step(len(run.outputs), len(AGENT_PIPELINE))
 
     # ------------------------------------------------------------------
     @staticmethod

@@ -149,6 +149,9 @@ class AIOperation(StrEnum):
     IMPROVE_DOCUMENT = "IMPROVE_DOCUMENT"
     SCORE_PROJECT = "SCORE_PROJECT"
     MATCH_FUNDING = "MATCH_FUNDING"
+    #: Un passage de la chaine d'agents. Facture a l'appel, pas au forfait :
+    #: huit agents, c'est huit appels au fournisseur.
+    RUN_AGENT_CHAIN = "RUN_AGENT_CHAIN"
 
 
 class JobKind(StrEnum):
@@ -156,6 +159,7 @@ class JobKind(StrEnum):
 
     GENERATE_DOCUMENT = "GENERATE_DOCUMENT"
     REFINE_DOCUMENT = "REFINE_DOCUMENT"
+    RUN_AGENT_CHAIN = "RUN_AGENT_CHAIN"
 
 
 class JobStatus(StrEnum):

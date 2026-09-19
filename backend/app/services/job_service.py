@@ -17,11 +17,13 @@ Deux garde-fous portent tout le reste :
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.agents import AGENT_PIPELINE
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.errors import AppError, NotFoundError
@@ -109,6 +111,28 @@ class JobService:
             payload=payload.model_dump(mode="json"),
         )
         return self._reserve_and_dispatch(job, user, AIOperation.IMPROVE_DOCUMENT, 1)
+
+    def enqueue_agent_chain(self, user: User, project: Project) -> GenerationJob:
+        """Met en file un passage complet de la chaine d'agents.
+
+        Les credits sont reserves pour **chaque agent**, pas pour le passage :
+        huit etapes, c'est huit appels au fournisseur. Reserver un seul credit
+        laisserait un compte epuise lancer une chaine entiere.
+
+        Les reprises ne sont pas reservees d'avance — on ne sait pas encore
+        s'il y en aura. Elles sont journalisees a l'execution.
+        """
+        job = GenerationJob(
+            user_id=user.id,
+            project_id=project.id,
+            kind=JobKind.RUN_AGENT_CHAIN,
+            document_type=None,
+            total_passes=len(AGENT_PIPELINE),
+            payload={},
+        )
+        return self._reserve_and_dispatch(
+            job, user, AIOperation.RUN_AGENT_CHAIN, len(AGENT_PIPELINE)
+        )
 
     def _reserve_and_dispatch(
         self, job: GenerationJob, user: User, operation: AIOperation, units: int
@@ -247,6 +271,8 @@ def _run(db: Session, job_id: str) -> JobStatus:
         db.commit()
 
     try:
+        if job.kind == JobKind.RUN_AGENT_CHAIN:
+            return _run_agent_chain(db, job, project, publish_progress)
         if job.kind == JobKind.GENERATE_DOCUMENT:
             result = documents.generate(
                 user,
@@ -303,3 +329,55 @@ def _finish_failed(db: Session, job: GenerationJob, code: str, message: str) -> 
     logger.info(
         "tâche de génération en échec : %s", code, extra={"event": "job_failed"}
     )
+
+
+def _run_agent_chain(
+    db: Session,
+    job: GenerationJob,
+    project: Project,
+    publish_progress: Callable[[int, int], None],
+) -> JobStatus:
+    """Execute un passage complet de la chaine et enregistre son resultat.
+
+    Le dossier est sauvegarde **quel que soit le verdict**. Un passage qui
+    finit sur `BLOCKED` a tout de meme produit du travail : le jeter obligerait
+    a tout refaire pour corriger un seul point, et couterait huit appels de
+    plus a chaque tentative.
+    """
+    from app.agents.orchestrator import Orchestrator
+    from app.services.dossier_service import DossierService
+
+    dossiers = DossierService(db)
+    state = dossiers.load_state(project.id)
+
+    run = Orchestrator().run(state, on_step=publish_progress)
+    record = dossiers.save_run(project.id, run)
+
+    job = db.get(GenerationJob, job.id)
+    job.status = JobStatus.SUCCEEDED
+    job.completed_passes = len(run.outputs)
+    job.total_passes = max(job.total_passes, len(run.outputs))
+    job.finished_at = datetime.now(UTC)
+    # Le verdict n'est pas le statut de la tache : une chaine qui aboutit a un
+    # dossier bloque a reussi son travail, elle a seulement conclu au refus.
+    job.result = {
+        "run_id": record.id,
+        "verdict": run.verdict,
+        "exportable": run.is_exportable,
+        "rounds": run.rounds,
+        "stalled": run.stalled,
+        "exhausted": run.exhausted,
+        "steps": len(run.outputs),
+        "open_findings": len(run.state.unresolved_issues),
+    }
+    db.commit()
+    logger.info(
+        "passage de la chaîne terminé",
+        extra={
+            "event": "agent_chain_finished",
+            "verdict": run.verdict,
+            "rounds": run.rounds,
+            "steps": len(run.outputs),
+        },
+    )
+    return JobStatus.SUCCEEDED

@@ -27,6 +27,10 @@ OPERATION_COST: dict[AIOperation, int] = {
     AIOperation.IMPROVE_DOCUMENT: 1,
     AIOperation.SCORE_PROJECT: 1,
     AIOperation.MATCH_FUNDING: 1,
+    # Un credit par agent, et non par passage : une chaine coute huit
+    # appels au fournisseur, la facturer comme un synopsis reviendrait a
+    # vendre a perte. `units` porte le nombre reel d'etapes.
+    AIOperation.RUN_AGENT_CHAIN: 1,
 }
 
 DEFAULT_PLANS: list[dict] = [

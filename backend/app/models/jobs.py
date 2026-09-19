@@ -43,8 +43,10 @@ class GenerationJob(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     kind: Mapped[JobKind] = mapped_column(
         SAEnum(JobKind, native_enum=False, length=30), nullable=False
     )
-    document_type: Mapped[DocumentType] = mapped_column(
-        SAEnum(DocumentType, native_enum=False, length=30), nullable=False
+    #: Nul pour un passage de la chaine d'agents : il ne produit pas un
+    #: document mais un dossier entier.
+    document_type: Mapped[DocumentType | None] = mapped_column(
+        SAEnum(DocumentType, native_enum=False, length=30), nullable=True
     )
     status: Mapped[JobStatus] = mapped_column(
         SAEnum(JobStatus, native_enum=False, length=20),
