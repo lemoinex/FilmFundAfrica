@@ -208,6 +208,20 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
+    def _debug_defaults_to_off_in_production(self) -> Settings:
+        """`DEBUG` suit l'environnement quand personne ne l'a posé.
+
+        La validation de production refuse `DEBUG=true` — elle obligeait donc
+        a declarer une variable dont la valeur etait deja deductible, et un
+        deploiement qui l'oubliait ne demarrait pas du tout. Une variable
+        posee explicitement reste souveraine, y compris pour activer le mode
+        debogage la ou il est deconseille : c'est un choix, pas un oubli.
+        """
+        if "debug" not in self.model_fields_set and self.is_production:
+            self.debug = False
+        return self
+
+    @model_validator(mode="after")
     def _refuse_unsafe_production(self) -> Settings:
         """Interdit de démarrer en production avec une configuration non sécurisée."""
         if self.environment != "production":

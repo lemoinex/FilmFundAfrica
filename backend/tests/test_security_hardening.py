@@ -7,6 +7,7 @@ existent pour empêcher sa réapparition.
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.config import DEV_JWT_SECRET, Settings
 from app.core.rate_limit import MemoryBackend, RateLimiter, RateLimitExceeded, auth_limiter
@@ -249,3 +250,34 @@ def test_a_variable_that_is_set_still_wins(monkeypatch):
     settings = Settings(_env_file=None)
     assert settings.rate_limit_ai_per_minute == 42
     assert settings.ai_provider == "anthropic"
+
+
+def test_debug_follows_the_environment_when_nobody_sets_it(monkeypatch):
+    """Une variable dont la valeur est déductible ne devrait pas être exigée.
+
+    La validation de production refuse `DEBUG=true` : elle obligeait donc à
+    déclarer `DEBUG=false`, et un déploiement qui l'oubliait ne démarrait
+    pas — pour une information que l'environnement portait déjà.
+    """
+    # Ni dans la construction, ni dans l'environnement — la suite de tests
+    # pose `DEBUG`, ce qui masquerait exactement ce qu'on veut mesurer.
+    monkeypatch.delenv("DEBUG", raising=False)
+    commun = {
+        "jwt_secret": "a" * 64,
+        "ai_provider": "mock",
+        "payment_provider": "manual",
+        "_env_file": None,
+    }
+    assert Settings(environment="production", **commun).debug is False
+    assert Settings(environment="development", **commun).debug is True
+
+
+def test_an_explicit_debug_flag_is_still_obeyed():
+    """Activer le débogage en production reste un choix, pas un oubli.
+
+    Il est refusé — mais par la validation de production, avec son message,
+    et non silencieusement écrasé.
+    """
+    with pytest.raises(ValidationError) as refus:
+        _production_settings(debug=True)
+    assert "DEBUG doit valoir false en production" in str(refus.value)

@@ -62,7 +62,7 @@ inter-origines : le frontend appelle l'API sur son propre domaine, et CORS ne se
 | `frontend` | `NEXT_PUBLIC_API_URL` | **rien à poser** : vide = le même domaine, ce qui est exactement le cas ici |
 | `backend` | `DATABASE_URL` | pooler Supabase, mode session, port 5432 |
 | `backend` | `ENVIRONMENT` | `production` |
-| `backend` | `DEBUG` | `false` |
+| `backend` | `DEBUG` | **rien à poser** : déduit de `ENVIRONMENT=production` |
 | `backend` | `JWT_SECRET` | `openssl rand -hex 32`, au moins 32 caractères |
 | `backend` | `CORS_ORIGINS` | le même domaine, par sécurité |
 | `backend` | `FRONTEND_URL` | idem, pour les liens des e-mails |
