@@ -47,6 +47,7 @@ IMPACT_AGENT = register(
             "la stratégie de financement, qui revient à l'agent financement",
             "les arbitrages narratifs, qui reviennent au scénariste",
         ],
+        state_field="impact_analysis",
         expected_output=[
             "CULTURAL_ANALYSIS",
             "SOCIAL_IMPACT",

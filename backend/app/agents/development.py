@@ -47,6 +47,7 @@ DEVELOPMENT_AGENT = register(
             "le budget et le plan de production, qui reviennent au producteur",
             "le choix des dispositifs de financement, qui revient à l'agent financement",
         ],
+        state_field="concept",
         expected_output=[
             "PROJECT_DEVELOPMENT_ANALYSIS",
             "PROJECT_STRENGTHS",

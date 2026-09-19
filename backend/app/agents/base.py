@@ -20,7 +20,10 @@ from dataclasses import dataclass, field
 
 from app.agents.contracts import AgentInput
 from app.models.enums import AgentRole
-from app.prompts.base import MISSING_VALUE_RULE
+from app.prompts.base import MISSING_VALUE_RULE, RenderedPrompt
+
+#: Marqueur porte par `metadata` d'un appel : une reponse JSON est attendue.
+AGENT_JSON_FORMAT = "agent_json"
 
 #: Seniorite simulee, commune a tous les agents.
 #:
@@ -105,7 +108,13 @@ class AgentDefinition:
     particular_rule: str | None = None
     #: Ce que l'agent ne decide pas : dit a qui revient la main.
     out_of_scope: list[str] = field(default_factory=list)
+    #: Champ de `ProjectState` que l'agent a le droit d'enrichir.
+    #:
+    #: `None` pour les validateurs : une instance de controle qui pourrait
+    #: reecrire le dossier ne serait plus independante de ce qu'elle controle.
+    state_field: str | None = None
     temperature: float = 0.4
+    max_output_tokens: int = 8000
 
     # ------------------------------------------------------------------
     def system_prompt(self) -> str:
@@ -217,19 +226,104 @@ class AgentDefinition:
         blocks.extend(
             [
                 "",
-                "STRUCTURE OBLIGATOIRE DE TA RÉPONSE",
-                "===================================",
+                "STRUCTURE OBLIGATOIRE DE TON ANALYSE",
+                "====================================",
+                "Le champ `analysis` est en Markdown et porte un titre de niveau 2 "
+                "(`##`) par bloc ci-dessous, dans l'ordre :",
                 sections,
                 "",
                 "FORMAT DE SORTIE",
                 "================",
-                "- Markdown ; un titre de niveau 2 (`##`) par bloc ci-dessus, dans l'ordre.",
-                "- Le bloc de modifications distingue explicitement ce qui est conservé, "
-                "modifié, retiré et ajouté, avec la raison de chaque changement.",
-                "- Pas de préambule, pas de conclusion méta.",
+                self._response_contract(),
             ]
         )
         return "\n".join(blocks)
+
+    # ------------------------------------------------------------------
+    def _response_contract(self) -> str:
+        """Contrat JSON attendu en retour.
+
+        Typé là où la valeur pilote un comportement — un verdict, une gravité,
+        le destinataire d'un constat — et laissé en prose là où un lecteur
+        humain est le destinataire. Relire du Markdown pour en déduire qu'un
+        dossier est bloqué serait confier une décision d'export à une
+        expression régulière.
+        """
+        if self.state_field:
+            patch_line = (
+                f'  "state_patch": {{ … }},        // enrichit `{self.state_field}` — '
+                "et rien d'autre de l'état"
+            )
+        else:
+            patch_line = (
+                '  "state_patch": null,           // tu contrôles, tu ne modifies pas '
+                "le dossier"
+            )
+
+        return "\n".join(
+            [
+                "Réponds par **un seul objet JSON**, sans texte autour et sans bloc de "
+                "code. Toute clé absente est traitée comme vide ; aucune clé "
+                "supplémentaire n'est acceptée.",
+                "",
+                "```",
+                "{",
+                '  "analysis": "…",               // Markdown, blocs ci-dessus dans l\'ordre',
+                '  "rationale": "…",              // pourquoi ces décisions, en quelques phrases',
+                '  "decisions": [',
+                "    {",
+                '      "observation": "…", "analysis": "…", "risk": "…",',
+                '      "decision": "…", "modification": "…", "validation": "…"',
+                "    }",
+                "  ],",
+                '  "modifications": {',
+                '    "preserved": ["…"], "modified": ["…"],',
+                '    "removed": ["…"],   "added": ["…"],',
+                '    "reasoning": ["…"]           // une justification par changement',
+                "  },",
+                '  "findings": [',
+                "    {",
+                '      "severity": "CRITICAL|MAJOR|MINOR|PASS",',
+                '      "element": "…", "description": "…",',
+                '      "owner": "<rôle de l\'agent capable de corriger>",',
+                '      "suggested_correction": "…"',
+                "    }",
+                "  ],",
+                '  "verdict": "PASS|PASS_WITH_WARNINGS|REQUIRES_CORRECTION|BLOCKED|null",',
+                patch_line,
+                '  "next_agent_instructions": "…"',
+                "}",
+                "```",
+                "",
+                "`removed` n'est jamais implicite : ce que tu retires doit y figurer, "
+                "avec sa raison dans `reasoning`.",
+                "`owner` sans destinataire réel vaut constat perdu — nomme l'agent, pas "
+                "une fonction vague.",
+            ]
+        )
+
+    # ------------------------------------------------------------------
+    def render(self, payload: AgentInput) -> RenderedPrompt:
+        """Prompt prêt pour `AIService`, avec la télémétrie de la chaîne.
+
+        On réutilise `RenderedPrompt` plutôt que d'ouvrir un second chemin :
+        les appels d'agents passent ainsi par la même journalisation et le
+        même plafond de sortie que les générations de document.
+        """
+        return RenderedPrompt(
+            system_prompt=self.system_prompt(),
+            user_prompt=self.user_prompt(payload),
+            outline=list(self.expected_output),
+            prompt_name=f"agent_{self.role.lower()}",
+            prompt_version=self.version,
+            document_label=self.profile,
+            max_output_tokens=self.max_output_tokens,
+            temperature=self.temperature,
+            context_json=payload.project_state.model_dump_json(exclude_none=True),
+            # Signale au fournisseur qu'une reponse JSON est attendue : le mode
+            # `mock` doit rendre un objet valide, pas du Markdown.
+            metadata_extra={"response_format": AGENT_JSON_FORMAT, "agent_role": self.role},
+        )
 
 
 #: Registre des agents, rempli a l'import de `app.agents`.

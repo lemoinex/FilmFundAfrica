@@ -192,6 +192,11 @@ class RenderedPrompt:
     context_json: str
     #: Longueur cible en mots, utile pour le suivi qualite et le decoupage.
     target_words_hint: int = 0
+    #: Metadonnees supplementaires transmises telles quelles au fournisseur.
+    #:
+    #: Sert a la chaine d'agents, qui attend du JSON la ou une generation de
+    #: document attend du Markdown : le fournisseur a besoin de le savoir.
+    metadata_extra: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

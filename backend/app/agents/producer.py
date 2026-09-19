@@ -42,6 +42,7 @@ PRODUCER_AGENT = register(
             "la construction du plan de financement, qui revient à l'agent financement",
             "les arbitrages artistiques, qui reviennent au réalisateur et au scénariste",
         ],
+        state_field="production_plan",
         expected_output=[
             "PRODUCTION_FEASIBILITY",
             "PRODUCTION_MODEL",

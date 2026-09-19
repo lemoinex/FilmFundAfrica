@@ -42,6 +42,7 @@ DIRECTOR_AGENT = register(
             "la réécriture du scénario, qui revient au scénariste",
             "le calendrier et le chiffrage, qui reviennent au producteur",
         ],
+        state_field="director_vision",
         expected_output=[
             "DIRECTORIAL_VISION",
             "VISUAL_LANGUAGE",

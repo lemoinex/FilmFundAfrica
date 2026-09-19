@@ -43,6 +43,7 @@ SCREENWRITER_AGENT = register(
             "le découpage technique et les choix de plans, qui reviennent au réalisateur",
             "la faisabilité de tournage d'une séquence, qui revient au producteur",
         ],
+        state_field="screenplay",
         expected_output=[
             "STORY_ANALYSIS",
             "CHARACTER_ANALYSIS",

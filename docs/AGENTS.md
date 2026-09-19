@@ -94,25 +94,81 @@ Corriger le producteur seul corrigerait le symptôme, pas ses conséquences : un
 budget revu change le plan de financement, qui change ce que le validateur doit
 relire.
 
+## Le moteur d'exécution
+
+### Sortie typée, pas de relecture de Markdown
+
+Un agent répond par **un seul objet JSON**, validé par Pydantic en `extra="forbid"`.
+Le choix se paie en robustesse à l'entrée — un modèle encadre volontiers sa
+réponse d'un bloc de code ou d'une phrase de politesse — et se rembourse
+partout ailleurs : une gravité, un verdict ou le destinataire d'un constat sont
+des valeurs typées, pas le résultat d'une expression régulière appliquée à de la
+prose. Confier une décision d'export à un `re.match` n'était pas défendable.
+
+L'extraction est donc **tolérante** (bloc de code, préambule bavard) et la
+validation **stricte**. Une sortie invalide lève une erreur nommant le champ
+fautif : mieux vaut une étape qui échoue qu'une étape dont on croit connaître le
+verdict.
+
+Le partage : **typé là où ça pilote un comportement** — `findings`, `verdict`,
+`modifications`, `state_patch` ; **prose là où le destinataire est humain** —
+`analysis`, `rationale`, la prose restant structurée par les blocs déclarés par
+chaque agent.
+
+### Ce que le moteur ne croit pas sur parole
+
+`agent` et `version` ne figurent pas dans le contrat de réponse : ils viennent de
+la définition. Un modèle qui déclarerait lui-même son rôle pourrait signer la
+production d'un autre, et toute la traçabilité reposerait sur sa bonne foi.
+
+Chaque agent constructeur ne peut enrichir **que sa propre section** de l'état
+(`state_field`). Les validateurs n'en ont aucune : un `state_patch` de leur part
+est refusé franchement, parce qu'un contrôle qui modifie ce qu'il contrôle est un
+défaut de conception, pas une donnée à ignorer.
+
+### La boucle, et ce qui l'arrête
+
+Trois garde-fous, pour trois raisons différentes :
+
+| Garde-fou | Pourquoi |
+| --- | --- |
+| `max_correction_rounds` (3) | deux validateurs qui ne s'accordent pas boucleraient jusqu'à épuisement du budget |
+| détection de non-progression | un tour qui ne change rien aux constats ouverts coûte huit appels pour le même résultat |
+| aucun export forcé | sortir de la boucle ne vaut pas validation : sans `PASS`, le dossier ne part pas |
+
+La reprise repart du propriétaire **le plus en amont**, pas du plus grave :
+corriger le budget avant le scénario laisserait le budget à refaire une fois le
+scénario modifié. L'ordre du pipeline est déjà l'ordre des dépendances.
+
+Un constat sans destinataire revient à son émetteur. Le laisser sans propriétaire
+le faisait disparaître entre deux filtres — détecté puis perdu, ce qui est pire
+que non détecté. C'est un défaut qu'un test a trouvé, pas une précaution
+théorique.
+
+### Le mode `mock` ne produit jamais de dossier exportable
+
+Sans clé API, la chaîne se déroule entièrement — c'est nécessaire pour la
+développer et la tester — mais chaque agent rend un constat `MAJOR` disant que
+rien n'a été rédigé ni contrôlé. Un dossier « validé » par un fournisseur qui
+n'analyse rien serait un mensonge utile à personne.
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
 **En place** : les huit définitions, les contrats, le registre, l'ordre du
-pipeline, le routage des corrections, la logique de verdict, le rendu des
-consignes. **51 tests** couvrent les périmètres, les garanties et la boucle.
+pipeline, le routage des corrections, la logique de verdict, **le moteur
+d'exécution et l'orchestrateur**. La chaîne accumule réellement un dossier,
+section par section, en traçant chaque modification. **77 tests** la couvrent.
 
-**Pas encore** — et rien n'est exécutable sans ces pièces :
+**Pas encore** :
 
-1. **Le moteur d'exécution.** Rien n'appelle encore le fournisseur d'IA avec la
-   consigne d'un agent, ni ne relit sa réponse pour en extraire `AgentOutput`.
-   C'est le chantier suivant, et le plus gros : la sortie est du Markdown
-   structuré, il faut la reparser de façon robuste ou passer à une sortie typée.
-2. **La persistance de `ProjectState`.** Le modèle existe en mémoire ; il n'a ni
-   table ni migration. L'historique des modifications et les constats non résolus
-   doivent survivre à une session.
-3. **Les routes et l'interface.** Aucun point d'entrée HTTP, aucun écran.
-4. **Le coût.** Une passe complète, c'est huit appels au fournisseur, davantage
-   avec les boucles de correction. Le modèle de crédits actuel compte par
-   document généré ; il ne sait pas compter une chaîne.
-
-Tant que 1 et 2 ne sont pas faits, la chaîne est une spécification exécutable :
-elle se teste, elle ne produit pas encore de dossier.
+1. **La persistance de `ProjectState`.** Il vit en mémoire le temps d'un
+   passage ; il n'a ni table ni migration. L'historique des modifications et les
+   constats non résolus ne survivent pas à la session — c'est le prochain
+   chantier, et il conditionne tout usage réel.
+2. **Les routes et l'interface.** Aucun point d'entrée HTTP, aucun écran.
+3. **Le coût.** Un passage propre, c'est huit appels ; avec les reprises,
+   jusqu'à trente-deux avant que les garde-fous ne coupent. Le modèle de crédits
+   compte par document généré : il ne sait pas compter une chaîne. Le brancher
+   tel quel facturerait une chaîne comme un synopsis.
+4. **La file.** Un passage complet dépasse largement une requête HTTP : il doit
+   passer par le worker, comme la génération de scénario.

@@ -46,6 +46,7 @@ FINANCING_AGENT = register(
             "le chiffrage du budget lui-même, qui revient au producteur",
             "la démonstration d'impact culturel, qui revient à l'agent impact",
         ],
+        state_field="financing_plan",
         expected_output=[
             "FINANCING_ANALYSIS",
             "ELIGIBLE_FINANCING_PATHS",

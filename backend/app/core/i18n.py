@@ -133,6 +133,13 @@ FR: dict[str, str] = {
     ),
     "prompt.notFound": "Aucun prompt n'est défini pour le document « {document} ».",
     "agent.notFound": "Aucun agent n'est défini pour le rôle « {agent} ».",
+    "agent.outputNotJson": (
+        "Le modèle n'a pas renvoyé d'objet JSON exploitable pour cette étape."
+    ),
+    "agent.outputInvalid": "Sortie d'agent invalide : {details}",
+    "agent.patchNotAllowed": (
+        "L'agent « {agent} » contrôle le dossier et ne peut pas le modifier."
+    ),
     "ai.providerUnknown": (
         "Fournisseur IA inconnu : « {name} ». Valeurs acceptées : anthropic, openai, "
         "mock."
@@ -443,6 +450,13 @@ EN: dict[str, str] = {
     ),
     "prompt.notFound": "No prompt is defined for the “{document}” document.",
     "agent.notFound": "No agent is defined for the “{agent}” role.",
+    "agent.outputNotJson": (
+        "The model did not return a usable JSON object for this step."
+    ),
+    "agent.outputInvalid": "Invalid agent output: {details}",
+    "agent.patchNotAllowed": (
+        "The “{agent}” agent reviews the package and cannot modify it."
+    ),
     "ai.providerUnknown": (
         "Unknown AI provider: “{name}”. Accepted values: anthropic, openai, mock."
     ),

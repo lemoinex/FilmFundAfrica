@@ -71,6 +71,7 @@ class AIService:
                 "document_label": prompt.document_label,
                 "prompt_name": prompt.prompt_name,
                 "prompt_version": prompt.prompt_version,
+                **prompt.metadata_extra,
             },
         )
         logger.info(

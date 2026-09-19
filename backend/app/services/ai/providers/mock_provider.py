@@ -31,6 +31,9 @@ class MockProvider(AIProvider):
     def complete(self, request: AICompletionRequest) -> AICompletionResponse:
         started = time.perf_counter()
 
+        if request.metadata.get("response_format") == "agent_json":
+            return self._agent_output(request, started)
+
         outline = [
             line for line in request.metadata.get("outline", "").split("\n") if line.strip()
         ]
@@ -82,6 +85,73 @@ class MockProvider(AIProvider):
         text = "\n".join(parts).strip()
         latency_ms = int((time.perf_counter() - started) * 1000)
 
+        return AICompletionResponse(
+            text=text,
+            model="mock-deterministic",
+            provider=self.name,
+            input_tokens=len(request.user_prompt) // 4,
+            output_tokens=len(text) // 4,
+            latency_ms=latency_ms,
+            stop_reason="end_turn",
+        )
+
+    # ------------------------------------------------------------------
+    def _agent_output(
+        self, request: AICompletionRequest, started: float
+    ) -> AICompletionResponse:
+        """Sortie d'agent en mode `mock` : structurellement valide, jamais probante.
+
+        Le mode `mock` doit permettre de traverser la chaine sans cle API. Il ne
+        doit pas permettre d'en sortir un dossier presente comme controle : sans
+        modele, rien n'a ete analyse. Le constat rendu est donc `MAJOR`, ce qui
+        interdit l'export tout en laissant l'orchestrateur derouler et la boucle
+        de correction s'exercer.
+        """
+        role = request.metadata.get("agent_role", "UNKNOWN")
+        outline = [
+            line.strip() for line in request.metadata.get("outline", "").split("\n") if line.strip()
+        ]
+        sections: list[str] = []
+        for heading in outline:
+            sections.append(f"## {heading}")
+            sections.append(MISSING)
+        analysis = "\n\n".join(sections) if sections else MISSING
+
+        payload = {
+            "analysis": analysis,
+            "rationale": (
+                "Aucun fournisseur d'IA n'est configuré (`AI_PROVIDER=mock`) : "
+                "aucune analyse n'a été produite."
+            ),
+            "decisions": [],
+            "modifications": {
+                "preserved": [],
+                "modified": [],
+                "removed": [],
+                "added": [],
+                "reasoning": [],
+            },
+            "findings": [
+                {
+                    "severity": "MAJOR",
+                    "element": "fournisseur d'IA",
+                    "description": (
+                        "Sortie produite en mode `mock` : le dossier n'a été ni rédigé "
+                        "ni contrôlé. Renseignez `AI_PROVIDER` et `AI_API_KEY`."
+                    ),
+                    "owner": role,
+                    "suggested_correction": "Configurer un fournisseur d'IA réel.",
+                }
+            ],
+            "verdict": "REQUIRES_CORRECTION",
+            "state_patch": None,
+            "next_agent_instructions": (
+                "Sortie `mock` : ne t'appuie sur aucun de ses contenus."
+            ),
+        }
+
+        text = json.dumps(payload, ensure_ascii=False)
+        latency_ms = int((time.perf_counter() - started) * 1000)
         return AICompletionResponse(
             text=text,
             model="mock-deterministic",
