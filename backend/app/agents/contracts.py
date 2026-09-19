@@ -156,6 +156,21 @@ class AgentInput(BaseModel):
     project_context: dict[str, Any] = Field(default_factory=dict)
 
 
+class CallTelemetry(BaseModel):
+    """Ce qu'a coute l'appel qui a produit une sortie.
+
+    Conservee etape par etape : c'est la seule facon de comparer le cout d'une
+    version de consigne a la suivante, ce qui est la raison d'etre du
+    versionnement des agents.
+    """
+
+    provider: str | None = None
+    model: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: int = 0
+
+
 class AgentOutput(BaseModel):
     """Ce qu'un agent rend.
 
@@ -174,6 +189,7 @@ class AgentOutput(BaseModel):
     next_agent_instructions: str = ""
     findings: list[Finding] = Field(default_factory=list)
     verdict: ValidationVerdict | None = None
+    telemetry: CallTelemetry = Field(default_factory=CallTelemetry)
 
 
 # `AgentInput` cite `AgentOutput` avant sa definition : Pydantic a besoin d'un

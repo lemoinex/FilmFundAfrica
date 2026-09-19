@@ -353,6 +353,29 @@ def _run_agent_chain(
     run = Orchestrator().run(state, on_step=publish_progress)
     record = dossiers.save_run(project.id, run)
 
+    # Les credits ont ete reserves a la mise en file : on ne redebite pas,
+    # mais l'appel doit laisser une trace. Sans elle, l'operation la plus
+    # couteuse du produit serait la seule absente du registre de consommation,
+    # et personne ne saurait ce qu'une chaine coute reellement en jetons.
+    user = db.get(User, job.user_id)
+    if user is not None:
+        steps = [output.telemetry for output in run.outputs]
+        CreditService(db).record_usage(
+            user,
+            operation=AIOperation.RUN_AGENT_CHAIN,
+            provider=next((t.provider for t in steps if t.provider), "inconnu"),
+            model=next((t.model for t in steps if t.model), "inconnu"),
+            project_id=project.id,
+            prompt_name="agent_chain",
+            prompt_version=str(len(run.outputs)),
+            input_tokens=sum(t.input_tokens for t in steps),
+            output_tokens=sum(t.output_tokens for t in steps),
+            latency_ms=sum(t.latency_ms for t in steps),
+            units=len(run.outputs),
+            # Deja preleve a la mise en file.
+            consume=False,
+        )
+
     job = db.get(GenerationJob, job.id)
     job.status = JobStatus.SUCCEEDED
     job.completed_passes = len(run.outputs)

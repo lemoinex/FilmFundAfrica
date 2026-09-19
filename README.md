@@ -76,7 +76,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          418 tests (pytest)
+│   └── tests/          428 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -531,7 +531,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 418 tests
+pytest                    # 428 tests
 ruff check .              # lint
 ```
 

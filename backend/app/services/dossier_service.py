@@ -138,6 +138,11 @@ class DossierService:
                     verdict=output.verdict,
                     changeset=output.modifications.model_dump(mode="json"),
                     decisions=[d.model_dump(mode="json") for d in output.decisions],
+                    provider=output.telemetry.provider,
+                    model=output.telemetry.model,
+                    input_tokens=output.telemetry.input_tokens,
+                    output_tokens=output.telemetry.output_tokens,
+                    latency_ms=output.telemetry.latency_ms,
                 )
             )
 

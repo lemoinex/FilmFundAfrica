@@ -299,20 +299,65 @@ sur la mise en forme — l'amorce du brouillon doit être en couleur, car un
 avertissement en noir se confond avec un intertitre, et cette régression-là ne
 casserait rien d'autre.
 
+## Le worker
+
+Un passage passe par la **même file** que la génération de documents : le worker
+dispatche sur le genre de tâche, il a suffi d'en ajouter un.
+
+```bash
+# avec REDIS_URL renseigné, dans un second terminal
+python -m app.workers.runner
+```
+
+`GET /health` dit lequel des deux modes est actif : `"generation": "worker"` ou
+`"inline-no-worker"`.
+
+**Vérifié sur la pile réelle** — PostgreSQL, Redis, API et worker en processus
+séparés. Le lancement répond `QUEUED` sans tenir la requête, et c'est bien le
+worker qui déroule les seize étapes puis conclut. Sans worker, l'API exécute le
+passage elle-même : c'est le repli documenté, et la limite décrite dans
+[`deploy/VERCEL.md`](../deploy/VERCEL.md).
+
+### Ce que cette vérification a trouvé
+
+La machinerie de file était éprouvée avec des générations de document. La chaîne
+la réutilise, et deux choses n'avaient jamais été branchées :
+
+**Aucune ligne dans le registre de consommation.** Huit crédits partaient,
+seize appels au fournisseur étaient faits, et `ai_usage` restait vide :
+l'opération la plus coûteuse du produit était la seule absente du journal.
+Impossible de savoir ce qu'une chaîne coûte en jetons, et les tableaux de bord
+qui lisent cette table sous-comptaient.
+
+**Les colonnes de télémétrie d'`agent_steps` étaient toujours vides.** Je les
+avais créées pour « comparer le coût d'une version de consigne à l'autre », puis
+jamais remplies. Elles le sont maintenant, étape par étape.
+
+Les deux sont couverts par des tests, dont un contrôlé par mutation.
+
+### Ce qu'il faut savoir en exploitation
+
+| Réglage | Effet sur la chaîne |
+| --- | --- |
+| `JOB_TIMEOUT_SECONDS` (900) | compté depuis le **dernier signe de vie**, pas le départ : le battement par agent empêche de tuer une chaîne vivante |
+| `JOB_STALE_SECONDS` (60) | une tâche en attente qu'aucun worker n'a prise est reprise par le balayage |
+| arrêt du worker | la tâche en cours reprend son état `RUNNING` ; le balayage la déclare interrompue et **rend les huit crédits**, pas un |
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
 **En place** : les huit agents, les contrats, le moteur, l'orchestrateur, la
-persistance, la file, les routes, l'écran, **et les exports PDF et Word**. La
-chaîne est utilisable de bout en bout, du lancement au document téléchargeable.
-**132 tests backend** la couvrent, plus 3 parcours de bout en bout.
+persistance, la file, les routes, l'écran, les exports PDF et Word, **et le
+worker vérifié de bout en bout**. **142 tests backend** la couvrent, plus 3
+parcours de bout en bout.
 
-**Pas encore** :
+**Pas encore** — et ce qui reste n'est plus technique :
 
-1. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
-   vide, l'API exécute le passage elle-même — vingt minutes de requête ouverte.
-   Sur un hébergement sans worker, c'est la limite décrite dans
-   [`deploy/VERCEL.md`](../deploy/VERCEL.md).
-2. **Une décision produit à prendre** : l'offre gratuite accorde **un** crédit,
-   une chaîne en coûte **huit**. Un compte gratuit ne peut donc jamais essayer
-   la fonction principale du produit. Le refus est propre et lisible, mais c'est
-   un arbitrage commercial, pas un défaut technique.
+1. **Une décision produit** : l'offre gratuite accorde **un** crédit, une chaîne
+   en coûte **huit**. Un compte gratuit ne peut donc jamais essayer la fonction
+   principale du produit. Le refus est propre et lisible, mais l'arbitrage
+   commercial revient à quelqu'un d'autre.
+2. **Un fournisseur d'IA réel.** En mode `mock`, la chaîne se déroule
+   entièrement mais ne rend jamais un dossier exportable — c'est voulu, et cela
+   signifie qu'aucun dossier réel ne sortira avant qu'une clé soit configurée.
+3. **La relecture des onze prompts par langue**, par un professionnel du
+   secteur.

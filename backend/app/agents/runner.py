@@ -24,6 +24,7 @@ from app.agents.base import AgentDefinition
 from app.agents.contracts import (
     AgentInput,
     AgentOutput,
+    CallTelemetry,
     ChangeSet,
     DecisionRecord,
     Finding,
@@ -144,6 +145,13 @@ class AgentRunner:
             next_agent_instructions=parsed.next_agent_instructions,
             findings=parsed.findings,
             verdict=parsed.verdict,
+            telemetry=CallTelemetry(
+                provider=response.provider,
+                model=response.model,
+                input_tokens=response.input_tokens,
+                output_tokens=response.output_tokens,
+                latency_ms=response.latency_ms,
+            ),
         )
 
     # ------------------------------------------------------------------
