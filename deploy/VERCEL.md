@@ -3,6 +3,24 @@
 `vercel.json`, à la racine, déclare les deux services et le routage. Il est requis par
 Vercel pour un projet à plusieurs services.
 
+## Le point qui fait échouer la construction
+
+Le service `backend` doit déclarer un **`entrypoint`** au format
+`module:variable`, relatif à son `root`. Ici : `app.main:app` — l'instance
+FastAPI s'appelle `app` et vit dans `backend/app/main.py`.
+
+Sans cette ligne, Vercel détecte bien FastAPI mais refuse de construire, en
+deux secondes et avant tout le reste :
+
+```
+MISSING_SERVICE_CONFIG — Service "backend" detected framework "fastapi"
+in "backend" and must specify an "entrypoint" for runtime "python".
+```
+
+L'erreur n'apparaît que dans le détail du déploiement : la liste montre
+seulement `ERROR`. Quinze déploiements ont échoué ainsi sans que personne ne
+le remarque.
+
 ## Routage
 
 | Chemin | Service |
