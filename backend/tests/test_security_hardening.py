@@ -199,25 +199,45 @@ def test_an_empty_typed_variable_falls_back_to_its_default(monkeypatch):
 
 
 def test_an_empty_value_that_means_something_is_left_alone(monkeypatch):
-    """« Vide » est une valeur pour certains réglages, et le reste.
+    """« Vide » est une valeur pour certains réglages, et le type le dit.
 
-    `REDIS_URL` vide veut dire « pas de Redis », `AI_EFFORT` vide « laisse le
-    serveur décider », `CORS_ORIGINS` vide « aucune origine autorisée ».
-    Leur substituer un défaut changerait le comportement demandé — et pour
-    `CORS_ORIGINS`, rouvrirait `localhost` en production.
+    `REDIS_URL` vide veut dire « pas de Redis » : son défaut est déjà vide.
+    `AI_EFFORT` vide veut dire « laisse le serveur décider », et `""` figure
+    explicitement dans son `Literal` — lui substituer `high` changerait le
+    comportement demandé.
     """
     from app.core.config import Settings
 
-    for nom in ("REDIS_URL", "AI_EFFORT", "CORS_ORIGINS", "SENTRY_DSN", "AI_MODEL"):
+    for nom in ("REDIS_URL", "AI_EFFORT", "SENTRY_DSN", "AI_MODEL", "AI_API_KEY"):
         monkeypatch.setenv(nom, "")
 
     settings = Settings(_env_file=None)
     assert settings.redis_url == ""
     assert settings.ai_effort == ""
-    assert settings.cors_origins == ""
-    assert settings.cors_origin_list == []
     assert settings.sentry_dsn == ""
     assert settings.ai_model == ""
+    assert settings.ai_api_key == ""
+
+
+def test_an_empty_string_field_with_a_real_default_falls_back(monkeypatch):
+    """Le second défaut, trouvé un cran plus bas que le premier.
+
+    Épargner toutes les chaînes laissait `DATABASE_URL=` (vide) faire échouer
+    le déploiement à l'import : « Could not parse SQLAlchemy URL from string
+    '' », avant que la moindre route n'existe. Une URL de base vide n'est
+    jamais un choix ; retomber sur le défaut laisse au moins l'application
+    démarrer et la sonde dire que la base est injoignable.
+    """
+    from app.core.config import Settings
+
+    for nom in ("DATABASE_URL", "SMTP_FROM", "JWT_ALGORITHM", "CORS_ORIGINS"):
+        monkeypatch.setenv(nom, "")
+
+    settings = Settings(_env_file=None)
+    assert settings.database_url.startswith("postgresql+psycopg://")
+    assert settings.smtp_from == "no-reply@filmfundafrica.com"
+    assert settings.jwt_algorithm == "HS256"
+    assert settings.cors_origins == "http://localhost:3000"
 
 
 def test_a_variable_that_is_set_still_wins(monkeypatch):

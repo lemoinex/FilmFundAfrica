@@ -7,16 +7,9 @@ Aucun secret n'est ecrit en dur dans le code.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, get_args, get_origin
 
-from pydantic import (
-    Field,
-    TypeAdapter,
-    ValidationError,
-    ValidationInfo,
-    field_validator,
-    model_validator,
-)
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Secret de developpement, volontairement reconnaissable.
@@ -172,20 +165,37 @@ class Settings(BaseSettings):
         de bord sans leurs valeurs — le geste le plus naturel au premier
         deploiement.
 
-        **Sauf la ou la chaine vide est une valeur.** `REDIS_URL` vide veut
-        dire « pas de Redis », `AI_EFFORT` vide « laisse le serveur decider »,
-        `CORS_ORIGINS` vide « aucune origine autorisee ». On ne remplace donc
-        que ce que le type refuse : si l'annotation accepte `""`, la valeur
-        est intentionnelle et reste telle quelle.
+        **Sauf la ou la chaine vide est une valeur**, et c'est le type qui le
+        dit. `REDIS_URL` vide veut dire « pas de Redis » — son defaut est deja
+        vide, rien a substituer. `AI_EFFORT` vide veut dire « laisse le
+        serveur decider » — `""` figure explicitement dans son `Literal`, ce
+        qui n'est pas un hasard.
+
+        Partout ailleurs, un defaut non vide l'emporte. La premiere version de
+        cette regle epargnait toutes les chaines, et `DATABASE_URL=` (vide) a
+        continue de faire echouer le deploiement d'un cran plus bas :
+        « Could not parse SQLAlchemy URL from string '' », a l'import, avant
+        que la moindre route n'existe. Une URL de base vide n'est jamais un
+        choix ; retomber sur le defaut laisse au moins l'application demarrer
+        et la sonde dire que la base est injoignable.
         """
         if value != "" or info.field_name is None:
             return value
+
         field = cls.model_fields[info.field_name]
-        try:
-            TypeAdapter(field.annotation).validate_python("")
-        except ValidationError:
-            return field.get_default(call_default_factory=True)
-        return value
+        default = field.get_default(call_default_factory=True)
+
+        # Le defaut est deja vide : substituer ne changerait rien.
+        if default == "":
+            return value
+
+        # Le type liste `""` parmi ses valeurs : l'auteur du reglage l'a voulu
+        # explicitement. `AI_EFFORT` vide veut dire « laisse le serveur
+        # decider », et ce n'est pas la meme chose que son defaut `high`.
+        if get_origin(field.annotation) is Literal and "" in get_args(field.annotation):
+            return value
+
+        return default
 
     @field_validator("database_url")
     @classmethod

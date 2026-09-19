@@ -21,6 +21,20 @@ L'erreur n'apparaît que dans le détail du déploiement : la liste montre
 seulement `ERROR`. Quinze déploiements ont échoué ainsi sans que personne ne
 le remarque.
 
+## Une variable vide n'est pas une variable absente
+
+Un tableau de bord où l'on colle les clés de `.env.example` sans leurs
+valeurs produit des variables **vides**, et une variable vide n'est pas une
+variable absente. L'application le gère désormais : un vide retombe sur le
+défaut, **sauf** là où le vide est une valeur que le type déclare
+(`AI_EFFORT`, ou tout réglage dont le défaut est déjà vide comme
+`REDIS_URL`).
+
+Ne comptez pas dessus pour autant : `DATABASE_URL` vide fait démarrer
+l'application sur une base locale inexistante, et `/health` répondra
+`database: unreachable`. Mieux vaut **supprimer** une variable que la
+laisser vide.
+
 ## Routage
 
 | Chemin | Service |
