@@ -351,9 +351,14 @@ Aucune fonctionnalité n'y est annoncée comme terminée si elle ne l'est pas.
    `403 subscription_closed`, pour tout le monde y compris les administrateurs : il n'y a
    rien à vendre tant que le produit n'est pas commercialisé. Résiliation et webhook du
    prestataire restent ouverts. Rien n'est supprimé — offres, abonnements, paiements et
-   historiques sont conservés, et `PLATFORM_MODE=public` rouvre tout. Conséquence à
-   connaître : un compte non administrateur créé pendant la bêta reste sur l'offre
-   gratuite sans pouvoir en changer.
+   historiques sont conservés, et `PLATFORM_MODE=public` rouvre tout. L'**inscription
+   publique** est fermée par le même interrupteur : `POST /auth/register` répond
+   `403 registration_closed` et l'écran `/inscription` l'annonce, ce qui lève la
+   conséquence qu'il fallait auparavant connaître — plus de compte non administrateur
+   créé pendant la bêta pour rester coincé sur une offre gratuite en sommeil. Confirmer
+   une adresse et redemander le lien restent ouverts, sans quoi un compte créé avant la
+   bascule ne pourrait plus jamais s'activer. Les comptes de la bêta se créent avec
+   `python -m scripts.create_admin`.
 7. **Aucun prestataire de paiement réel** — le cycle d'abonnement fonctionne de bout en bout,
    mais avec `manual` (encaissement hors ligne) ou `mock` (simulé). Brancher CinetPay, PayDunya,
    Wave ou Flutterwave revient à écrire une classe implémentant `PaymentProvider` : trois

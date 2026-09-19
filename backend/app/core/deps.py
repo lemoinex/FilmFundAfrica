@@ -135,6 +135,47 @@ def require_subscription_open(current_user: CurrentUser) -> User:
     return current_user
 
 
+def registration_open() -> bool:
+    """L'inscription publique est-elle ouverte ?
+
+    Fermee pendant la beta privee, ouverte des `PLATFORM_MODE=public`. Le
+    meme drapeau qui ferme la souscription ferme l'inscription : la beta se
+    mene avec des comptes connus, et un visiteur qui creerait un compte
+    n'aurait de toute facon acces a rien, l'offre gratuite etant elle aussi
+    en sommeil. Un seul interrupteur, donc, et pas de date : rouvrir reste
+    une decision explicite.
+    """
+    from app.core.platform import is_internal
+
+    return not is_internal()
+
+
+def require_registration_open() -> None:
+    """Ferme la creation de compte pendant la beta privee.
+
+    **Rien n'est supprime** : la route, le service, la verification d'adresse
+    et le formulaire restent en place, et `PLATFORM_MODE=public` rouvre le
+    tout sans changement de code.
+
+    La fermeture vaut pour tout le monde — il n'y a personne a exempter, la
+    route etant anonyme. Les comptes de la beta se creent directement en
+    base, comme les deux administrateurs.
+
+    Ce qui reste ouvert : **confirmer une adresse** et **en redemander le
+    lien**. Ces deux routes achevent une inscription deja faite, elles n'en
+    creent pas ; les fermer emprisonnerait un compte cree avant la bascule
+    dans un etat non confirme, sans aucun recours.
+    """
+    from app.core.errors import AppError
+
+    if not registration_open():
+        raise AppError(
+            "auth.registrationClosed",
+            code="registration_closed",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
 def require_matching_access(db: DbSession, current_user: CurrentUser) -> User:
     """Réserve le rapprochement aux offres qui l'incluent (`allows_matching`).
 

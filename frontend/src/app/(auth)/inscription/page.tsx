@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, Spinner } from "@/components/ui";
 import { ApiError, authApi } from "@/lib/api";
@@ -30,6 +30,27 @@ export default function RegisterPage() {
   /** Message de confirmation : identique que l'adresse soit libre ou déjà prise. */
   const [sent, setSent] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
+  /**
+   * `null` tant que le serveur n'a pas répondu : montrer le formulaire puis
+   * le retirer serait plus déroutant qu'attendre un instant.
+   *
+   * En cas d'échec de l'appel, on ouvre. Le serveur reste seul juge et
+   * refusera si l'inscription est fermée ; fermer sur un incident réseau
+   * priverait d'inscription une plateforme ouverte, ce qui est le pire des
+   * deux défauts.
+   */
+  const [open, setOpen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    authApi
+      .registrationStatus()
+      .then((status) => current && setOpen(status.open))
+      .catch(() => current && setOpen(true));
+    return () => {
+      current = false;
+    };
+  }, []);
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -72,6 +93,29 @@ export default function RegisterPage() {
       // ne doit rien laisser deviner.
       setResent(true);
     }
+  }
+
+  if (open === null) {
+    return (
+      <div className="card flex items-center justify-center p-12">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <div className="card p-8">
+        <h1 className="font-display text-2xl text-slatey-100">{t("register.closedTitle")}</h1>
+        <p className="mt-3 text-sm text-slatey-300">{t("register.closedBody")}</p>
+        <p className="mt-6 text-sm text-slatey-400">
+          {t("register.closedHasAccount")}{" "}
+          <Link href="/connexion" className="text-brass-300 hover:text-brass-200">
+            {t("login.submit")}
+          </Link>
+        </p>
+      </div>
+    );
   }
 
   if (sent) {

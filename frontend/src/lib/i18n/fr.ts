@@ -271,6 +271,10 @@ export const fr = {
     "Le lien a été envoyé à {email}. Il expire dans 24 heures. Pensez à regarder dans les indésirables.",
   "register.resend": "Renvoyer le lien",
   "register.resent": "Si un lien était en attente, un nouveau vient de partir.",
+  "register.closedTitle": "Inscriptions fermées",
+  "register.closedBody":
+    "FilmFund Africa est en bêta privée : la création de compte est réservée à l'équipe le temps de cette phase. L'inscription rouvrira à l'ouverture commerciale.",
+  "register.closedHasAccount": "Vous avez déjà un compte ?",
 
   // --- Chargement ---
   "load.failed": "Chargement impossible.",

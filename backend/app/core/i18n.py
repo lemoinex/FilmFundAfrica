@@ -108,6 +108,11 @@ FR: dict[str, str] = {
     "auth.sessionPasswordChanged": (
         "Session expirée : le mot de passe a été modifié. Reconnectez-vous."
     ),
+    "auth.registrationClosed": (
+        "FilmFund Africa est en bêta privée : la création de compte est fermée. "
+        "L'inscription rouvrira à l'ouverture commerciale ; si vous avez déjà un "
+        "compte, vous pouvez vous connecter."
+    ),
     "quota.exportNotIncluded": (
         "L'export n'est pas inclus dans l'offre « {plan} ». Passez à une offre "
         "supérieure pour exporter votre dossier."
@@ -463,6 +468,11 @@ EN: dict[str, str] = {
     # --- Session and quotas ---
     "auth.sessionPasswordChanged": (
         "Session expired: the password was changed. Please sign in again."
+    ),
+    "auth.registrationClosed": (
+        "FilmFund Africa is in private beta: creating an account is closed. "
+        "Registration reopens at the commercial launch; if you already have an "
+        "account, you can sign in."
     ),
     "quota.exportNotIncluded": (
         "Export is not included in the “{plan}” plan. Move to a higher plan to export "

@@ -287,6 +287,78 @@ def test_in_public_mode_the_profile_says_the_rules_apply(client, admin, public):
 
 
 # ----------------------------------------------------------------------
+# L'inscription
+
+
+def test_creating_an_account_is_closed_during_the_private_beta(client, internal):
+    """La bêta se mène avec des comptes connus."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "visiteur@example.com",
+            "password": "MotDePasse123",
+            "first_name": "Visiteur",
+            "last_name": "Anonyme",
+            "user_type": "AUTHOR",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "registration_closed"
+
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.email == "visiteur@example.com").count() == 0
+
+
+def test_the_form_can_ask_whether_registration_is_open(client, internal):
+    """Sans cette réponse, l'écran proposerait une porte qui ne s'ouvre pas."""
+    assert client.get("/api/v1/auth/registration").json() == {"open": False}
+
+
+def test_registration_reopens_at_the_commercial_launch(client, public):
+    """Rien n'est supprimé : `PLATFORM_MODE=public` rouvre, sans migration."""
+    assert client.get("/api/v1/auth/registration").json() == {"open": True}
+    assert client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "nouvelle@example.com",
+            "password": "MotDePasse123",
+            "first_name": "Nouvelle",
+            "last_name": "Venue",
+            "user_type": "AUTHOR",
+        },
+    ).status_code == 202
+
+
+def test_an_account_awaiting_confirmation_is_not_stranded(client, monkeypatch):
+    """Le trou laissé exprès dans la fermeture.
+
+    Fermer aussi la confirmation d'adresse emprisonnerait dans un état
+    inactif tout compte créé avant la bascule : plus d'activation, et pas
+    de recours non plus, puisque se réinscrire est justement fermé.
+    """
+    from tests.conftest import pending_verification_token, register_payload
+
+    # Compte créé avant la fermeture, et resté non confirmé.
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "public")
+    assert client.post(
+        "/api/v1/auth/register", json=register_payload("attente@example.com")
+    ).status_code == 202
+
+    monkeypatch.setattr("app.core.config.settings.platform_mode", "internal")
+
+    # Redemander le lien le renouvelle : c'est le lien final qui doit ouvrir.
+    assert client.post(
+        "/api/v1/auth/resend-verification", json={"email": "attente@example.com"}
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": pending_verification_token("attente@example.com")},
+    ).status_code == 200
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.email == "attente@example.com").one().is_verified
+
+
+# ----------------------------------------------------------------------
 # Le prédicat lui-même
 
 

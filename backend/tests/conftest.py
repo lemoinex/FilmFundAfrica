@@ -33,6 +33,12 @@ os.environ.update(
         # Clé de l'automatisation : sans elle, les routes n8n restent fermées
         # et les tests d'authentification n'auraient rien à vérifier.
         "N8N_API_KEY": "cle-automatisation-de-test",
+        # La phase commerciale sert de référence à la suite : c'est l'état où
+        # toutes les règles d'offre s'appliquent, et celui où l'inscription
+        # est ouverte — sans quoi les tests du parcours d'inscription
+        # n'auraient plus de parcours à éprouver. La bêta privée est une
+        # déviation, que chaque test concerné déclare explicitement.
+        "PLATFORM_MODE": "public",
     }
 )
 
@@ -159,8 +165,23 @@ def register_and_verify(client, email: str = "user@example.com", **overrides) ->
 
     L'inscription n'ouvre plus de session : le compte s'active en ouvrant le
     lien reçu par e-mail. C'est ce parcours-là que les tests rejouent.
+
+    L'inscription publique étant fermée pendant la bêta privée, l'helper
+    rouvre le temps de l'appel — un compte de bêta se crée en base, et c'est
+    bien ce que cette fonction représente pour les tests qui travaillent en
+    mode interne. Ceux qui éprouvent la fermeture elle-même appellent la
+    route directement, sans passer par ici.
     """
-    response = client.post("/api/v1/auth/register", json=register_payload(email, **overrides))
+    from app.core.config import settings
+
+    phase = settings.platform_mode
+    settings.platform_mode = "public"
+    try:
+        response = client.post(
+            "/api/v1/auth/register", json=register_payload(email, **overrides)
+        )
+    finally:
+        settings.platform_mode = phase
     assert response.status_code == 202, response.text
     verified = client.post(
         "/api/v1/auth/verify-email", json={"token": pending_verification_token(email)}

@@ -198,6 +198,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 /* Authentification                                                    */
 /* ------------------------------------------------------------------ */
 export const authApi = {
+  // Fermée pendant la bêta privée. L'écran le demande avant de proposer un
+  // formulaire dont le serveur refuserait l'envoi — et le rouvre de lui-même
+  // à l'ouverture commerciale, sans nouveau déploiement du frontend.
+  registrationStatus: () =>
+    request<{ open: boolean }>("/api/v1/auth/registration", { auth: false }),
+
   register: (payload: {
     email: string;
     password: string;

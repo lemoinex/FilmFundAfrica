@@ -267,6 +267,10 @@ export const en: Record<MessageKey, string> = {
     "The link has been sent to {email}. It expires in 24 hours. Remember to look in your spam folder.",
   "register.resend": "Send the link again",
   "register.resent": "If a link was pending, a new one has just been sent.",
+  "register.closedTitle": "Registration closed",
+  "register.closedBody":
+    "FilmFund Africa is in private beta: creating an account is reserved for the team during this phase. Registration reopens at the commercial launch.",
+  "register.closedHasAccount": "Already have an account?",
 
   // --- Loading ---
   "load.failed": "Could not load this page.",

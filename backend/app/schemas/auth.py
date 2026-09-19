@@ -42,6 +42,19 @@ class RegisterRequest(BaseModel):
         return value
 
 
+class RegistrationStatus(BaseModel):
+    """Etat de l'inscription, lisible sans etre authentifie.
+
+    Le formulaire ne peut pas le deviner : sans cette reponse il proposerait
+    une creation de compte que le serveur refuse, ou — s'il la masquait en
+    dur — resterait ferme apres l'ouverture commerciale. La seule chose
+    publiee est ce booleen ; ni le mode ni les dates de la beta n'ont a
+    sortir d'ici.
+    """
+
+    open: bool
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

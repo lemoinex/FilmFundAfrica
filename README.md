@@ -169,6 +169,20 @@ Deux actions restent ouvertes, délibérément :
 Rien n'est supprimé : offres, prix, abonnements, paiements et historiques
 restent en base et lisibles. `PLATFORM_MODE=public` rouvre tout.
 
+**L'inscription publique est fermée en `internal`.** `POST /auth/register`
+répond `403 registration_closed`, et l'écran `/inscription` l'annonce au lieu
+de présenter un formulaire dont l'envoi échouerait — il interroge
+`GET /auth/registration`, la seule chose publiée étant un booléen. Le même
+interrupteur ferme la souscription et l'inscription : la bêta se mène avec
+des comptes connus, et un visiteur qui créerait un compte n'aurait de toute
+façon accès à rien, l'offre gratuite étant elle aussi en sommeil.
+
+Deux routes restent ouvertes, là encore délibérément : **confirmer une
+adresse** et **en redemander le lien**. Elles achèvent une inscription déjà
+faite, elles n'en créent pas ; les fermer emprisonnerait dans un état
+inactif tout compte créé avant la bascule, sans recours — se réinscrire
+étant justement fermé.
+
 **Accès pendant la bêta.** La plateforme s'utilise avec des comptes
 administrateurs, créés un par un :
 

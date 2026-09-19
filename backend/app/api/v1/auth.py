@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, status
 
-from app.core.deps import CurrentUser, DbSession, Translator
+from app.core.deps import (
+    CurrentUser,
+    DbSession,
+    Translator,
+    registration_open,
+    require_registration_open,
+)
 from app.core.i18n import request_locale
 from app.core.rate_limit import rate_limit_auth
 from app.schemas.auth import (
@@ -14,6 +20,7 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    RegistrationStatus,
     ResendVerificationRequest,
     ResetPasswordRequest,
     TokenPair,
@@ -44,11 +51,21 @@ def _with_dev_token(t: Translator, key: str, token: str | None) -> Message:
     return Message(detail=message)
 
 
+@router.get(
+    "/registration",
+    response_model=RegistrationStatus,
+    summary="L'inscription est-elle ouverte ?",
+)
+def registration_status() -> RegistrationStatus:
+    """Dit au formulaire s'il a lieu d'être, avant de le montrer."""
+    return RegistrationStatus(open=registration_open())
+
+
 @router.post(
     "/register",
     response_model=Message,
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[Depends(rate_limit_auth)],
+    dependencies=[Depends(rate_limit_auth), Depends(require_registration_open)],
     summary="Créer un compte",
 )
 def register(

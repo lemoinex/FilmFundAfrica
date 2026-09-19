@@ -21,6 +21,10 @@ export ENVIRONMENT=development
 export DEBUG=false
 export JWT_SECRET=e2e-secret-jamais-utilise-en-production-0123456789
 export AI_PROVIDER=mock
+# Les parcours de bout en bout commencent tous par une inscription, fermée en
+# bêta privée. C'est la phase commerciale qu'ils rejouent — celle où tout est
+# ouvert et où toutes les règles d'offre s'appliquent.
+export PLATFORM_MODE=public
 export DATABASE_URL="sqlite:///$DB"
 export RATE_LIMIT_AUTH_PER_MINUTE=1000
 export RATE_LIMIT_AI_PER_MINUTE=1000
