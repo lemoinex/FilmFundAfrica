@@ -179,6 +179,90 @@ def test_an_http_error_is_reported_as_such(provider, monkeypatch):
     assert failed.value.code == "ai_provider_error"
 
 
+# ----------------------------------------------------------------------
+# Ce que dit l'erreur
+
+
+def test_the_providers_own_words_reach_the_error(provider, monkeypatch):
+    """Le défaut corrigé : le message générique envoyait chercher au mauvais endroit.
+
+    Relevé sur un appel réel — solde épuisé, HTTP 400. L'ancien libellé
+    disait « vérifiez la clé API et le modèle configuré » alors que les deux
+    étaient justes : on régénère une clé parfaitement valide pendant que la
+    vraie cause reste invisible. Solde, modèle retiré du catalogue et payload
+    invalide arrivent tous en 400 ; seul le fournisseur sait lequel.
+    """
+    _respond(
+        monkeypatch,
+        {
+            "type": "error",
+            "error": {
+                "type": "invalid_request_error",
+                "message": (
+                    "Your credit balance is too low to access the Anthropic API."
+                ),
+            },
+        },
+        status=400,
+    )
+    with pytest.raises(AIProviderError) as failed:
+        provider.complete(_request())
+    assert "credit balance is too low" in failed.value.detail
+    assert "vérifiez la clé" not in failed.value.detail.lower()
+
+
+def test_a_body_that_is_not_json_does_not_crash_the_call(provider, monkeypatch):
+    """Une passerelle en amont rend du HTML, pas du JSON.
+
+    Échouer ici remplacerait l'erreur du fournisseur par la nôtre, et on
+    perdrait jusqu'au code de statut.
+    """
+
+    def fake_post(self, url, json=None, headers=None):  # noqa: ARG001
+        return httpx.Response(502, text="<html>Bad Gateway</html>",
+                              request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    with pytest.raises(AIProviderError) as failed:
+        provider.complete(_request())
+    assert "502" in failed.value.detail
+    assert "Bad Gateway" in failed.value.detail
+
+
+def test_an_empty_body_still_names_the_status(provider, monkeypatch):
+    def fake_post(self, url, json=None, headers=None):  # noqa: ARG001
+        return httpx.Response(503, text="", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+    with pytest.raises(AIProviderError) as failed:
+        provider.complete(_request())
+    assert "503" in failed.value.detail
+    assert "aucun motif" in failed.value.detail
+
+
+def test_a_verbose_provider_is_truncated(provider, monkeypatch):
+    """Un message d'erreur n'est pas un journal : le détail complet y va."""
+    _respond(monkeypatch, {"error": {"message": "x" * 5000}}, status=400)
+    with pytest.raises(AIProviderError) as failed:
+        provider.complete(_request())
+    assert len(failed.value.detail) < 500
+    assert failed.value.detail.endswith("…")
+
+
+def test_openai_reports_its_own_reason_too(monkeypatch):
+    """Les deux fournisseurs partagent la forme de l'erreur — et le défaut."""
+    from app.services.ai.providers.openai_provider import OpenAIProvider
+
+    _respond(
+        monkeypatch,
+        {"error": {"message": "You exceeded your current quota."}},
+        status=429,
+    )
+    with pytest.raises(AIProviderError) as failed:
+        OpenAIProvider(api_key="clé-de-test").complete(_request("un-modele-openai"))
+    assert "exceeded your current quota" in failed.value.detail
+
+
 def test_a_missing_key_refuses_to_build_the_provider(monkeypatch):
     """Mieux vaut échouer au démarrage qu'au premier appel payant."""
     monkeypatch.setattr("app.core.config.settings.ai_api_key", "")

@@ -8,7 +8,12 @@ import httpx
 
 from app.core.config import settings
 from app.core.errors import AIProviderError
-from app.services.ai.base import AICompletionRequest, AICompletionResponse, AIProvider
+from app.services.ai.base import (
+    AICompletionRequest,
+    AICompletionResponse,
+    AIProvider,
+    upstream_reason,
+)
 
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
@@ -54,7 +59,11 @@ class OpenAIProvider(AIProvider):
 
         if response.status_code >= 400:
             raise AIProviderError(
-                "ai.providerError", params={"status": response.status_code}
+                "ai.providerError",
+                params={
+                    "status": response.status_code,
+                    "reason": upstream_reason(response, self.name),
+                },
             )
 
         data = response.json()

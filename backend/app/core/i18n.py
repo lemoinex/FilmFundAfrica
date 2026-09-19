@@ -165,10 +165,9 @@ FR: dict[str, str] = {
     ),
     # --- Fournisseur d'IA ---
     "ai.keyRequired": "AI_API_KEY est requis lorsque AI_PROVIDER={provider}.",
-    "ai.providerError": (
-        "Erreur du fournisseur IA ({status}). Vérifiez la clé API et le modèle "
-        "configuré."
-    ),
+    # Le motif exact du fournisseur, et non une supposition : un solde épuisé,
+    # un modèle retiré et un payload invalide arrivent tous en 400.
+    "ai.providerError": "Erreur du fournisseur IA ({status}) : {reason}",
     # --- Veille ---
     "auth.invalidCredentials": "Adresse e-mail ou mot de passe incorrect.",
     "candidate.sourceRequired": "Un candidat sans URL source n'est pas recevable.",
@@ -494,9 +493,7 @@ EN: dict[str, str] = {
     ),
     # --- AI provider ---
     "ai.keyRequired": "AI_API_KEY is required when AI_PROVIDER={provider}.",
-    "ai.providerError": (
-        "AI provider error ({status}). Check the API key and the configured model."
-    ),
+    "ai.providerError": "AI provider error ({status}): {reason}",
     # --- Monitoring ---
     "auth.invalidCredentials": "Incorrect email address or password.",
     "candidate.sourceRequired": "A candidate without a source URL cannot be accepted.",
