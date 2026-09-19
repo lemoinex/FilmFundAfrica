@@ -28,6 +28,7 @@ from app.schemas.settings import (
     AIConfigRead,
     AIConfigTestResult,
     AIConfigUpdate,
+    PlatformStatusRead,
 )
 from app.schemas.user import AdminUserUpdate, UserRead
 from app.services.ai_config_service import AIConfigService
@@ -109,6 +110,26 @@ def project_stats(db: DbSession, _: CurrentAdmin) -> dict:
         "by_status": {str(key): value for key, value in by_status.items()}
         or {str(s): 0 for s in ProjectStatus},
     }
+
+
+# ---------------------------------------------------------------------------
+# Cycle de vie de la plateforme
+# ---------------------------------------------------------------------------
+@router.get(
+    "/platform",
+    response_model=PlatformStatusRead,
+    summary="Mode de la plateforme (bêta interne ou commercial)",
+)
+def platform_mode(_: CurrentAdmin) -> PlatformStatusRead:
+    """En bêta interne, les administrateurs ne se voient opposer aucun quota.
+
+    C'est voulu, et c'est exactement pour cela que l'information doit être
+    visible : sans elle, on croirait les règles d'offre éprouvées alors
+    qu'elles ne s'appliquent à personne dans l'équipe.
+    """
+    from app.core.platform import platform_status
+
+    return PlatformStatusRead(**platform_status())
 
 
 # ---------------------------------------------------------------------------

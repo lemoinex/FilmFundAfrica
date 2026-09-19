@@ -80,3 +80,16 @@ class AIConfigTestResult(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     latency_ms: int = 0
+
+
+class PlatformStatusRead(BaseModel):
+    """Cycle de vie de la plateforme, tel que l'administration le lit.
+
+    Les dates sont des reperes affiches, jamais des declencheurs : le passage
+    en mode public demande un changement explicite de `PLATFORM_MODE`.
+    """
+
+    mode: Literal["internal", "public"]
+    internal: bool
+    start_date: str
+    target_end_date: str

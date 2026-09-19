@@ -42,6 +42,11 @@ class UserRead(ORMModel):
     created_at: datetime
     profile: ProfileRead | None = None
     plan_code: PlanCode | None = None
+    #: Faux quand aucune contrainte d'offre ne s'applique a ce compte (beta
+    #: interne, administrateur). L'interface s'en sert pour ne pas afficher
+    #: « 0 credit restant » a quelqu'un qui n'est pas facture : avant le mode
+    #: interne, 0 voulait dire bloque, ce n'est plus vrai.
+    commercial_rules_apply: bool = True
 
 
 class AdminUserUpdate(BaseModel):

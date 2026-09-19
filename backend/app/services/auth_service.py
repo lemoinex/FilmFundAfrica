@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import AuthenticationError, NotFoundError
 from app.core.i18n import resolve_locale
+from app.core.platform import commercial_rules_apply
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -269,4 +270,9 @@ def serialize_user(user: User) -> UserRead:
     if user.subscription is not None and user.subscription.plan is not None:
         plan_code = user.subscription.plan.code
     data = UserRead.model_validate(user)
-    return data.model_copy(update={"plan_code": plan_code})
+    return data.model_copy(
+        update={
+            "plan_code": plan_code,
+            "commercial_rules_apply": commercial_rules_apply(user),
+        }
+    )

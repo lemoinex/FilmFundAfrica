@@ -111,12 +111,21 @@ def require_export_access(db: DbSession, current_user: CurrentUser) -> User:
 
     Le drapeau vit en base et est modifiable depuis l'administration : ouvrir
     l'export à l'offre gratuite ne demande aucun changement de code.
+
+    L'exemption des administrateurs passe par `commercial_rules_apply`, comme
+    les quotas de projets et de crédits. Elle était auparavant inconditionnelle
+    ici : deux définitions concurrentes de la même exemption auraient fini par
+    diverger, et celle-ci ignorait le cycle de vie de la plateforme.
     """
     from app.core.errors import QuotaExceededError
+    from app.core.platform import commercial_rules_apply
     from app.services.credit_service import CreditService
 
+    if not commercial_rules_apply(current_user):
+        return current_user
+
     plan = CreditService(db).plan_for_user(current_user)
-    if not plan.allows_export and not current_user.is_admin:
+    if not plan.allows_export:
         raise QuotaExceededError(
             "quota.exportNotIncluded",
             params={"plan": plan.name},

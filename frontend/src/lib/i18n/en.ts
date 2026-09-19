@@ -52,12 +52,19 @@ export const en: Record<MessageKey, string> = {
   "nav.newProject": "New project",
   "nav.logout": "Sign out",
   "nav.creditsRemaining": "AI credits left",
+  "nav.creditsUnlimited": "Unlimited (beta)",
 
   // --- Administration ---
   "admin.title": "Administration",
   "admin.tabs.funding": "Funding",
   "admin.tabs.watch": "Monitoring",
   "admin.tabs.ai": "Artificial intelligence",
+  "platform.internal.title": "Internal beta",
+  "platform.internal.body":
+    "Plan constraints — project quotas, AI credits, export — are not enforced against administrators. They still apply to every other account. Since {start}, target {end}.",
+  "platform.public.title": "Commercial phase",
+  "platform.public.body":
+    "Subscription rules apply to every account, administrators included.",
 
   // --- AI configuration ---
   "aiConfig.title": "AI provider",

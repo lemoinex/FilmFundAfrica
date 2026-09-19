@@ -55,12 +55,19 @@ export const fr = {
   "nav.newProject": "Nouveau projet",
   "nav.logout": "Se déconnecter",
   "nav.creditsRemaining": "Crédits IA restants",
+  "nav.creditsUnlimited": "Illimité (bêta)",
 
   // --- Administration ---
   "admin.title": "Administration",
   "admin.tabs.funding": "Financements",
   "admin.tabs.watch": "Veille",
   "admin.tabs.ai": "Intelligence artificielle",
+  "platform.internal.title": "Bêta interne",
+  "platform.internal.body":
+    "Les contraintes d'offre — quotas de projets, crédits IA, export — ne sont pas opposées aux administrateurs. Elles restent appliquées à tous les autres comptes. Depuis le {start}, cible du {end}.",
+  "platform.public.title": "Phase commerciale",
+  "platform.public.body":
+    "Les règles d'abonnement s'appliquent à tous les comptes, administrateurs compris.",
 
   // --- Configuration de l'IA ---
   "aiConfig.title": "Fournisseur d'intelligence artificielle",

@@ -100,8 +100,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="absolute inset-x-0 bottom-0 border-t border-ink-800 p-3">
           <div className="rounded-lg bg-ink-800 p-3">
             <p className="text-xs text-slatey-400">{t("nav.creditsRemaining")}</p>
+            {/*
+              Afficher « 0 » à un compte qui n'est pas facturé laisserait
+              croire qu'il est bloqué — c'est ce que 0 voulait dire avant la
+              bêta interne. Le solde reste en base, intact : c'est son
+              affichage qui serait mensonger ici.
+            */}
             <p className="mt-0.5 font-display text-xl tabular-nums text-brass-200">
-              {user?.ai_credits_remaining ?? "—"}
+              {user?.commercial_rules_apply === false
+                ? t("nav.creditsUnlimited")
+                : (user?.ai_credits_remaining ?? "—")}
             </p>
           </div>
           <button type="button" onClick={logout} className="btn-ghost mt-2 w-full justify-start text-sm">

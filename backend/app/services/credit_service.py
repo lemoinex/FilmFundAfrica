@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import QuotaExceededError
+from app.core.platform import commercial_rules_apply
 from app.models.billing import AIUsage, Subscription, SubscriptionPlan
 from app.models.enums import AIOperation, PlanCode, SubscriptionStatus
 from app.models.user import User
@@ -136,6 +137,8 @@ class CreditService:
 
     # ------------------------------------------------------------------
     def check_project_quota(self, user: User, current_project_count: int) -> None:
+        if not commercial_rules_apply(user):
+            return
         plan = self.plan_for_user(user)
         if plan.max_projects and current_project_count >= plan.max_projects:
             raise QuotaExceededError(
@@ -152,6 +155,12 @@ class CreditService:
         """
         self.refresh_period_if_needed(user)
         cost = OPERATION_COST.get(operation, 1) * max(units, 1)
+        if not commercial_rules_apply(user):
+            # Le cout reste calcule et rendu : les appelants s'en servent pour
+            # dimensionner la generation. Seule la facturation est levee, et
+            # elle l'est ici plutot qu'en aval pour que `reserve` et
+            # `record_usage` n'aient pas a la recalculer.
+            return 0
         if user.ai_credits_remaining < cost:
             plan = self.plan_for_user(user)
             # Une generation en plusieurs passes coute plus d'un credit : le
@@ -177,7 +186,11 @@ class CreditService:
         credit pourrait empiler autant de taches qu'il le souhaite.
         """
         cost = self.check_credits(user, operation, units=units)
-        user.ai_credits_remaining = max(user.ai_credits_remaining - cost, 0)
+        # Zero = aucune contrainte commerciale pour cet utilisateur. Retenir
+        # quand meme, en bornant a zero, creerait de la monnaie : un solde de
+        # 1 borne a 0 puis rembourse de 8 apres un echec rendrait 8 credits.
+        if cost:
+            user.ai_credits_remaining = max(user.ai_credits_remaining - cost, 0)
         return cost
 
     def refund(self, user: User, amount: int) -> None:
@@ -217,9 +230,8 @@ class CreditService:
         ont deja ete journalises un par un (generation d'un scenario en
         plusieurs passes), pour ne pas compter deux fois les memes appels.
         """
-        cost = (
-            OPERATION_COST.get(operation, 1) * max(units, 1) if (consume and success) else 0
-        )
+        billable = consume and success and commercial_rules_apply(user)
+        cost = OPERATION_COST.get(operation, 1) * max(units, 1) if billable else 0
         if cost:
             user.ai_credits_remaining = max(user.ai_credits_remaining - cost, 0)
 

@@ -45,6 +45,10 @@ def health(db: DbSession) -> dict:
         # `unavailable` : un DSN est configure mais le paquet manque. Le
         # deploiement croit alors etre suivi sans l'etre — d'ou la sonde.
         "error_tracking": sentry_status(),
+        # Un deploiement qui se croit commercial alors qu'il tourne en beta
+        # interne n'opposerait aucun quota a ses administrateurs sans que
+        # personne ne le sache. La sonde le dit.
+        "platform_mode": settings.platform_mode,
         "ai_provider": settings.ai_provider,
         "ai_configured": settings.ai_provider == "mock" or bool(settings.ai_api_key),
     }

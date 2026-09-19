@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     debug: bool = True
     default_locale: Literal["fr", "en"] = "fr"
 
+    # --- Cycle de vie de la plateforme ---
+    #: `internal` : beta privee. Les contraintes **commerciales** ne sont pas
+    #: opposees aux administrateurs, qui eprouvent le produit en conditions
+    #: reelles. `public` : phase commerciale, les regles d'offre s'appliquent
+    #: a tout le monde.
+    #:
+    #: Ce reglage ne touche ni l'authentification, ni les roles, ni la
+    #: propriete des ressources : voir `app/core/platform.py`.
+    platform_mode: Literal["internal", "public"] = "internal"
+    #: Reperes de la phase interne, purement informatifs. **Aucune bascule
+    #: automatique** : depasser la date cible ne change rien, le passage en
+    #: `public` reste une decision explicite.
+    internal_start_date: str = "2026-09-19"
+    internal_target_end_date: str = "2027-09-19"
+
     # --- Base de donnees ---
     database_url: str = "postgresql+psycopg://filmfund:filmfund@localhost:5432/filmfund"
 

@@ -20,6 +20,7 @@ l'exporter dans un format exploitable par un comité de lecture.
 1. [Architecture](#1-architecture)
 2. [Installation](#2-installation)
 3. [Configuration](#3-configuration)
+3 bis. [Cycle de vie de la plateforme](#3-bis-cycle-de-vie-de-la-plateforme)
 4. [Variables d'environnement](#4-variables-denvironnement)
 5. [Lancement avec Docker](#5-lancement-avec-docker)
 6. [Lancement du backend](#6-lancement-du-backend)
@@ -76,7 +77,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          483 tests (pytest)
+│   └── tests/          505 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -124,12 +125,45 @@ l'application de bout en bout et faire tourner la suite de tests.
 
 ---
 
+## 3 bis. Cycle de vie de la plateforme
+
+FilmFund Africa traverse deux phases, et `PLATFORM_MODE` dit laquelle.
+
+| Mode | Ce qui s'applique |
+| --- | --- |
+| `internal` (défaut) | Bêta privée. Les contraintes **commerciales** — quota de projets, crédits IA, export — ne sont pas opposées aux **administrateurs**. Tout autre compte garde les règles de son offre. |
+| `public` | Phase commerciale. Les règles d'offre s'appliquent à tout le monde, administrateurs compris. |
+
+**« Interne » veut dire sans facturation, pas sans contrôle.** L'exemption ne
+porte que sur les contraintes d'offre : l'authentification, le rôle, la
+propriété des ressources et toutes les règles de sécurité sont vérifiées à
+l'identique dans les deux modes, et avant elle. Un seul prédicat,
+`commercial_rules_apply` (`backend/app/core/platform.py`), décide — les cinq
+points d'application l'interrogent, il n'y a pas de contournement global.
+
+L'exemption est volontairement étroite : **les administrateurs, et eux
+seuls**. Ouvrir la bêta à tous en ferait une phase gratuite pour le public,
+ce qui n'est pas la même chose.
+
+**Aucune bascule automatique.** `INTERNAL_TARGET_END_DATE` est un repère
+affiché ; le dépasser ne change rien. Passer en phase commerciale demande de
+mettre `PLATFORM_MODE=public` et de redémarrer. Le retour arrière est
+identique, immédiat, et ne détruit aucune donnée : abonnements, plans,
+paiements et historiques restent en place dans les deux modes.
+
+Le mode est visible sans lire la configuration : `GET /health` le publie sous
+`platform_mode`, et un bandeau le rappelle en tête de l'administration.
+
+---
+
 ## 4. Variables d'environnement
 
 Toutes les variables sont documentées dans [`.env.example`](.env.example). Les principales :
 
 | Variable | Rôle | Défaut |
 | --- | --- | --- |
+| `PLATFORM_MODE` | `internal` (bêta privée) ou `public` (phase commerciale) | `internal` |
+| `INTERNAL_START_DATE` / `INTERNAL_TARGET_END_DATE` | Repères informatifs de la bêta ; **aucune bascule automatique** | `2026-09-19` / `2027-09-19` |
 | `DATABASE_URL` | Connexion PostgreSQL (compatible Supabase / Neon) | local Docker |
 | `JWT_SECRET` | Signature des jetons — **obligatoire en production** (≥ 32 caractères) | — |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Durée du jeton d'accès | `60` |
@@ -587,7 +621,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 483 tests
+pytest                    # 505 tests
 ruff check .              # lint
 ```
 

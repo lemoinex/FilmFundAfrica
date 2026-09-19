@@ -11,6 +11,7 @@ import type {
   AIConfig,
   AIConfigTestResult,
   AIConfigUpdate,
+  PlatformStatus,
   AgentRun,
   AgentRunDetail,
   AuthResponse,
@@ -470,6 +471,11 @@ export const candidateApi = {
       method: "POST",
       body: { note: note ?? null },
     }),
+};
+
+export const platformApi = {
+  /** Mode de la plateforme. Réservé aux administrateurs, comme l'information. */
+  get: () => request<PlatformStatus>("/api/v1/admin/platform"),
 };
 
 export const aiConfigApi = {

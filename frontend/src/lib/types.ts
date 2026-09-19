@@ -57,6 +57,8 @@ export interface User {
   created_at: string;
   profile?: Profile | null;
   plan_code?: "FREE" | "PRO_AUTHOR" | "PRODUCER" | null;
+  /** Faux en bêta interne pour un administrateur : aucun quota ne lui est opposé. */
+  commercial_rules_apply?: boolean;
 }
 
 export interface AuthResponse {
@@ -678,4 +680,12 @@ export interface AIConfigTestResult {
   input_tokens: number;
   output_tokens: number;
   latency_ms: number;
+}
+
+/** Cycle de vie de la plateforme : bêta interne, puis phase commerciale. */
+export interface PlatformStatus {
+  mode: "internal" | "public";
+  internal: boolean;
+  start_date: string;
+  target_end_date: string;
 }

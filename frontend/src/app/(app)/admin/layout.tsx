@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui";
+import { platformApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { classNames } from "@/lib/format";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import type { PlatformStatus } from "@/lib/types";
 
 const ADMIN_TABS: { href: string; label: MessageKey }[] = [
   { href: "/admin/financements", label: "admin.tabs.funding" },
@@ -22,6 +25,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user } = useAuth();
   const pathname = usePathname();
   const { t } = useI18n();
+  const [platform, setPlatform] = useState<PlatformStatus | null>(null);
+
+  // Pendant la bêta interne, aucun quota n'est opposé aux administrateurs.
+  // C'est voulu — et c'est précisément pourquoi il faut le dire : sans ce
+  // rappel, on croirait les règles d'offre éprouvées alors qu'elles ne
+  // s'appliquent à personne dans l'équipe. Un échec est sans conséquence :
+  // l'information est un repère, pas une garde.
+  useEffect(() => {
+    if (user?.user_type !== "ADMIN") return;
+    platformApi
+      .get()
+      .then(setPlatform)
+      .catch(() => setPlatform(null));
+  }, [user?.user_type]);
 
   if (user && user.user_type !== "ADMIN") {
     return (
@@ -52,6 +69,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
       </div>
+
+      {platform ? (
+        <Alert
+          tone={platform.internal ? "warning" : "info"}
+          title={t(platform.internal ? "platform.internal.title" : "platform.public.title")}
+        >
+          {platform.internal
+            ? t("platform.internal.body", {
+                start: platform.start_date,
+                end: platform.target_end_date,
+              })
+            : t("platform.public.body")}
+        </Alert>
+      ) : null}
 
       {children}
     </div>
