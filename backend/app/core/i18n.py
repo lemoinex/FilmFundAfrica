@@ -157,6 +157,19 @@ FR: dict[str, str] = {
         "AI_MODEL est requis avec AI_PROVIDER={provider} : aucun modèle par défaut "
         "n'est supposé à votre place."
     ),
+    "ai.keyProviderRequired": (
+        "Précisez à quel fournisseur cette clé appartient : une clé Anthropic "
+        "envoyée à OpenAI apparaîtrait dans les journaux d'un tiers."
+    ),
+    "ai.keyNotApplicable": (
+        "Le fournisseur « {provider} » n'appelle aucun service externe : il n'a "
+        "pas de clé."
+    ),
+    "secret.unreadable": (
+        "Un secret enregistré est illisible : la clé de chiffrement du serveur "
+        "(SECRETS_KEY, ou JWT_SECRET à défaut) a changé depuis son "
+        "enregistrement. Ressaisissez-le."
+    ),
     "funding.sourceRequiredToPublish": (
         "Impossible de publier ce dispositif comme ouvert sans son URL source."
     ),
@@ -484,6 +497,17 @@ EN: dict[str, str] = {
     "ai.modelRequired": (
         "AI_MODEL is required with AI_PROVIDER={provider}: no default model is "
         "assumed on your behalf."
+    ),
+    "ai.keyProviderRequired": (
+        "State which provider this key belongs to: an Anthropic key sent to "
+        "OpenAI would end up in a third party's logs."
+    ),
+    "ai.keyNotApplicable": (
+        "Provider “{provider}” calls no external service: it has no key."
+    ),
+    "secret.unreadable": (
+        "A stored secret cannot be read: the server encryption key (SECRETS_KEY, "
+        "or JWT_SECRET as a fallback) changed since it was saved. Enter it again."
     ),
     "funding.sourceRequiredToPublish": (
         "This scheme cannot be published as open without its source URL."

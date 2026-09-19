@@ -76,7 +76,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          452 tests (pytest)
+│   └── tests/          483 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -137,7 +137,8 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `PAYMENT_PROVIDER` | `manual` (encaissement hors ligne) ou `mock` (simulé, développement) | `manual` |
 | `PAYMENT_WEBHOOK_SECRET` | Secret signant les notifications du prestataire | vide |
 | `AI_PROVIDER` | `anthropic`, `openai` ou `mock` | `mock` |
-| `AI_API_KEY` | Clé du fournisseur choisi | vide |
+| `AI_API_KEY` | Clé du fournisseur choisi ; surchargeable depuis l'administration | vide |
+| `SECRETS_KEY` | Chiffrement des clés saisies dans l'administration ; vide = dérivée de `JWT_SECRET` | vide |
 | `AI_MODEL` | Modèle visé ; vide = défaut du fournisseur choisi (**requis avec `openai`**) | vide |
 | `AI_EFFORT` | Profondeur de réflexion (`low`…`max`) ; vide = défaut du serveur | `high` |
 | `AI_MAX_OUTPUT_TOKENS` | Plafond de sortie par appel — pilote la taille d'une passe | `8000` |
@@ -310,6 +311,25 @@ AI_PROVIDER=openai
 AI_API_KEY=sk-...
 AI_MODEL=...   # obligatoire ici
 ```
+
+**La clé peut aussi se déposer depuis l'application**, sans redéploiement :
+*Administration → Intelligence artificielle*. On y choisit le fournisseur
+actif, on y saisit le modèle, et **chaque fournisseur garde sa propre clé** —
+passer d'Anthropic à OpenAI puis revenir ne fait pas perdre la première, ce
+sont deux comptes chez deux sociétés. Un bouton éprouve la configuration par
+un appel réel : c'est la seule chose qui distingue une clé valide d'une clé
+révoquée, d'un solde épuisé ou d'un modèle retiré du catalogue, trois cas qui
+arrivent tous en HTTP 400.
+
+Ce qui est saisi là prime sur `AI_API_KEY`, `AI_PROVIDER` et `AI_MODEL` ;
+un déploiement qui n'ouvre jamais cet écran se comporte exactement comme
+avant. Les clés sont **chiffrées en base** (`SECRETS_KEY`, dérivée de
+`JWT_SECRET` si elle est vide) et ne ressortent jamais de l'API : l'écran
+n'en affiche que les quatre derniers caractères, et chaque modification est
+inscrite au journal d'audit sans le secret. Conséquence à connaître : sans
+`SECRETS_KEY` explicite, faire tourner `JWT_SECRET` rend les clés stockées
+illisibles — l'écran le dit alors franchement et reste utilisable pour les
+ressaisir.
 
 **Deux fournisseurs réels au choix, et le modèle par défaut appartient au
 fournisseur, pas au réglage.** Les deux ne parlent pas le même catalogue : un
@@ -567,7 +587,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 452 tests
+pytest                    # 483 tests
 ruff check .              # lint
 ```
 

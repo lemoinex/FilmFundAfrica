@@ -636,3 +636,46 @@ export interface DashboardResponse {
   recommended_opportunities: RecommendedOpportunity[];
   notifications: NotificationItem[];
 }
+
+/** Fournisseurs d'IA que l'application sait construire. */
+export type AIProviderName = "anthropic" | "openai" | "mock";
+
+/**
+ * État d'un fournisseur vu par l'administration.
+ *
+ * `key_hint` ne contient que les quatre derniers caractères : l'API ne
+ * renvoie jamais une clé, même à un administrateur.
+ */
+export interface AIProviderState {
+  name: AIProviderName;
+  configured: boolean;
+  key_hint: string | null;
+  key_source: "database" | "environment" | "unreadable" | "none";
+  default_model: string;
+  requires_key: boolean;
+}
+
+export interface AIConfig {
+  active_provider: AIProviderName;
+  effective_model: string;
+  configured_model: string;
+  model_source: "database" | "environment" | "provider_default" | "none";
+  providers: AIProviderState[];
+}
+
+export interface AIConfigUpdate {
+  provider?: AIProviderName;
+  model?: string;
+  key_provider?: AIProviderName;
+  api_key?: string;
+}
+
+export interface AIConfigTestResult {
+  ok: boolean;
+  provider: string;
+  model: string;
+  detail: string;
+  input_tokens: number;
+  output_tokens: number;
+  latency_ms: number;
+}

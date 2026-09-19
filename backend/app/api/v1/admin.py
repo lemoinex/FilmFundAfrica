@@ -9,7 +9,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
-from app.core.config import settings
 from app.core.deps import CurrentAdmin, DbSession, Translator
 from app.core.errors import NotFoundError
 from app.models.billing import AIUsage, SubscriptionPlan
@@ -25,7 +24,13 @@ from app.schemas.ingestion import (
     CandidateRead,
     CandidateRejection,
 )
+from app.schemas.settings import (
+    AIConfigRead,
+    AIConfigTestResult,
+    AIConfigUpdate,
+)
 from app.schemas.user import AdminUserUpdate, UserRead
+from app.services.ai_config_service import AIConfigService
 from app.services.auth_service import serialize_user
 from app.services.credit_service import CreditService
 from app.services.ingestion_service import IngestionService
@@ -106,22 +111,40 @@ def project_stats(db: DbSession, _: CurrentAdmin) -> dict:
     }
 
 
-def _effective_model() -> str:
-    """Modèle réellement utilisé, ou une mention explicite s'il manque."""
-    from app.core.errors import AppError
-    from app.services.ai.service import build_provider
-
-    try:
-        return settings.ai_model or build_provider().default_model or "non configuré"
-    except AppError:
-        # Fournisseur inconstructible (clé absente) : le tableau de bord doit
-        # rester lisible plutôt que de tomber avec lui.
-        return settings.ai_model or "non configuré"
-
-
 # ---------------------------------------------------------------------------
 # IA
 # ---------------------------------------------------------------------------
+@router.get(
+    "/ai/config", response_model=AIConfigRead, summary="Configuration du fournisseur d'IA"
+)
+def ai_config(db: DbSession, _: CurrentAdmin) -> AIConfigRead:
+    return AIConfigService(db).read()
+
+
+@router.put(
+    "/ai/config", response_model=AIConfigRead, summary="Modifier la configuration d'IA"
+)
+def update_ai_config(
+    payload: AIConfigUpdate, db: DbSession, admin: CurrentAdmin
+) -> AIConfigRead:
+    result = AIConfigService(db).update(payload, actor_id=admin.id)
+    db.commit()
+    return result
+
+
+@router.post(
+    "/ai/test",
+    response_model=AIConfigTestResult,
+    summary="Éprouver la configuration par un appel réel",
+)
+def test_ai_config(db: DbSession, admin: CurrentAdmin) -> AIConfigTestResult:
+    """Appel réel et facturé : c'est la seule preuve qu'une clé fonctionne."""
+    result = AIConfigService(db).test(actor_id=admin.id)
+    db.commit()
+    return result
+
+
+
 @router.get("/stats/ai", summary="Consommation IA")
 def ai_stats(db: DbSession, _: CurrentAdmin) -> dict:
     totals = db.execute(
@@ -136,12 +159,13 @@ def ai_stats(db: DbSession, _: CurrentAdmin) -> dict:
     failures = int(
         db.scalar(select(func.count()).select_from(AIUsage).where(AIUsage.success.is_(False))) or 0
     )
+    # L'etat effectif, pas les variables d'environnement : le fournisseur
+    # et le modele peuvent avoir ete changes depuis l'administration, et
+    # c'est ce qui part reellement qu'un administrateur doit lire ici.
+    config = AIConfigService(db).read()
     return {
-        "provider": settings.ai_provider,
-        # Le modele effectif, pas le reglage : vide, c'est le defaut du
-        # fournisseur qui s'applique, et c'est lui qu'un administrateur
-        # doit lire pour savoir ce qui part reellement.
-        "model": _effective_model(),
+        "provider": config.active_provider,
+        "model": config.effective_model or "non configuré",
         "calls": int(totals[0]),
         "input_tokens": int(totals[1]),
         "output_tokens": int(totals[2]),

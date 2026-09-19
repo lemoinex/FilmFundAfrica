@@ -7,6 +7,11 @@ SQLAlchemy==2.0.36
 alembic==1.14.1
 psycopg[binary]==3.2.3
 python-jose[cryptography]==3.5.0
+# Chiffrement des secrets conserves en base (cles de fournisseur d'IA
+# saisies depuis l'administration). Deja tiree par python-jose, mais
+# declaree ici parce qu'on l'importe directement : une dependance dont on
+# se sert n'a pas a dependre du jour ou une autre cessera de l'installer.
+cryptography==41.0.7
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.32

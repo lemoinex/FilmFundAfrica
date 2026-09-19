@@ -11,6 +11,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 const ADMIN_TABS: { href: string; label: MessageKey }[] = [
   { href: "/admin/financements", label: "admin.tabs.funding" },
   { href: "/admin/veille", label: "admin.tabs.watch" },
+  { href: "/admin/ia", label: "admin.tabs.ai" },
 ];
 
 /**

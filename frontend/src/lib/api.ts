@@ -8,6 +8,9 @@
 
 import { currentLocale, tr } from "./i18n/translate";
 import type {
+  AIConfig,
+  AIConfigTestResult,
+  AIConfigUpdate,
   AgentRun,
   AgentRunDetail,
   AuthResponse,
@@ -467,6 +470,17 @@ export const candidateApi = {
       method: "POST",
       body: { note: note ?? null },
     }),
+};
+
+export const aiConfigApi = {
+  /** Configuration effective du fournisseur d'IA. Ne renvoie jamais de clé. */
+  get: () => request<AIConfig>("/api/v1/admin/ai/config"),
+
+  update: (payload: AIConfigUpdate) =>
+    request<AIConfig>("/api/v1/admin/ai/config", { method: "PUT", body: payload }),
+
+  /** Appel réel et facturé : la seule preuve qu'une clé fonctionne. */
+  test: () => request<AIConfigTestResult>("/api/v1/admin/ai/test", { method: "POST" }),
 };
 
 export const billingApi = {

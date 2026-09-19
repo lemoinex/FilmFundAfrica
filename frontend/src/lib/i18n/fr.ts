@@ -60,6 +60,52 @@ export const fr = {
   "admin.title": "Administration",
   "admin.tabs.funding": "Financements",
   "admin.tabs.watch": "Veille",
+  "admin.tabs.ai": "Intelligence artificielle",
+
+  // --- Configuration de l'IA ---
+  "aiConfig.title": "Fournisseur d'intelligence artificielle",
+  "aiConfig.subtitle":
+    "Choisissez le fournisseur, déposez sa clé, éprouvez-la. Chaque fournisseur garde la sienne.",
+  "aiConfig.activeProvider": "Fournisseur actif",
+  "aiConfig.providerHint":
+    "Le changement s'applique à la prochaine génération, sans redéploiement.",
+  "aiConfig.model": "Modèle",
+  "aiConfig.modelPlaceholder": "Laisser vide pour le défaut du fournisseur",
+  "aiConfig.modelEffective": "Modèle appliqué : {model}",
+  "aiConfig.modelRequired":
+    "Ce fournisseur n'a pas de modèle par défaut : indiquez-en un, sinon aucune génération ne partira.",
+  "aiConfig.source.database": "saisi ici",
+  "aiConfig.source.environment": "variable d'environnement",
+  "aiConfig.source.provider_default": "défaut du fournisseur",
+  "aiConfig.source.none": "aucune",
+  "aiConfig.source.unreadable": "illisible",
+  "aiConfig.provider.anthropic": "Anthropic (Claude)",
+  "aiConfig.provider.openai": "OpenAI",
+  "aiConfig.provider.mock": "Hors ligne (mock)",
+  "aiConfig.keyLabel": "Clé API — {provider}",
+  "aiConfig.keyPlaceholder": "Coller la clé, puis enregistrer",
+  "aiConfig.keyInPlace": "Clé en place ({hint}), source : {source}",
+  "aiConfig.keyAbsent": "Aucune clé enregistrée pour ce fournisseur.",
+  "aiConfig.keyUnreadable":
+    "Une clé est enregistrée mais ne peut plus être déchiffrée : la clé de chiffrement du serveur (SECRETS_KEY, ou JWT_SECRET à défaut) a changé depuis. Collez-en une nouvelle pour rétablir le service.",
+  "aiConfig.keyNotNeeded": "Ce fournisseur n'appelle aucun service externe : il n'a pas de clé.",
+  "aiConfig.keyNeverShown":
+    "Une clé enregistrée ne peut plus être relue, ici ni ailleurs : elle est chiffrée en base et seuls ses quatre derniers caractères sont affichés. Pour la remplacer, collez-en une nouvelle.",
+  "aiConfig.replaceKey": "Remplacer la clé",
+  "aiConfig.removeKey": "Supprimer la clé",
+  "aiConfig.removeKeyConfirm":
+    "Supprimer la clé {provider} ? Les générations échoueront tant qu'aucune autre ne sera fournie.",
+  "aiConfig.save": "Enregistrer",
+  "aiConfig.saved": "Configuration enregistrée.",
+  "aiConfig.test": "Éprouver la configuration",
+  "aiConfig.testRunning": "Appel en cours…",
+  "aiConfig.testWarning":
+    "L'essai passe un appel réel, facturé par le fournisseur. C'est aussi la seule façon de distinguer une clé valide d'un solde épuisé.",
+  "aiConfig.testOk":
+    "Appel abouti — {provider} / {model}, {input} jetons en entrée, {output} en sortie, {latency} ms.",
+  "aiConfig.testFailed": "Appel refusé : {detail}",
+  "aiConfig.mockWarning":
+    "Le mode « mock » ne rédige rien : il produit une structure vide et la chaîne d'agents rend un dossier non exportable. Utile hors ligne, jamais pour un dossier réel.",
   "admin.restricted.title": "Accès réservé",
   "admin.restricted.body": "Cet espace est réservé aux administrateurs de la plateforme.",
 

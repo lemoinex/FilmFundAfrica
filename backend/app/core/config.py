@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     password_reset_expire_minutes: int = 60
     #: Duree de validite du lien de confirmation d'adresse (24 h par defaut).
     email_verification_expire_minutes: int = 1440
+    #: Cle de chiffrement des secrets conserves en base (cles de fournisseur
+    #: d'IA saisies depuis l'administration). Vide : derivee de `JWT_SECRET`.
+    #: Consequence a connaitre — faire tourner `JWT_SECRET` rend alors les
+    #: cles stockees illisibles, et il faut les ressaisir.
+    secrets_key: str = ""
     cors_origins: str = "http://localhost:3000"
     #: IP des proxys de confiance, seules autorisees a definir X-Forwarded-For.
     trusted_proxy_ips: str = ""

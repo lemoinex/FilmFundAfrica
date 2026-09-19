@@ -25,7 +25,9 @@ class OpenAIProvider(AIProvider):
     default_model = ""
 
     def __init__(self, api_key: str | None = None, timeout: int | None = None) -> None:
-        self.api_key = api_key or settings.ai_api_key
+        from app.services.ai.credentials import api_key_for
+
+        self.api_key = api_key or api_key_for(self.name)
         self.timeout = timeout or settings.ai_timeout_seconds
         if not self.api_key:
             raise AIProviderError(

@@ -57,6 +57,51 @@ export const en: Record<MessageKey, string> = {
   "admin.title": "Administration",
   "admin.tabs.funding": "Funding",
   "admin.tabs.watch": "Monitoring",
+  "admin.tabs.ai": "Artificial intelligence",
+
+  // --- AI configuration ---
+  "aiConfig.title": "AI provider",
+  "aiConfig.subtitle":
+    "Pick the provider, drop in its key, put it to the test. Each provider keeps its own.",
+  "aiConfig.activeProvider": "Active provider",
+  "aiConfig.providerHint": "The change applies to the next generation, with no redeploy.",
+  "aiConfig.model": "Model",
+  "aiConfig.modelPlaceholder": "Leave empty for the provider default",
+  "aiConfig.modelEffective": "Model in use: {model}",
+  "aiConfig.modelRequired":
+    "This provider has no default model: name one, or no generation will go out.",
+  "aiConfig.source.database": "entered here",
+  "aiConfig.source.environment": "environment variable",
+  "aiConfig.source.provider_default": "provider default",
+  "aiConfig.source.none": "none",
+  "aiConfig.source.unreadable": "unreadable",
+  "aiConfig.provider.anthropic": "Anthropic (Claude)",
+  "aiConfig.provider.openai": "OpenAI",
+  "aiConfig.provider.mock": "Offline (mock)",
+  "aiConfig.keyLabel": "API key — {provider}",
+  "aiConfig.keyPlaceholder": "Paste the key, then save",
+  "aiConfig.keyInPlace": "Key in place ({hint}), source: {source}",
+  "aiConfig.keyAbsent": "No key stored for this provider.",
+  "aiConfig.keyUnreadable":
+    "A key is stored but can no longer be decrypted: the server encryption key (SECRETS_KEY, or JWT_SECRET as a fallback) has changed since. Paste a new one to restore the service.",
+  "aiConfig.keyNotNeeded": "This provider calls no external service: it has no key.",
+  "aiConfig.keyNeverShown":
+    "A stored key can never be read back, here or anywhere else: it is encrypted in the database and only its last four characters are shown. To replace it, paste a new one.",
+  "aiConfig.replaceKey": "Replace key",
+  "aiConfig.removeKey": "Remove key",
+  "aiConfig.removeKeyConfirm":
+    "Remove the {provider} key? Generation will fail until another one is supplied.",
+  "aiConfig.save": "Save",
+  "aiConfig.saved": "Configuration saved.",
+  "aiConfig.test": "Test the configuration",
+  "aiConfig.testRunning": "Calling…",
+  "aiConfig.testWarning":
+    "The test makes a real, billable call. It is also the only way to tell a valid key from an empty balance.",
+  "aiConfig.testOk":
+    "Call succeeded — {provider} / {model}, {input} input tokens, {output} output, {latency} ms.",
+  "aiConfig.testFailed": "Call refused: {detail}",
+  "aiConfig.mockWarning":
+    "“mock” mode writes nothing: it produces an empty structure and the agent chain returns a dossier that cannot be exported. Useful offline, never for a real dossier.",
   "admin.restricted.title": "Restricted area",
   "admin.restricted.body": "This area is reserved for platform administrators.",
 
