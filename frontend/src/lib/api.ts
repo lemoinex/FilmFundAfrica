@@ -53,8 +53,21 @@ import type {
   User,
 } from "./types";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+/**
+ * Racine de l'API. **Vide = le même domaine**, et c'est le cas déployé.
+ *
+ * Sur Vercel, `vercel.json` sert l'API et l'interface sous un seul domaine :
+ * une URL relative atteint le backend sans qu'aucune variable ne soit posée.
+ * L'ancien repli — `http://localhost:8000` — était exact en développement et
+ * faux partout ailleurs : un build sans `NEXT_PUBLIC_API_URL` produisait une
+ * interface qui appelait la machine de son visiteur.
+ *
+ * En développement, l'API vit sur un autre port : les trois chemins locaux
+ * (docker-compose, `.env.example`, Playwright) renseignent donc la variable.
+ * Une valeur vide est traitée comme absente — une variable vide n'est pas
+ * une variable renseignée, ici comme côté serveur.
+ */
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 const ACCESS_KEY = "ffa.access_token";
 const REFRESH_KEY = "ffa.refresh_token";
