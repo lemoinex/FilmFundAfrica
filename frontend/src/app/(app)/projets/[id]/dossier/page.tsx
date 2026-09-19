@@ -5,7 +5,14 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert, Badge, EmptyState, SectionHeading, SkeletonCard, Spinner } from "@/components/ui";
-import { ApiError, authApi, dossierApi, projectApi, waitForJob } from "@/lib/api";
+import {
+  ApiError,
+  authApi,
+  dossierApi,
+  downloadExport,
+  projectApi,
+  waitForJob,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n";
 import type {
@@ -59,6 +66,7 @@ export default function DossierPage() {
   const [progress, setProgress] = useState<GenerationJob | null>(null);
   const [outcome, setOutcome] = useState<AgentChainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const refresh = useCallback(
     async (withResolved: boolean) => {
@@ -115,6 +123,23 @@ export default function DossierPage() {
     } finally {
       setRunning(false);
       setProgress(null);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    setError(null);
+    try {
+      // Le nom du fichier vient du serveur : c'est lui qui sait si le dossier
+      // part en « brouillon », et ce mot ne doit pas se perdre en route.
+      await downloadExport(
+        `/api/v1/projects/${id}/export/dossier/pdf`,
+        `${project?.title ?? t("dossier.title")}.pdf`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("dossier.exportFailed"));
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -221,6 +246,17 @@ export default function DossierPage() {
             {running ? <Spinner /> : null}
             {neverRan ? t("dossier.run") : t("dossier.rerun")}
           </button>
+          {!neverRan ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              {exporting ? <Spinner /> : null}
+              {status.exportable ? t("dossier.exportPdf") : t("dossier.exportDraft")}
+            </button>
+          ) : null}
           <span className="text-sm text-slatey-400">
             {tn("dossier.cost", AGENT_COUNT, { count: AGENT_COUNT })}
           </span>

@@ -134,6 +134,10 @@ FR: dict[str, str] = {
     "prompt.notFound": "Aucun prompt n'est défini pour le document « {document} ».",
     "agent.notFound": "Aucun agent n'est défini pour le rôle « {agent} ».",
     "dossier.runNotFound": "Passage introuvable.",
+    "export.dossierNotBuilt": (
+        "La chaîne d'agents n'a pas encore tourné sur ce projet : il n'y a rien "
+        "à exporter."
+    ),
     "agent.outputNotJson": (
         "Le modèle n'a pas renvoyé d'objet JSON exploitable pour cette étape."
     ),
@@ -452,6 +456,10 @@ EN: dict[str, str] = {
     "prompt.notFound": "No prompt is defined for the “{document}” document.",
     "agent.notFound": "No agent is defined for the “{agent}” role.",
     "dossier.runNotFound": "Run not found.",
+    "export.dossierNotBuilt": (
+        "The agent chain has not run on this project yet: there is nothing to "
+        "export."
+    ),
     "agent.outputNotJson": (
         "The model did not return a usable JSON object for this step."
     ),

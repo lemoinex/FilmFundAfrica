@@ -18,6 +18,7 @@ from docx.shared import Pt, RGBColor
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from reportlab.lib import colors
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -171,6 +172,219 @@ class ExportService:
 
         doc.build(story)
         return buffer.getvalue()
+
+    # ------------------------------------------------------------------
+    def agent_dossier_to_pdf(
+        self,
+        project: Project,
+        dossier,
+        *,
+        exportable: bool,
+        verdict: str | None,
+        findings: list | None = None,
+    ) -> bytes:
+        """Le dossier construit par la chaine d'agents, en PDF.
+
+        Deux documents differents selon l'etat, et c'est voulu.
+
+        **Validé** : un dossier propre, destine a un comite de lecture. Les
+        constats internes n'y figurent pas — ils relevent de l'assurance
+        qualite, et les exposer a un financeur desservirait le projet.
+
+        **Non validé** : le meme contenu, mais marque « brouillon » des la
+        premiere page et suivi des constats a traiter. C'est la seule raison
+        de produire ce PDF-la, et il ne doit jamais pouvoir passer pour le
+        document final.
+        """
+        buffer = io.BytesIO()
+        label = "dossier" if exportable else "brouillon"
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=2.2 * cm,
+            rightMargin=2.2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm,
+            title=f"{project.title} — {label}",
+            author="FilmFund Africa",
+        )
+        styles = getSampleStyleSheet()
+        body = ParagraphStyle(
+            "DossierBody",
+            parent=styles["BodyText"],
+            alignment=TA_JUSTIFY,
+            fontSize=10.5,
+            leading=15,
+            spaceAfter=6,
+        )
+        cover_title = ParagraphStyle(
+            "DossierCover", parent=styles["Title"], fontSize=26, leading=30, spaceAfter=18
+        )
+        warning = ParagraphStyle(
+            "DossierWarning",
+            parent=styles["BodyText"],
+            fontSize=12,
+            leading=17,
+            # Un avertissement en noir se lit comme du corps de texte : la
+            # couleur est ce qui empeche de prendre un brouillon pour un final.
+            textColor=colors.HexColor("#B03812"),
+            spaceAfter=10,
+        )
+
+        story: list = [Spacer(1, 3.5 * cm), Paragraph(_escape_xml(project.title), cover_title)]
+
+        meta = " · ".join(
+            part
+            for part in [
+                str(project.project_type).replace("_", " ").title(),
+                project.genre,
+                f"{project.duration} min" if project.duration else None,
+                project.country,
+            ]
+            if part
+        )
+        if meta:
+            story.append(Paragraph(_escape_xml(meta), styles["Heading3"]))
+
+        story.append(Spacer(1, 1 * cm))
+        story.extend(self._dossier_banner(dossier, exportable, verdict, warning, body))
+        story.extend(
+            [
+                Spacer(1, 2 * cm),
+                Paragraph(
+                    f"Généré le {date.today():%d/%m/%Y} — FilmFund Africa",
+                    styles["Normal"],
+                ),
+                PageBreak(),
+            ]
+        )
+
+        story.extend(self._dossier_sections(dossier, body, styles))
+
+        if not exportable and findings:
+            story.append(PageBreak())
+            story.extend(self._dossier_findings(findings, body, styles))
+
+        doc.build(story)
+        return buffer.getvalue()
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _dossier_banner(dossier, exportable: bool, verdict, warning, body) -> list:
+        """Ce que le lecteur doit savoir avant la premiere ligne du dossier."""
+        blocks: list = []
+        if exportable:
+            blocks.append(
+                Paragraph(
+                    "<b>Dossier contrôlé.</b> Une relecture humaine reste due avant "
+                    "toute soumission : ce document est une aide à la constitution, "
+                    "pas une garantie d'éligibilité.",
+                    body,
+                )
+            )
+        else:
+            blocks.append(
+                Paragraph(
+                    "<b>BROUILLON — dossier non validé.</b> Les contrôles ont relevé "
+                    "des points à traiter : ce document ne doit pas être soumis en "
+                    "l'état. Les constats figurent en fin de document.",
+                    warning,
+                )
+            )
+        if verdict:
+            # Le libellé, pas la valeur de l'énumération : « BLOCKED » dans un
+            # document français destiné à être lu par un tiers fait négligé.
+            label = VERDICT_LABELS.get(str(verdict), str(verdict))
+            blocks.append(Paragraph(f"Verdict du dernier contrôle : {label}", body))
+
+        # La logline porte son statut de provenance : une hypothese ne doit pas
+        # se lire comme un fait etabli, meme dans un brouillon.
+        logline = getattr(dossier, "logline", None) or {}
+        if logline.get("value"):
+            blocks.append(Spacer(1, 0.6 * cm))
+            blocks.append(Paragraph(_inline_to_reportlab(str(logline["value"])), body))
+            if logline.get("status") not in TRUSTED_STATUSES:
+                blocks.append(
+                    Paragraph(
+                        "<i>Information non vérifiée — à confirmer avant soumission.</i>",
+                        body,
+                    )
+                )
+        return blocks
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _dossier_sections(dossier, body, styles) -> list:
+        """Les sections remplies, dans l'ordre de la chaine.
+
+        Une section vide est passee : un titre suivi de rien laisserait croire
+        a un oubli de mise en page plutot qu'a une etape non faite.
+        """
+        story: list = []
+        rendered = 0
+        for attribute, label in DOSSIER_SECTIONS:
+            content = getattr(dossier, attribute, None) or {}
+            if not content:
+                continue
+            if rendered:
+                story.append(Spacer(1, 0.8 * cm))
+            story.append(Paragraph(_escape_xml(label), styles["Heading1"]))
+            story.append(Spacer(1, 0.3 * cm))
+            for key, value in content.items():
+                story.append(
+                    Paragraph(
+                        f"<b>{_escape_xml(str(key))}</b> : "
+                        f"{_escape_xml(_render_value(value))}",
+                        body,
+                    )
+                )
+            rendered += 1
+
+        if rendered == 0:
+            story.append(
+                Paragraph(
+                    "Aucune section n'a encore été produite. Lancez la chaîne "
+                    "d'agents pour construire le dossier.",
+                    body,
+                )
+            )
+        return story
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _dossier_findings(findings: list, body, styles) -> list:
+        """Les constats a traiter, avec l'agent capable de les corriger."""
+        story: list = [
+            Paragraph("Points à traiter", styles["Heading1"]),
+            Spacer(1, 0.3 * cm),
+            Paragraph(
+                "Cette section est interne : elle n'a pas vocation à être "
+                "transmise à un financeur.",
+                body,
+            ),
+            Spacer(1, 0.4 * cm),
+        ]
+        for finding in findings:
+            severity = SEVERITY_LABELS.get(str(finding.severity), str(finding.severity))
+            owner = AGENT_LABELS.get(str(finding.owner or ""), "")
+            story.append(
+                Paragraph(
+                    f"<b>{_escape_xml(severity)} — {_escape_xml(finding.element)}</b>",
+                    body,
+                )
+            )
+            story.append(Paragraph(_escape_xml(finding.description), body))
+            if owner:
+                story.append(Paragraph(f"<i>À corriger par : {_escape_xml(owner)}</i>", body))
+            if finding.suggested_correction:
+                story.append(
+                    Paragraph(
+                        f"<i>Proposition : {_escape_xml(finding.suggested_correction)}</i>",
+                        body,
+                    )
+                )
+            story.append(Spacer(1, 0.35 * cm))
+        return story
 
     @staticmethod
     def _markdown_to_flowables(content: str, body: ParagraphStyle, styles) -> list:
@@ -407,3 +621,60 @@ class ExportService:
         else:
             lines.append("Information non fournie.")
         return "\n".join(lines)
+
+
+#: Sections du dossier d'agents, dans l'ordre ou la chaine les remplit.
+DOSSIER_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("concept", "Concept"),
+    ("synopsis", "Synopsis"),
+    ("screenplay", "Scénario"),
+    ("director_vision", "Vision de réalisation"),
+    ("production_plan", "Plan de production"),
+    ("budget", "Budget"),
+    ("financing_plan", "Plan de financement"),
+    ("cultural_analysis", "Analyse culturelle"),
+    ("impact_analysis", "Impact"),
+)
+
+#: Statuts d'information qui engagent un dossier. Les autres sont signales.
+TRUSTED_STATUSES = frozenset({"VERIFIED", "PROVIDED_BY_USER"})
+
+SEVERITY_LABELS = {
+    "CRITICAL": "Bloquant",
+    "MAJOR": "Important",
+    "MINOR": "Mineur",
+    "PASS": "Conforme",
+}
+
+VERDICT_LABELS = {
+    "PASS": "conforme",
+    "PASS_WITH_WARNINGS": "conforme, avec réserves",
+    "REQUIRES_CORRECTION": "à corriger",
+    "BLOCKED": "bloqué",
+}
+
+AGENT_LABELS = {
+    "DEVELOPMENT": "Développement",
+    "SCREENWRITER": "Scénario",
+    "DIRECTOR": "Réalisation",
+    "PRODUCER": "Production",
+    "FINANCING": "Financement",
+    "IMPACT": "Impact",
+    "CONSISTENCY_VALIDATOR": "Contrôle de cohérence",
+    "FUNDING_PACKAGE_VALIDATOR": "Contrôle du dossier",
+}
+
+
+def _render_value(value) -> str:
+    """Rend une valeur de section en texte lisible.
+
+    Les sections sont des dictionnaires libres : leur contenu change d'un
+    projet a l'autre, et l'export ne peut pas presumer de leur forme.
+    """
+    if isinstance(value, list):
+        return " · ".join(_render_value(item) for item in value)
+    if isinstance(value, dict):
+        return " · ".join(f"{key} : {_render_value(item)}" for key, item in value.items())
+    if isinstance(value, bool):
+        return "oui" if value else "non"
+    return str(value)

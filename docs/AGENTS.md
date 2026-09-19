@@ -258,23 +258,54 @@ manque que la capture d'écran a révélé, pas les tests.
 **Rien ne se présente comme validé.** Quand le dossier est exportable, l'écran
 rappelle qu'une relecture humaine reste due.
 
+## L'export PDF
+
+`GET /projects/{id}/export/dossier/pdf`, et un bouton sur l'écran.
+
+**Deux documents différents selon l'état, et la différence est voulue.**
+
+Validé, le PDF est propre : page de garde, sections dans l'ordre de la chaîne,
+rien d'autre. C'est le document qu'un comité de lecture peut recevoir.
+
+Non validé, le même contenu porte **« BROUILLON — dossier non validé »** en rouge
+dès la première page, le nom du fichier le dit aussi, et les constats à traiter
+sont annexés. C'est la seule raison de produire ce PDF-là.
+
+**L'export n'est jamais refusé.** Un auteur a le droit de lire son travail en
+cours ; ce qui est interdit, c'est qu'un brouillon puisse passer pour un
+document abouti. D'où la double marque, dans le fichier *et* dans son nom : un
+fichier renommé perdrait l'une, pas l'autre.
+
+**Les constats restent dehors quand le dossier est validé.** Ce sont des notes
+d'assurance qualité interne ; les exposer à un financeur desservirait le projet.
+Un constat mineur ne bloque donc pas l'export, et ne s'y retrouve pas non plus.
+
+**Une information non vérifiée est signalée comme telle.** Une logline au statut
+`ASSUMPTION` ou `TO_BE_VERIFIED` est suivie d'une mention explicite plutôt que
+présentée comme un fait — c'est la règle « l'IA n'invente rien » appliquée au
+document qui sort.
+
+Les tests lisent le PDF produit (`pypdf`, dépendance de test uniquement) plutôt
+que de se contenter de vérifier qu'un fichier commence par `%PDF` : ce qui
+compte est ce que le document dit, pas qu'il existe.
+
 ## Ce qui est construit, et ce qui ne l'est pas
 
 **En place** : les huit agents, les contrats, le moteur, l'orchestrateur, la
-persistance, la file, les routes, **et l'écran**. La chaîne est utilisable de
-bout en bout par un auteur. **112 tests backend** la couvrent, plus 3 parcours
-de bout en bout.
+persistance, la file, les routes, l'écran, **et l'export PDF**. La chaîne est
+utilisable de bout en bout, du lancement au document téléchargeable.
+**123 tests backend** la couvrent, plus 3 parcours de bout en bout.
 
 **Pas encore** :
 
-1. **L'export du dossier en PDF/DOCX.** `final_documents` existe et attend ;
-   l'export actuel porte sur les documents, pas sur le dossier de la chaîne.
-2. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
+1. **Le worker en production.** Le code le gère, mais tant que `REDIS_URL` est
    vide, l'API exécute le passage elle-même — vingt minutes de requête ouverte.
    Sur un hébergement sans worker, c'est la limite décrite dans
    [`deploy/VERCEL.md`](../deploy/VERCEL.md).
+2. **L'export DOCX du dossier.** Le PDF existe ; certains fonds demandent du
+   Word. La brique est là (`document_to_docx`), il reste à l'appliquer au
+   dossier.
 3. **Une décision produit à prendre** : l'offre gratuite accorde **un** crédit,
    une chaîne en coûte **huit**. Un compte gratuit ne peut donc jamais essayer
    la fonction principale du produit. Le refus est propre et lisible, mais c'est
-   un arbitrage commercial, pas un défaut technique — à trancher avant la mise
-   en ligne.
+   un arbitrage commercial, pas un défaut technique.
