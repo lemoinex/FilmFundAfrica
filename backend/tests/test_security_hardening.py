@@ -160,3 +160,72 @@ def test_login_verifies_a_hash_even_for_unknown_accounts(client, monkeypatch):
         json={"email": "inconnu@example.com", "password": "MotDePasse123"},
     )
     assert calls == [auth_service.DUMMY_PASSWORD_HASH]
+
+
+# ----------------------------------------------------------------------
+# Une variable d'environnement vide n'est pas une variable renseignée
+
+
+def test_an_empty_typed_variable_falls_back_to_its_default(monkeypatch):
+    """Le défaut corrigé : le premier déploiement répondait 500.
+
+    Recopier les clés de `.env.example` dans un tableau de bord sans leurs
+    valeurs — le geste le plus naturel — produisait des variables vides.
+    Pydantic tentait alors de lire `''` comme un entier et refusait de
+    démarrer, sur une erreur illisible depuis l'extérieur
+    (`FUNCTION_INVOCATION_FAILED`).
+    """
+    from app.core.config import Settings
+
+    for nom in (
+        "RATE_LIMIT_AI_PER_MINUTE",
+        "AI_MAX_OUTPUT_TOKENS",
+        "REDIS_TIMEOUT_SECONDS",
+        "SENTRY_TRACES_SAMPLE_RATE",
+        "PAYMENT_PROVIDER",
+        "AI_PROVIDER",
+        "ENVIRONMENT",
+    ):
+        monkeypatch.setenv(nom, "")
+
+    settings = Settings(_env_file=None)
+    assert settings.rate_limit_ai_per_minute == 10
+    assert settings.ai_max_output_tokens == 8000
+    assert settings.redis_timeout_seconds == 0.25
+    assert settings.sentry_traces_sample_rate == 0.0
+    assert settings.payment_provider == "manual"
+    assert settings.ai_provider == "mock"
+    assert settings.environment == "development"
+
+
+def test_an_empty_value_that_means_something_is_left_alone(monkeypatch):
+    """« Vide » est une valeur pour certains réglages, et le reste.
+
+    `REDIS_URL` vide veut dire « pas de Redis », `AI_EFFORT` vide « laisse le
+    serveur décider », `CORS_ORIGINS` vide « aucune origine autorisée ».
+    Leur substituer un défaut changerait le comportement demandé — et pour
+    `CORS_ORIGINS`, rouvrirait `localhost` en production.
+    """
+    from app.core.config import Settings
+
+    for nom in ("REDIS_URL", "AI_EFFORT", "CORS_ORIGINS", "SENTRY_DSN", "AI_MODEL"):
+        monkeypatch.setenv(nom, "")
+
+    settings = Settings(_env_file=None)
+    assert settings.redis_url == ""
+    assert settings.ai_effort == ""
+    assert settings.cors_origins == ""
+    assert settings.cors_origin_list == []
+    assert settings.sentry_dsn == ""
+    assert settings.ai_model == ""
+
+
+def test_a_variable_that_is_set_still_wins(monkeypatch):
+    """La correction ne doit pas avaler les valeurs réelles."""
+    from app.core.config import Settings
+
+    monkeypatch.setenv("RATE_LIMIT_AI_PER_MINUTE", "42")
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    settings = Settings(_env_file=None)
+    assert settings.rate_limit_ai_per_minute == 42
+    assert settings.ai_provider == "anthropic"

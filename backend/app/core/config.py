@@ -9,7 +9,14 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import (
+    Field,
+    TypeAdapter,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Secret de developpement, volontairement reconnaissable.
@@ -152,6 +159,33 @@ class Settings(BaseSettings):
     storage_backend: Literal["local", "s3"] = "local"
 
     frontend_url: str = Field(default="http://localhost:3000")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _empty_means_unset(cls, value: object, info: ValidationInfo) -> object:
+        """Une variable d'environnement vide vaut « non renseignée ».
+
+        Le defaut corrige : `RATE_LIMIT_AI_PER_MINUTE=` (vide) faisait
+        echouer le demarrage avec « unable to parse string as an integer »,
+        et l'API repondait 500 sans rien d'exploitable. C'est pourtant ce
+        qu'on obtient en recopiant les cles de `.env.example` dans un tableau
+        de bord sans leurs valeurs — le geste le plus naturel au premier
+        deploiement.
+
+        **Sauf la ou la chaine vide est une valeur.** `REDIS_URL` vide veut
+        dire « pas de Redis », `AI_EFFORT` vide « laisse le serveur decider »,
+        `CORS_ORIGINS` vide « aucune origine autorisee ». On ne remplace donc
+        que ce que le type refuse : si l'annotation accepte `""`, la valeur
+        est intentionnelle et reste telle quelle.
+        """
+        if value != "" or info.field_name is None:
+            return value
+        field = cls.model_fields[info.field_name]
+        try:
+            TypeAdapter(field.annotation).validate_python("")
+        except ValidationError:
+            return field.get_default(call_default_factory=True)
+        return value
 
     @field_validator("database_url")
     @classmethod
