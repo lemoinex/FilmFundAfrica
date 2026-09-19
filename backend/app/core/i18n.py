@@ -132,6 +132,7 @@ FR: dict[str, str] = {
         "réalisable avec la configuration actuelle : {maximum} minutes."
     ),
     "prompt.notFound": "Aucun prompt n'est défini pour le document « {document} ».",
+    "agent.notFound": "Aucun agent n'est défini pour le rôle « {agent} ».",
     "ai.providerUnknown": (
         "Fournisseur IA inconnu : « {name} ». Valeurs acceptées : anthropic, openai, "
         "mock."
@@ -441,6 +442,7 @@ EN: dict[str, str] = {
         "{maximum} minutes."
     ),
     "prompt.notFound": "No prompt is defined for the “{document}” document.",
+    "agent.notFound": "No agent is defined for the “{agent}” role.",
     "ai.providerUnknown": (
         "Unknown AI provider: “{name}”. Accepted values: anthropic, openai, mock."
     ),

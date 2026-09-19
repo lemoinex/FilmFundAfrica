@@ -174,3 +174,58 @@ class JobStatus(StrEnum):
     @property
     def is_final(self) -> bool:
         return self in (JobStatus.SUCCEEDED, JobStatus.FAILED)
+
+
+class AgentRole(StrEnum):
+    """Les huit agents de la chaine, dans l'ordre ou ils interviennent.
+
+    L'ordre de declaration est celui du pipeline : `AGENT_PIPELINE` s'en sert
+    plutot que de redire la sequence ailleurs.
+    """
+
+    DEVELOPMENT = "DEVELOPMENT"
+    SCREENWRITER = "SCREENWRITER"
+    DIRECTOR = "DIRECTOR"
+    PRODUCER = "PRODUCER"
+    FINANCING = "FINANCING"
+    IMPACT = "IMPACT"
+    CONSISTENCY_VALIDATOR = "CONSISTENCY_VALIDATOR"
+    FUNDING_PACKAGE_VALIDATOR = "FUNDING_PACKAGE_VALIDATOR"
+
+
+class ConfidenceStatus(StrEnum):
+    """Statut d'une information portee par l'etat du projet.
+
+    Aucune information n'est nue : elle porte toujours d'ou elle vient. C'est
+    ce qui permet de refuser qu'une hypothese soit presentee comme un fait, et
+    de savoir ce qu'il reste a verifier avant de soumettre un dossier.
+    """
+
+    VERIFIED = "VERIFIED"
+    PROVIDED_BY_USER = "PROVIDED_BY_USER"
+    INFERRED = "INFERRED"
+    ASSUMPTION = "ASSUMPTION"
+    TO_BE_VERIFIED = "TO_BE_VERIFIED"
+    UNKNOWN = "UNKNOWN"
+
+
+class Severity(StrEnum):
+    """Gravite d'un constat, des validateurs jusqu'aux drapeaux du dossier."""
+
+    CRITICAL = "CRITICAL"
+    MAJOR = "MAJOR"
+    MINOR = "MINOR"
+    PASS = "PASS"
+
+
+class ValidationVerdict(StrEnum):
+    """Verdict rendu par un validateur.
+
+    `BLOCKED` n'est pas un echec technique mais un refus motive : le dossier
+    existe, il ne doit simplement pas partir en l'etat.
+    """
+
+    PASS = "PASS"
+    PASS_WITH_WARNINGS = "PASS_WITH_WARNINGS"
+    REQUIRES_CORRECTION = "REQUIRES_CORRECTION"
+    BLOCKED = "BLOCKED"

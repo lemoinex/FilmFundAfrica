@@ -68,6 +68,7 @@ filmfund-africa/
 │   │   ├── api/v1/     Routes HTTP
 │   │   ├── core/       Configuration, sécurité, base de données, erreurs, logs
 │   │   ├── models/     Tables SQLAlchemy (22 tables)
+│   │   ├── agents/     Chaîne d'agents du dossier (voir docs/AGENTS.md)
 │   │   ├── prompts/    Prompts versionnés, un module par document
 │   │   ├── repositories/  Requêtes SQL isolées
 │   │   ├── schemas/    Contrats d'entrée/sortie Pydantic
@@ -75,7 +76,7 @@ filmfund-africa/
 │   │   └── workers/    Worker de génération + tâches planifiées (n8n)
 │   ├── alembic/        Migrations
 │   ├── scripts/seed.py Données de démonstration
-│   └── tests/          289 tests (pytest)
+│   └── tests/          340 tests (pytest)
 ├── frontend/           Next.js 14 (App Router), TypeScript, Tailwind
 ├── database/           Initialisation PostgreSQL
 ├── docs/               État du projet, décisions d'architecture
@@ -530,7 +531,7 @@ pointe un binaire déjà présent.
 
 ```bash
 cd backend
-pytest                    # 289 tests
+pytest                    # 340 tests
 ruff check .              # lint
 ```
 
