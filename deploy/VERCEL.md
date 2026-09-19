@@ -64,10 +64,28 @@ inter-origines : le frontend appelle l'API sur son propre domaine, et CORS ne se
 | `backend` | `ENVIRONMENT` | `production` |
 | `backend` | `DEBUG` | **rien à poser** : déduit de `ENVIRONMENT=production` |
 | `backend` | `JWT_SECRET` | `openssl rand -hex 32`, au moins 32 caractères |
+| `backend` | `SECRETS_KEY` | `openssl rand -hex 32` — chiffre les clés d'IA déposées depuis l'administration. Absente, `JWT_SECRET` en tient lieu : faire tourner l'un rend alors les clés illisibles |
 | `backend` | `CORS_ORIGINS` | le même domaine, par sécurité |
 | `backend` | `FRONTEND_URL` | idem, pour les liens des e-mails |
 | `backend` | `AI_PROVIDER`, `AI_API_KEY` | sinon les documents ne sont pas rédigés |
 | `backend` | `SMTP_*` | sinon aucun compte ne peut être activé |
+
+### Poser une variable ne suffit pas : il faut redéployer
+
+Vercel fige les variables au moment où le déploiement est **créé**. Les
+modifier dans les réglages ne touche pas le déploiement en cours : il
+continue de tourner avec les valeurs qu'il avait à sa naissance. Sans
+redéploiement, on constate exactement ce qu'on croyait venir de corriger —
+`/health` répondant `environment: development` et `database: unreachable`
+alors que `ENVIRONMENT` et `DATABASE_URL` viennent d'être renseignées.
+
+*Deployments* → le déploiement de production le plus récent → **⋯** →
+**Redeploy**. Un nouveau commit sur la branche de production fait de même.
+
+C'est aussi le test le plus rapide de la configuration : après
+redéploiement, `/health` doit répondre `environment: production` et
+`database: ok`. Tant que `database` reste `unreachable`, c'est `DATABASE_URL`
+qu'il faut relire — pooler Supabase, mode session, port 5432.
 
 ## La limite à connaître avant de s'engager
 
