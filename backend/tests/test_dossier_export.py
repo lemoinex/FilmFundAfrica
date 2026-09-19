@@ -244,3 +244,161 @@ def _pdf_text(reader_cls, content: bytes) -> str:
 
     reader = reader_cls(io.BytesIO(content))
     return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+# ----------------------------------------------------------------------
+# Word : mêmes règles, format modifiable
+
+
+def _docx(client, headers, project_id):
+    return client.get(f"/api/v1/projects/{project_id}/export/dossier/docx", headers=headers)
+
+
+def _docx_text(content: bytes) -> str:
+    import io
+
+    from docx import Document as DocxDocument
+
+    return "\n".join(p.text for p in DocxDocument(io.BytesIO(content)).paragraphs)
+
+
+def test_nothing_to_export_in_word_either(client, paid):
+    headers, project_id = paid
+    assert _docx(client, headers, project_id).json()["code"] == "dossier_not_built"
+
+
+def test_a_validated_dossier_exports_as_a_word_file(client, paid, monkeypatch):
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted())
+
+    response = _docx(client, headers, project_id)
+    assert response.status_code == 200
+    assert "wordprocessingml" in response.headers["content-type"]
+    # Un .docx est une archive zip : la signature le prouve mieux qu'un nom.
+    assert response.content.startswith(b"PK")
+    assert "BROUILLON" not in response.headers["content-disposition"]
+
+
+def test_the_word_draft_carries_the_same_warning(client, paid, monkeypatch):
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted("BLOCKED", _blocking()))
+
+    response = _docx(client, headers, project_id)
+    assert "BROUILLON" in response.headers["content-disposition"]
+
+    text = _docx_text(response.content)
+    assert "BROUILLON" in text
+    assert "ne doit pas être soumis" in text
+    assert "bloqué" in text
+
+
+def test_the_two_formats_say_the_same_thing(client, paid, monkeypatch):
+    """Si les avertissements divergeaient, un format serait moins clair.
+
+    C'est la raison d'être des textes partagés : ce test échoue dès que l'un
+    des deux exports se met à raconter autre chose.
+    """
+    from pypdf import PdfReader
+
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted("BLOCKED", _blocking()))
+
+    pdf = _pdf_text(PdfReader, _export(client, headers, project_id).content)
+    word = _docx_text(_docx(client, headers, project_id).content)
+
+    for phrase in (
+        "BROUILLON — dossier non validé.",
+        "ne doit pas être soumis en l'état",
+        "Points à traiter",
+        "Aucun budget fourni",
+        "Chiffrer les 24 jours",
+    ):
+        assert phrase in pdf, f"absent du PDF : {phrase}"
+        assert phrase in word, f"absent du Word : {phrase}"
+
+
+def test_word_findings_stay_out_of_a_validated_dossier(client, paid, monkeypatch):
+    headers, project_id = paid
+    minor = [
+        {
+            "severity": "MINOR",
+            "element": "titre",
+            "description": "Formulation perfectible du titre.",
+            "owner": "DEVELOPMENT",
+        }
+    ]
+    _run_chain(client, headers, project_id, monkeypatch, Scripted("PASS_WITH_WARNINGS", minor))
+
+    text = _docx_text(_docx(client, headers, project_id).content)
+    assert "Points à traiter" not in text
+    assert "Formulation perfectible" not in text
+    assert "relecture humaine" in text
+
+
+def test_the_word_document_stays_editable(client, paid, monkeypatch):
+    """Tout l'intérêt du format : un financeur qui annote doit pouvoir écrire."""
+    import io
+
+    from docx import Document as DocxDocument
+
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted())
+
+    document = DocxDocument(io.BytesIO(_docx(client, headers, project_id).content))
+    document.add_paragraph("Annotation d'un lecteur.")
+    again = io.BytesIO()
+    document.save(again)
+    assert "Annotation d'un lecteur." in _docx_text(again.getvalue())
+
+
+def test_the_free_plan_cannot_export_word_either(client, make_user):
+    headers, _ = make_user("gratuit-docx@example.com")
+    project_id = client.post(
+        "/api/v1/projects",
+        json={"title": "Projet gratuit", "project_type": "DOCUMENTARY"},
+        headers=headers,
+    ).json()["id"]
+    assert _docx(client, headers, project_id).status_code == 402
+
+
+def test_the_word_draft_warning_is_visually_distinct(client, paid, monkeypatch):
+    """Le gras seul se confond avec un intertitre : c'est la couleur qui alerte.
+
+    Testé parce qu'une régression ici est invisible à la relecture du code et
+    ne casse aucune autre assertion — le document resterait « correct ».
+    """
+    import io
+
+    from docx import Document as DocxDocument
+
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted("BLOCKED", _blocking()))
+
+    document = DocxDocument(io.BytesIO(_docx(client, headers, project_id).content))
+    lead = next(
+        run
+        for paragraph in document.paragraphs
+        for run in paragraph.runs
+        if "BROUILLON" in run.text
+    )
+    assert lead.bold
+    assert lead.font.color.rgb is not None, "un avertissement en noir passe inaperçu"
+
+
+def test_a_validated_word_dossier_has_no_red_warning(client, paid, monkeypatch):
+    import io
+
+    from docx import Document as DocxDocument
+
+    headers, project_id = paid
+    _run_chain(client, headers, project_id, monkeypatch, Scripted())
+
+    document = DocxDocument(io.BytesIO(_docx(client, headers, project_id).content))
+    lead = next(
+        run
+        for paragraph in document.paragraphs
+        for run in paragraph.runs
+        if "Dossier contrôlé" in run.text
+    )
+    assert lead.bold
+    assert lead.font.color.rgb is None

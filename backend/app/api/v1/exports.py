@@ -27,12 +27,54 @@ def _filename(value: str, extension: str) -> str:
     return f"{slug}.{extension}"
 
 
+def _dossier_filename(title: str, exportable: bool, extension: str) -> str:
+    """Le nom dit l'état : il survit au téléchargement, l'écran non."""
+    suffix = "dossier" if exportable else "dossier_BROUILLON"
+    return _filename(f"{title}_{suffix}", extension)
+
+
 def _attachment(content: bytes, media_type: str, filename: str) -> Response:
     return Response(
         content=content,
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _agent_dossier_context(project, db):
+    """Dossier, verdict et constats du dernier passage.
+
+    Partage par les deux formats : leur decision d'affichage repose sur les
+    memes faits, et les dupliquer les ferait diverger tot ou tard.
+    """
+    from sqlalchemy import select
+
+    from app.agents import is_exportable
+    from app.models.agents import AgentRun, DossierFinding
+    from app.services.dossier_service import DossierService
+
+    dossier = DossierService(db).get_or_create(project.id)
+    last = db.scalar(
+        select(AgentRun)
+        .where(AgentRun.dossier_id == dossier.id)
+        .order_by(AgentRun.created_at.desc())
+        .limit(1)
+    )
+    if last is None:
+        # Rien a exporter tant que la chaine n'a pas tourne : un document vide
+        # serait plus deroutant qu'une erreur qui dit quoi faire.
+        raise AppError("export.dossierNotBuilt", code="dossier_not_built")
+
+    findings = list(
+        db.scalars(
+            select(DossierFinding).where(
+                DossierFinding.dossier_id == dossier.id,
+                DossierFinding.resolved_at.is_(None),
+            )
+        )
+    )
+    exportable = bool(last.verdict and is_exportable(last.verdict))
+    return dossier, exportable, last.verdict, findings
 
 
 @router.get("/pdf", summary="Exporter le dossier complet en PDF")
@@ -57,44 +99,31 @@ def export_agent_dossier_pdf(project: OwnedProject, db: DbSession) -> Response:
     L'export n'est jamais refusé : un auteur a le droit de lire son travail en
     cours. Ce qui est interdit, c'est qu'un brouillon se présente comme abouti.
     """
-    from sqlalchemy import select
-
-    from app.agents import is_exportable
-    from app.models.agents import AgentRun, DossierFinding
-    from app.services.dossier_service import DossierService
-
-    dossier = DossierService(db).get_or_create(project.id)
-    last = db.scalar(
-        select(AgentRun)
-        .where(AgentRun.dossier_id == dossier.id)
-        .order_by(AgentRun.created_at.desc())
-        .limit(1)
-    )
-    if last is None:
-        # Rien a exporter tant que la chaine n'a pas tourne : un PDF vide
-        # serait plus deroutant qu'une erreur qui dit quoi faire.
-        raise AppError("export.dossierNotBuilt", code="dossier_not_built")
-
-    exportable = bool(last.verdict and is_exportable(last.verdict))
-    findings = list(
-        db.scalars(
-            select(DossierFinding).where(
-                DossierFinding.dossier_id == dossier.id,
-                DossierFinding.resolved_at.is_(None),
-            )
-        )
-    )
-
+    dossier, exportable, verdict, findings = _agent_dossier_context(project, db)
     content = ExportService(db).agent_dossier_to_pdf(
-        project,
-        dossier,
-        exportable=exportable,
-        verdict=last.verdict,
-        findings=findings,
+        project, dossier, exportable=exportable, verdict=verdict, findings=findings
     )
-    suffix = "dossier" if exportable else "dossier_BROUILLON"
     return _attachment(
-        content, "application/pdf", _filename(f"{project.title}_{suffix}", "pdf")
+        content, "application/pdf", _dossier_filename(project.title, exportable, "pdf")
+    )
+
+
+@router.get("/dossier/docx", summary="Exporter le dossier de la chaîne d'agents en Word")
+def export_agent_dossier_docx(project: OwnedProject, db: DbSession) -> Response:
+    """Le même dossier, modifiable.
+
+    Certains fonds n'acceptent que du Word, souvent parce qu'ils annotent le
+    dossier avant de le rendre. Contenu et avertissements sont identiques au
+    PDF : ils sont partagés, pas recopiés.
+    """
+    dossier, exportable, verdict, findings = _agent_dossier_context(project, db)
+    content = ExportService(db).agent_dossier_to_docx(
+        project, dossier, exportable=exportable, verdict=verdict, findings=findings
+    )
+    return _attachment(
+        content,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        _dossier_filename(project.title, exportable, "docx"),
     )
 
 

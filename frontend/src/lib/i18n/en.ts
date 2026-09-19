@@ -518,6 +518,7 @@ export const en: Record<MessageKey, string> = {
   "dossier.noHistoryHint": "Changes will appear here from the first run.",
   "dossier.exportPdf": "Export the package (PDF)",
   "dossier.exportDraft": "Export the draft (PDF)",
+  "dossier.exportDocx": "Export as Word",
   "dossier.exportFailed": "Export failed.",
   "dossier.findings": "Findings",
   "dossier.noFinding": "No open finding.",

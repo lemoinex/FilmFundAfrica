@@ -66,7 +66,7 @@ export default function DossierPage() {
   const [progress, setProgress] = useState<GenerationJob | null>(null);
   const [outcome, setOutcome] = useState<AgentChainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
 
   const refresh = useCallback(
     async (withResolved: boolean) => {
@@ -126,20 +126,20 @@ export default function DossierPage() {
     }
   }
 
-  async function handleExport() {
-    setExporting(true);
+  async function handleExport(format: "pdf" | "docx") {
+    setExporting(format);
     setError(null);
     try {
       // Le nom du fichier vient du serveur : c'est lui qui sait si le dossier
       // part en « brouillon », et ce mot ne doit pas se perdre en route.
       await downloadExport(
-        `/api/v1/projects/${id}/export/dossier/pdf`,
-        `${project?.title ?? t("dossier.title")}.pdf`,
+        `/api/v1/projects/${id}/export/dossier/${format}`,
+        `${project?.title ?? t("dossier.title")}.${format}`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("dossier.exportFailed"));
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
@@ -247,15 +247,26 @@ export default function DossierPage() {
             {neverRan ? t("dossier.run") : t("dossier.rerun")}
           </button>
           {!neverRan ? (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleExport}
-              disabled={exporting}
-            >
-              {exporting ? <Spinner /> : null}
-              {status.exportable ? t("dossier.exportPdf") : t("dossier.exportDraft")}
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleExport("pdf")}
+                disabled={exporting !== null}
+              >
+                {exporting === "pdf" ? <Spinner /> : null}
+                {status.exportable ? t("dossier.exportPdf") : t("dossier.exportDraft")}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleExport("docx")}
+                disabled={exporting !== null}
+              >
+                {exporting === "docx" ? <Spinner /> : null}
+                {t("dossier.exportDocx")}
+              </button>
+            </>
           ) : null}
           <span className="text-sm text-slatey-400">
             {tn("dossier.cost", AGENT_COUNT, { count: AGENT_COUNT })}

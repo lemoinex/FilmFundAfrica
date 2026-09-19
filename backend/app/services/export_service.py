@@ -274,22 +274,12 @@ class ExportService:
         """Ce que le lecteur doit savoir avant la premiere ligne du dossier."""
         blocks: list = []
         if exportable:
-            blocks.append(
-                Paragraph(
-                    "<b>Dossier contrôlé.</b> Une relecture humaine reste due avant "
-                    "toute soumission : ce document est une aide à la constitution, "
-                    "pas une garantie d'éligibilité.",
-                    body,
-                )
-            )
+            lead, rest = VALIDATED_NOTICE
+            blocks.append(Paragraph(f"<b>{_escape_xml(lead)}</b> {_escape_xml(rest)}", body))
         else:
+            lead, rest = DRAFT_WARNING
             blocks.append(
-                Paragraph(
-                    "<b>BROUILLON — dossier non validé.</b> Les contrôles ont relevé "
-                    "des points à traiter : ce document ne doit pas être soumis en "
-                    "l'état. Les constats figurent en fin de document.",
-                    warning,
-                )
+                Paragraph(f"<b>{_escape_xml(lead)}</b> {_escape_xml(rest)}", warning)
             )
         if verdict:
             # Le libellé, pas la valeur de l'énumération : « BLOCKED » dans un
@@ -305,10 +295,7 @@ class ExportService:
             blocks.append(Paragraph(_inline_to_reportlab(str(logline["value"])), body))
             if logline.get("status") not in TRUSTED_STATUSES:
                 blocks.append(
-                    Paragraph(
-                        "<i>Information non vérifiée — à confirmer avant soumission.</i>",
-                        body,
-                    )
+                    Paragraph(f"<i>{_escape_xml(UNVERIFIED_NOTICE)}</i>", body)
                 )
         return blocks
 
@@ -341,13 +328,7 @@ class ExportService:
             rendered += 1
 
         if rendered == 0:
-            story.append(
-                Paragraph(
-                    "Aucune section n'a encore été produite. Lancez la chaîne "
-                    "d'agents pour construire le dossier.",
-                    body,
-                )
-            )
+            story.append(Paragraph(_escape_xml(EMPTY_DOSSIER_NOTICE), body))
         return story
 
     # ------------------------------------------------------------------
@@ -355,13 +336,9 @@ class ExportService:
     def _dossier_findings(findings: list, body, styles) -> list:
         """Les constats a traiter, avec l'agent capable de les corriger."""
         story: list = [
-            Paragraph("Points à traiter", styles["Heading1"]),
+            Paragraph(FINDINGS_TITLE, styles["Heading1"]),
             Spacer(1, 0.3 * cm),
-            Paragraph(
-                "Cette section est interne : elle n'a pas vocation à être "
-                "transmise à un financeur.",
-                body,
-            ),
+            Paragraph(_escape_xml(FINDINGS_NOTICE), body),
             Spacer(1, 0.4 * cm),
         ]
         for finding in findings:
@@ -385,6 +362,124 @@ class ExportService:
                 )
             story.append(Spacer(1, 0.35 * cm))
         return story
+
+    # ------------------------------------------------------------------
+    def agent_dossier_to_docx(
+        self,
+        project: Project,
+        dossier,
+        *,
+        exportable: bool,
+        verdict: str | None,
+        findings: list | None = None,
+    ) -> bytes:
+        """Le dossier de la chaine en Word, aux memes regles que le PDF.
+
+        Certains fonds n'acceptent que du Word, et souvent parce qu'ils
+        annotent le dossier avant de le rendre. Le contenu et les
+        avertissements sont donc identiques au PDF — ils sont partages — mais
+        le document reste modifiable, ce qui est tout l'interet du format.
+        """
+        docx = DocxDocument()
+        style = docx.styles["Normal"]
+        style.font.name = "Calibri"
+        style.font.size = Pt(11)
+
+        heading = docx.add_heading(project.title, level=0)
+        heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        meta = " · ".join(
+            part
+            for part in [
+                str(project.project_type).replace("_", " ").title(),
+                project.genre,
+                f"{project.duration} min" if project.duration else None,
+                project.country,
+            ]
+            if part
+        )
+        if meta:
+            subtitle = docx.add_paragraph(meta)
+            subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            subtitle.runs[0].font.color.rgb = RGBColor(0x6B, 0x6B, 0x6B)
+
+        docx.add_paragraph()
+        self._docx_banner(docx, dossier, exportable, verdict)
+        docx.add_paragraph()
+        docx.add_paragraph(f"Généré le {date.today():%d/%m/%Y} — FilmFund Africa")
+
+        self._docx_sections(docx, dossier)
+
+        if not exportable and findings:
+            docx.add_page_break()
+            self._docx_findings(docx, findings)
+
+        buffer = io.BytesIO()
+        docx.save(buffer)
+        return buffer.getvalue()
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _docx_banner(docx, dossier, exportable: bool, verdict) -> None:
+        lead, rest = VALIDATED_NOTICE if exportable else DRAFT_WARNING
+        paragraph = docx.add_paragraph()
+        run = paragraph.add_run(lead)
+        run.bold = True
+        if not exportable:
+            # Le gras seul ne suffit pas : dans un document que l'on parcourt,
+            # c'est la couleur qui empeche de confondre brouillon et final.
+            run.font.color.rgb = RGBColor(0xB0, 0x38, 0x12)
+        paragraph.add_run(" " + rest)
+
+        if verdict:
+            label = VERDICT_LABELS.get(str(verdict), str(verdict))
+            docx.add_paragraph(f"Verdict du dernier contrôle : {label}")
+
+        logline = getattr(dossier, "logline", None) or {}
+        if logline.get("value"):
+            docx.add_paragraph()
+            docx.add_paragraph(str(logline["value"]))
+            if logline.get("status") not in TRUSTED_STATUSES:
+                unverified = docx.add_paragraph(UNVERIFIED_NOTICE)
+                unverified.runs[0].italic = True
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _docx_sections(docx, dossier) -> None:
+        rendered = 0
+        for attribute, label in DOSSIER_SECTIONS:
+            content = getattr(dossier, attribute, None) or {}
+            if not content:
+                continue
+            docx.add_heading(label, level=1)
+            for key, value in content.items():
+                paragraph = docx.add_paragraph()
+                paragraph.add_run(f"{key} : ").bold = True
+                paragraph.add_run(_render_value(value))
+            rendered += 1
+
+        if rendered == 0:
+            docx.add_paragraph(EMPTY_DOSSIER_NOTICE)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _docx_findings(docx, findings: list) -> None:
+        docx.add_heading(FINDINGS_TITLE, level=1)
+        notice = docx.add_paragraph(FINDINGS_NOTICE)
+        notice.runs[0].italic = True
+
+        for finding in findings:
+            severity = SEVERITY_LABELS.get(str(finding.severity), str(finding.severity))
+            paragraph = docx.add_paragraph()
+            paragraph.add_run(f"{severity} — {finding.element}").bold = True
+            docx.add_paragraph(finding.description)
+            owner = AGENT_LABELS.get(str(finding.owner or ""), "")
+            if owner:
+                line = docx.add_paragraph(f"À corriger par : {owner}")
+                line.runs[0].italic = True
+            if finding.suggested_correction:
+                line = docx.add_paragraph(f"Proposition : {finding.suggested_correction}")
+                line.runs[0].italic = True
 
     @staticmethod
     def _markdown_to_flowables(content: str, body: ParagraphStyle, styles) -> list:
@@ -621,6 +716,40 @@ class ExportService:
         else:
             lines.append("Information non fournie.")
         return "\n".join(lines)
+
+
+#: Avertissements portes par le dossier exporte, quel que soit le format.
+#:
+#: Partages entre le PDF et le DOCX a dessein : s'ils divergeaient, un des deux
+#: formats finirait par etre moins clair que l'autre sur ce qui compte le plus
+#: — qu'un brouillon ne passe pas pour un document abouti.
+#:
+#: Chacun se lit en deux parties : une amorce mise en valeur, puis le reste.
+DRAFT_WARNING = (
+    "BROUILLON — dossier non validé.",
+    "Les contrôles ont relevé des points à traiter : ce document ne doit pas être "
+    "soumis en l'état. Les constats figurent en fin de document.",
+)
+
+VALIDATED_NOTICE = (
+    "Dossier contrôlé.",
+    "Une relecture humaine reste due avant toute soumission : ce document est une "
+    "aide à la constitution, pas une garantie d'éligibilité.",
+)
+
+#: Une information dont la provenance n'est pas etablie ne doit pas se lire
+#: comme un fait, meme dans un brouillon.
+UNVERIFIED_NOTICE = "Information non vérifiée — à confirmer avant soumission."
+
+FINDINGS_TITLE = "Points à traiter"
+FINDINGS_NOTICE = (
+    "Cette section est interne : elle n'a pas vocation à être transmise à un financeur."
+)
+
+EMPTY_DOSSIER_NOTICE = (
+    "Aucune section n'a encore été produite. Lancez la chaîne d'agents pour "
+    "construire le dossier."
+)
 
 
 #: Sections du dossier d'agents, dans l'ordre ou la chaine les remplit.

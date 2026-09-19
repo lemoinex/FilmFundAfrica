@@ -527,6 +527,7 @@ export const fr = {
   "dossier.noHistoryHint": "Les modifications apparaîtront ici dès le premier passage.",
   "dossier.exportPdf": "Exporter le dossier (PDF)",
   "dossier.exportDraft": "Exporter le brouillon (PDF)",
+  "dossier.exportDocx": "Exporter en Word",
   "dossier.exportFailed": "Export impossible.",
   "dossier.findings": "Constats",
   "dossier.noFinding": "Aucun constat ouvert.",

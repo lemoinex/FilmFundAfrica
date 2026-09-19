@@ -258,9 +258,11 @@ manque que la capture d'écran a révélé, pas les tests.
 **Rien ne se présente comme validé.** Quand le dossier est exportable, l'écran
 rappelle qu'une relecture humaine reste due.
 
-## L'export PDF
+## L'export
 
-`GET /projects/{id}/export/dossier/pdf`, et un bouton sur l'écran.
+`GET /projects/{id}/export/dossier/pdf` et `…/dossier/docx`, avec leurs boutons
+sur l'écran. Certains fonds n'acceptent que du Word, souvent parce qu'ils
+annotent le dossier avant de le rendre.
 
 **Deux documents différents selon l'état, et la différence est voulue.**
 
@@ -285,16 +287,24 @@ Un constat mineur ne bloque donc pas l'export, et ne s'y retrouve pas non plus.
 présentée comme un fait — c'est la règle « l'IA n'invente rien » appliquée au
 document qui sort.
 
-Les tests lisent le PDF produit (`pypdf`, dépendance de test uniquement) plutôt
-que de se contenter de vérifier qu'un fichier commence par `%PDF` : ce qui
-compte est ce que le document dit, pas qu'il existe.
+**Les deux formats disent exactement la même chose.** Les avertissements sont
+des constantes partagées, pas des textes recopiés : s'ils divergeaient, un des
+deux formats finirait par être moins clair sur ce qui compte le plus. Un test
+compare les deux sorties phrase par phrase et échoue dès que l'une s'écarte.
+
+Les tests lisent les documents produits (`pypdf` pour le PDF, `python-docx` pour
+le Word) plutôt que de vérifier qu'un fichier commence par `%PDF` ou `PK` : ce
+qui compte est ce que le document dit, pas qu'il existe. Deux tests portent même
+sur la mise en forme — l'amorce du brouillon doit être en couleur, car un
+avertissement en noir se confond avec un intertitre, et cette régression-là ne
+casserait rien d'autre.
 
 ## Ce qui est construit, et ce qui ne l'est pas
 
 **En place** : les huit agents, les contrats, le moteur, l'orchestrateur, la
-persistance, la file, les routes, l'écran, **et l'export PDF**. La chaîne est
-utilisable de bout en bout, du lancement au document téléchargeable.
-**123 tests backend** la couvrent, plus 3 parcours de bout en bout.
+persistance, la file, les routes, l'écran, **et les exports PDF et Word**. La
+chaîne est utilisable de bout en bout, du lancement au document téléchargeable.
+**132 tests backend** la couvrent, plus 3 parcours de bout en bout.
 
 **Pas encore** :
 
@@ -302,10 +312,7 @@ utilisable de bout en bout, du lancement au document téléchargeable.
    vide, l'API exécute le passage elle-même — vingt minutes de requête ouverte.
    Sur un hébergement sans worker, c'est la limite décrite dans
    [`deploy/VERCEL.md`](../deploy/VERCEL.md).
-2. **L'export DOCX du dossier.** Le PDF existe ; certains fonds demandent du
-   Word. La brique est là (`document_to_docx`), il reste à l'appliquer au
-   dossier.
-3. **Une décision produit à prendre** : l'offre gratuite accorde **un** crédit,
+2. **Une décision produit à prendre** : l'offre gratuite accorde **un** crédit,
    une chaîne en coûte **huit**. Un compte gratuit ne peut donc jamais essayer
    la fonction principale du produit. Le refus est propre et lisible, mais c'est
    un arbitrage commercial, pas un défaut technique.
