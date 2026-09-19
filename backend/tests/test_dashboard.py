@@ -13,6 +13,41 @@ def test_health_endpoint(client):
     assert body["database"] == "ok"
 
 
+def test_the_probe_names_the_variables_it_received(client, monkeypatch):
+    """Distinguer « mal renseignée » de « jamais transmise ».
+
+    Sans ce repérage, une variable qui n'atteint pas le processus ne se lit
+    que par ses effets — environnement `development`, base injoignable — et
+    l'on ne sait pas s'il faut corriger la valeur ou l'endroit où elle est
+    posée.
+    """
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("SECRETS_KEY", "une-cle-de-test")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+
+    config = client.get("/health").json()["config"]
+    assert config["host"] == "production"
+    assert "SECRETS_KEY" in config["provided"]
+    assert "REDIS_URL" not in config["provided"]
+
+
+def test_an_empty_variable_does_not_count_as_provided(client, monkeypatch):
+    """Une variable vide n'est pas une variable renseignée — ici aussi.
+
+    C'est précisément le cas que la sonde doit rendre visible : coller les
+    noms sans les valeurs produit des variables vides, indiscernables de
+    variables absentes par leurs seuls effets.
+    """
+    monkeypatch.setenv("SECRETS_KEY", "   ")
+    assert "SECRETS_KEY" not in client.get("/health").json()["config"]["provided"]
+
+
+def test_the_probe_never_publishes_a_value(client, monkeypatch):
+    """Les noms sont déjà publics ; les valeurs sont des secrets."""
+    monkeypatch.setenv("JWT_SECRET", "valeur-qui-ne-doit-jamais-sortir")
+    assert "valeur-qui-ne-doit-jamais-sortir" not in client.get("/health").text
+
+
 def test_dashboard_reflects_projects_and_documents(client, auth_headers):
     empty = client.get("/api/v1/dashboard", headers=auth_headers).json()
     assert empty["stats"]["projects"] == 0

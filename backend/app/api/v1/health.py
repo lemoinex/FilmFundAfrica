@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
@@ -12,6 +14,24 @@ from app.core.rate_limit import backend_status
 from app.services.job_queue import job_queue
 
 router = APIRouter(tags=["Système"])
+
+#: Variables que la sonde signale comme transmises ou non.
+#:
+#: Seuls les **noms** sortent d'ici, jamais les valeurs ni leur longueur —
+#: et ces noms sont deja publics, `.env.example` les liste. Ce qui manquait
+#: etait ailleurs : quand une valeur n'arrive pas jusqu'au processus, on
+#: n'en lit que l'effet — « environnement `development` », « base
+#: injoignable » — jamais la cause. Trois redeploiements ont ete necessaires
+#: pour distinguer *mal renseignee* de *jamais transmise*, faute de pouvoir
+#: poser la question directement.
+WATCHED_ENV = (
+    "DATABASE_URL",
+    "ENVIRONMENT",
+    "JWT_SECRET",
+    "SECRETS_KEY",
+    "REDIS_URL",
+    "AI_PROVIDER",
+)
 
 
 @router.get("/health", summary="Sonde de santé")
@@ -51,4 +71,16 @@ def health(db: DbSession) -> dict:
         "platform_mode": settings.platform_mode,
         "ai_provider": settings.ai_provider,
         "ai_configured": settings.ai_provider == "mock" or bool(settings.ai_api_key),
+        # `host` vaut la valeur que l'hebergeur injecte lui-meme (sur Vercel,
+        # `VERCEL_ENV`). Vide alors que `provided` l'est aussi, le processus
+        # ne recoit aucune variable et le probleme est en amont de
+        # l'application. Renseigne alors que `provided` reste incomplet, les
+        # variables manquantes n'ont pas ete transmises a CE service — mauvaise
+        # portee, valeur vide, ou deploiement anterieur a leur enregistrement.
+        "config": {
+            "host": os.environ.get("VERCEL_ENV", ""),
+            "provided": [
+                name for name in WATCHED_ENV if os.environ.get(name, "").strip()
+            ],
+        },
     }
